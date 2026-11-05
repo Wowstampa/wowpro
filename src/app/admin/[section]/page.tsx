@@ -7,6 +7,9 @@ import {AdminFeedbackBoard, type AdminFeedback} from '@/components/admin-feedbac
 import {createAdminClient} from '@/lib/supabase/admin.server';
 import {requireProfile} from '@/lib/auth';
 import {AdminTeamDirectory, type TeamOperator} from '@/components/admin-team-directory';
+import {AdminFileStorage} from '@/components/admin-file-storage';
+import {getFileStorageSummary} from '@/lib/file-archive';
+import {ARCHIVE_AFTER_DAYS, STORAGE_LIMIT_BYTES, listRequestFiles} from '@/lib/request-files';
 
 const titles: Record<string, string> = {
   clienti: 'Clienti',
@@ -80,6 +83,7 @@ async function RequestsPage() {
   let requests: AdminGraphicRequest[] = [];
   let clients: {recordId: string; companyName: string}[] = [];
   let graphicOperators: {id: string; name: string}[] = [];
+  let storage: Awaited<ReturnType<typeof getFileStorageSummary>> | null = null;
   let hasLoadError = false;
   try {
     const admin = createAdminClient();
@@ -96,6 +100,8 @@ async function RequestsPage() {
       .filter(({fields}) => !fields.archiviato)
       .map(({id, fields}) => ({recordId: id, companyName: fields.ragione_sociale || fields.cliente_id || 'Cliente WOWPRO'}));
     graphicOperators = (operatorRows || []).filter((operator) => operator.role === 'graphic_operator').map((operator) => ({id: operator.id, name: operator.full_name || operator.email}));
+    const filesByRequest = await listRequestFiles((data || []).map((graphicRequest) => graphicRequest.id));
+    try { storage = await getFileStorageSummary(); } catch (storageError) { console.error('[File storage summary]', storageError); }
     requests = (data || []).map((graphicRequest) => {
       const company = asRecord(graphicRequest.companies);
       const requester = asRecord(graphicRequest.requester);
@@ -110,6 +116,7 @@ async function RequestsPage() {
         status: graphicRequest.status,
         creditCost: graphicRequest.credit_cost,
         createdAt: graphicRequest.created_at,
+        files: filesByRequest.get(graphicRequest.id) || [],
       };
     });
   } catch (error) {
@@ -120,7 +127,7 @@ async function RequestsPage() {
   return <>
     <PageHeader eyebrow="WowStampa · Programma WOWPRO" title="Richieste" />
     <main className="page-content">
-      {hasLoadError ? <section className="empty-card empty-card--section"><span className="eyebrow">REGISTRO NON DISPONIBILE</span><h2>Impossibile caricare le richieste</h2><p>Verifica la configurazione Supabase del servizio e riprova.</p></section> : <AdminRequestBoard clients={clients} graphicOperators={graphicOperators} initialRequests={requests} />}
+      {hasLoadError ? <section className="empty-card empty-card--section"><span className="eyebrow">REGISTRO NON DISPONIBILE</span><h2>Impossibile caricare le richieste</h2><p>Verifica la configurazione Supabase del servizio e riprova.</p></section> : <>{storage ? <AdminFileStorage archivableBytes={storage.archivable.reduce((total, file) => total + file.size, 0)} archivableIds={storage.archivable.map((file) => file.id)} archiveAfterDays={ARCHIVE_AFTER_DAYS} fileCount={storage.fileCount} limitBytes={STORAGE_LIMIT_BYTES} usedBytes={storage.usedBytes} /> : null}<AdminRequestBoard clients={clients} graphicOperators={graphicOperators} initialRequests={requests} /></>}
     </main>
   </>;
 }
