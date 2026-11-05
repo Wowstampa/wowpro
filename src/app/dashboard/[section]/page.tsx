@@ -1,10 +1,13 @@
-import {BadgeCheck, CreditCard, Info, Pencil, Sparkles} from 'lucide-react';
+import Link from 'next/link';
+import {BadgeCheck, CreditCard, Info, Mail, MessageCircle, MessageSquareText, Palette, Pencil, Sparkles} from 'lucide-react';
 
 import {PageHeader} from '@/components/app-shell';
 import {ClientRequestsWorkspace} from '@/components/client-requests-workspace';
 import {ClientOrders} from '@/components/client-orders';
 import {CreditPurchase} from '@/components/credit-purchase';
-import {SupportChat} from '@/components/support-chat';
+import {OpenChatButton} from '@/components/support-widget';
+import {getConversationCompany} from '@/lib/support';
+import {createAdminClient} from '@/lib/supabase/admin.server';
 import {requireProfile} from '@/lib/auth';
 import {getWowproClient} from '@/lib/integrations/airtable';
 import {listCustomerOrders, type CustomerOrder} from '@/lib/integrations/shopify';
@@ -18,7 +21,7 @@ export default async function ClientSectionPage({params}: {params: Promise<{sect
   if (section === 'crediti') return <CreditsPage />;
   if (section === 'richieste') return <RequestsPage />;
   if (section === 'ordini') return <OrdersPage />;
-  if (section === 'supporto') return <><PageHeader eyebrow="WOWPRO · Area cliente" title="Supporto" /><main className="page-content"><SupportChat emptyHint="Scrivi al tuo account manager: ti risponderà qui e riceverai un avviso via email." viewer="client" /></main></>;
+  if (section === 'supporto') return <SupportPage />;
   const title = titles[section] || 'WOWPRO';
   return <><PageHeader eyebrow="WOWPRO · Area cliente" title={title} /><main className="page-content"><section className="empty-card empty-card--section"><span className="eyebrow">IN PREPARAZIONE</span><h2>{title}</h2><p>Questo spazio verrà collegato ai dati del tuo account.</p></section></main></>;
 }
@@ -62,6 +65,43 @@ async function OrdersPage() {
   }
   return <><PageHeader eyebrow="WOWPRO · Area cliente" title="Ordini" /><main className="page-content">{hasLoadError ? <section className="empty-card empty-card--section"><span className="eyebrow">COLLEGAMENTO NON DISPONIBILE</span><h2>Impossibile caricare gli ordini</h2><p>Riprova tra qualche istante. Se il problema continua, contatta il tuo account manager.</p></section> : <ClientOrders orders={orders} />}</main></>;
 }
+
+async function SupportPage() {
+  const profile = await requireProfile(['client']);
+  let manager: {name: string; email: string} | null = null;
+  let designer: {name: string; email: string; request: string} | null = null;
+  if (profile.company_id) {
+    try {
+      manager = (await getConversationCompany(profile.company_id))?.manager || null;
+      // The designer of the most recent request that has one assigned.
+      const {data} = await createAdminClient().from('graphic_requests').select('title,designer:assigned_to(full_name,email)').eq('company_id', profile.company_id).not('assigned_to', 'is', null).order('created_at', {ascending: false}).limit(1).maybeSingle();
+      const person = (Array.isArray(data?.designer) ? data?.designer[0] : data?.designer) as {full_name?: string; email?: string} | null | undefined;
+      if (person?.email) designer = {name: person.full_name || person.email, email: person.email, request: data?.title || ''};
+    } catch (error) { console.error('[Support contacts]', error); }
+  }
+  return <><PageHeader eyebrow="WOWPRO · Area cliente" title="Supporto" /><main className="page-content">
+    <section className="support-contacts">
+      <article className="support-contact">
+        <span className="support-contact__avatar">{initials(manager?.name || 'WowStampa')}</span>
+        <span className="eyebrow">IL TUO ACCOUNT MANAGER</span>
+        <h2>{manager?.name || 'Team WowStampa'}</h2>
+        <p>Il tuo punto di riferimento per crediti, abbonamento, preventivi, ordini e qualsiasi dubbio sul servizio.</p>
+        <ul className="support-contact__list">{manager ? <li><Mail size={16} /><a href={`mailto:${manager.email}`}>{manager.email}</a></li> : null}</ul>
+        <div className="support-contact__actions"><OpenChatButton className="button button--primary"><MessageCircle size={17} /> Scrivi in chat</OpenChatButton>{manager ? <a className="button button--ghost" href={`mailto:${manager.email}`}><Mail size={17} /> Invia email</a> : null}</div>
+      </article>
+      <article className="support-contact support-contact--designer">
+        <span className="support-contact__avatar support-contact__avatar--designer">{designer ? initials(designer.name) : <Palette size={22} />}</span>
+        <span className="eyebrow">IL TUO GRAFICO</span>
+        <h2>{designer?.name || 'In assegnazione'}</h2>
+        <p>{designer ? 'Segue le tue richieste grafiche. Per brief, file e revisioni usa la scheda della richiesta: tutto resta in un unico posto.' : 'Ti assegneremo un grafico dedicato con la tua prima richiesta grafica.'}</p>
+        <ul className="support-contact__list">{designer ? <li><Mail size={16} /><a href={`mailto:${designer.email}`}>{designer.email}</a></li> : null}{designer?.request ? <li><Palette size={16} />Ultima richiesta: {designer.request}</li> : null}</ul>
+        <div className="support-contact__actions"><Link className="button button--ghost" href="/dashboard/richieste"><MessageSquareText size={17} /> Vai alle richieste</Link></div>
+      </article>
+    </section>
+  </main></>;
+}
+
+function initials(value: string) { return value.split(' ').filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase(); }
 
 async function RequestsPage() {
   const profile = await requireProfile(['client']);
