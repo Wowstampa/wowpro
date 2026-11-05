@@ -112,8 +112,14 @@ async function SupportPage() {
       if (company?.airtable_record_id) {
         try { const record = await getWowproClient(company.airtable_record_id); credits = Number(record.fields.crediti_inclusi_residui || 0) + Number(record.fields.crediti_extra_residui || 0); } catch { /* Credits chip is optional. */ }
       }
-      // The designer of the most recent request that has one assigned.
-      const {data} = await admin.from('graphic_requests').select('assigned_to,designer:assigned_to(full_name,email)').eq('company_id', profile.company_id).not('assigned_to', 'is', null).order('created_at', {ascending: false}).limit(1).maybeSingle();
+      // Dedicated designer set on the client, otherwise the designer of the most recent assigned request.
+      const {data: link} = await admin.from('companies').select('designer_id').eq('id', profile.company_id).maybeSingle();
+      const dedicatedId = (link as {designer_id?: string | null} | null)?.designer_id;
+      if (dedicatedId) {
+        const {data: person} = await admin.from('profiles').select('id,full_name,email').eq('id', dedicatedId).maybeSingle();
+        if (person?.email) designer = {id: person.id, name: person.full_name || person.email, email: person.email, phone: null};
+      }
+      const {data} = designer ? {data: null} : await admin.from('graphic_requests').select('assigned_to,designer:assigned_to(full_name,email)').eq('company_id', profile.company_id).not('assigned_to', 'is', null).order('created_at', {ascending: false}).limit(1).maybeSingle();
       const person = (Array.isArray(data?.designer) ? data?.designer[0] : data?.designer) as {full_name?: string; email?: string} | null | undefined;
       if (data?.assigned_to && person?.email) designer = {id: data.assigned_to, name: person.full_name || person.email, email: person.email, phone: null};
       const ids = [manager?.id, designer?.id].filter(Boolean) as string[];
