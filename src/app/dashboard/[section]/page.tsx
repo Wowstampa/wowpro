@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import {BadgeCheck, CreditCard, Info, Mail, MessageCircle, MessageSquareText, Palette, Pencil, Sparkles} from 'lucide-react';
+import {BadgeCheck, CreditCard, Info, Mail, MessageSquareText, Palette, Pencil, Phone, Sparkles} from 'lucide-react';
 
 import {PageHeader} from '@/components/app-shell';
 import {ClientRequestsWorkspace} from '@/components/client-requests-workspace';
@@ -68,38 +68,62 @@ async function OrdersPage() {
 
 async function SupportPage() {
   const profile = await requireProfile(['client']);
-  let manager: {name: string; email: string} | null = null;
-  let designer: {name: string; email: string; request: string} | null = null;
+  type Contact = {id: string; name: string; email: string; phone: string | null};
+  let manager: Contact | null = null;
+  let designer: Contact | null = null;
+  let credits: number | null = null;
   if (profile.company_id) {
     try {
-      manager = (await getConversationCompany(profile.company_id))?.manager || null;
+      const admin = createAdminClient();
+      const company = await getConversationCompany(profile.company_id);
+      if (company?.manager) manager = {...company.manager, phone: null};
+      if (company?.airtable_record_id) {
+        try { const record = await getWowproClient(company.airtable_record_id); credits = Number(record.fields.crediti_inclusi_residui || 0) + Number(record.fields.crediti_extra_residui || 0); } catch { /* Credits chip is optional. */ }
+      }
       // The designer of the most recent request that has one assigned.
-      const {data} = await createAdminClient().from('graphic_requests').select('title,designer:assigned_to(full_name,email)').eq('company_id', profile.company_id).not('assigned_to', 'is', null).order('created_at', {ascending: false}).limit(1).maybeSingle();
+      const {data} = await admin.from('graphic_requests').select('assigned_to,designer:assigned_to(full_name,email)').eq('company_id', profile.company_id).not('assigned_to', 'is', null).order('created_at', {ascending: false}).limit(1).maybeSingle();
       const person = (Array.isArray(data?.designer) ? data?.designer[0] : data?.designer) as {full_name?: string; email?: string} | null | undefined;
-      if (person?.email) designer = {name: person.full_name || person.email, email: person.email, request: data?.title || ''};
+      if (data?.assigned_to && person?.email) designer = {id: data.assigned_to, name: person.full_name || person.email, email: person.email, phone: null};
+      const ids = [manager?.id, designer?.id].filter(Boolean) as string[];
+      if (ids.length) {
+        const {data: phones} = await admin.from('profiles').select('id,phone').in('id', ids);
+        for (const row of phones || []) {
+          if (manager && row.id === manager.id) manager.phone = row.phone || null;
+          if (designer && row.id === designer.id) designer.phone = row.phone || null;
+        }
+      }
     } catch (error) { console.error('[Support contacts]', error); }
   }
-  return <><PageHeader eyebrow="WOWPRO · Area cliente" title="Supporto" /><main className="page-content">
-    <section className="support-contacts">
-      <article className="support-contact">
-        <span className="support-contact__avatar">{initials(manager?.name || 'WowStampa')}</span>
-        <span className="eyebrow">IL TUO ACCOUNT MANAGER</span>
-        <h2>{manager?.name || 'Team WowStampa'}</h2>
-        <p>Il tuo punto di riferimento per crediti, abbonamento, preventivi, ordini e qualsiasi dubbio sul servizio.</p>
-        <ul className="support-contact__list">{manager ? <li><Mail size={16} /><a href={`mailto:${manager.email}`}>{manager.email}</a></li> : null}</ul>
-        <div className="support-contact__actions"><OpenChatButton className="button button--primary"><MessageCircle size={17} /> Scrivi in chat</OpenChatButton>{manager ? <a className="button button--ghost" href={`mailto:${manager.email}`}><Mail size={17} /> Invia email</a> : null}</div>
-      </article>
-      <article className="support-contact support-contact--designer">
-        <span className="support-contact__avatar support-contact__avatar--designer">{designer ? initials(designer.name) : <Palette size={22} />}</span>
-        <span className="eyebrow">IL TUO GRAFICO</span>
-        <h2>{designer?.name || 'In assegnazione'}</h2>
-        <p>{designer ? 'Segue le tue richieste grafiche. Per brief, file e revisioni usa la scheda della richiesta: tutto resta in un unico posto.' : 'Ti assegneremo un grafico dedicato con la tua prima richiesta grafica.'}</p>
-        <ul className="support-contact__list">{designer ? <li><Mail size={16} /><a href={`mailto:${designer.email}`}>{designer.email}</a></li> : null}{designer?.request ? <li><Palette size={16} />Ultima richiesta: {designer.request}</li> : null}</ul>
-        <div className="support-contact__actions"><Link className="button button--ghost" href="/dashboard/richieste"><MessageSquareText size={17} /> Vai alle richieste</Link></div>
-      </article>
+  return <><PageHeader eyebrow="WOWPRO · Area cliente" title="Supporto" action={credits !== null ? <div className="credit-chip"><i /> <strong>{number(credits)}</strong> crediti disponibili</div> : undefined} /><main className="page-content">
+    <section>
+      <div className="credits-section-title"><h2>Supporto WOWPRO</h2><p>Hai una linea diretta con il tuo team dedicato: account manager e grafico</p></div>
+      <div className="support-contacts">
+        <article className="support-card">
+          <span className="support-card__label">IL TUO ACCOUNT MANAGER</span>
+          <div className="support-card__person"><span className="support-card__avatar">{initials(manager?.name || 'WowStampa')}</span><div><h3>{manager?.name || 'Team WowStampa'}</h3><p>Account Manager dedicato · WOWPRO</p></div></div>
+          <div className="support-card__rows">
+            {manager ? <a className="support-card__row" href={`mailto:${manager.email}`}><span><Mail size={17} /></span><div><small>Email diretta</small><strong>{manager.email}</strong></div></a> : null}
+            <OpenChatButton className="support-card__row"><span><MessageSquareText size={17} /></span><div><small>Chat dedicata</small><strong>Scrivici dal portale</strong></div></OpenChatButton>
+            {manager?.phone ? <a className="support-card__row" href={whatsappLink(manager.phone)} rel="noreferrer" target="_blank"><span><Phone size={17} /></span><div><small>Telefono / WhatsApp</small><strong>{manager.phone}</strong></div></a> : null}
+          </div>
+          <footer className="support-card__foot"><p><b>Il tuo riferimento</b> per crediti, abbonamento, preventivi e ordini.</p></footer>
+        </article>
+        <article className="support-card support-card--designer">
+          <span className="support-card__label">IL TUO GRAFICO DEDICATO</span>
+          <div className="support-card__person"><span className="support-card__avatar">{designer ? initials(designer.name) : <Palette size={24} />}</span><div><h3>{designer?.name || 'In assegnazione'}</h3><p>Grafico dedicato · WOWPRO</p></div></div>
+          <div className="support-card__rows">
+            {designer ? <a className="support-card__row" href={`mailto:${designer.email}`}><span><Mail size={17} /></span><div><small>Email diretta</small><strong>{designer.email}</strong></div></a> : null}
+            <Link className="support-card__row" href="/dashboard/richieste"><span><MessageSquareText size={17} /></span><div><small>Richieste grafiche</small><strong>Per brief e revisioni grafiche</strong></div></Link>
+            {designer?.phone ? <a className="support-card__row" href={whatsappLink(designer.phone)} rel="noreferrer" target="_blank"><span><Phone size={17} /></span><div><small>Telefono / WhatsApp</small><strong>{designer.phone}</strong></div></a> : null}
+          </div>
+          <footer className="support-card__foot"><p><b>Lavorazioni grafiche:</b> revisioni, modifiche e creazioni.</p>{designer ? null : <p>Ti assegneremo un grafico dedicato con la tua prima richiesta.</p>}</footer>
+        </article>
+      </div>
     </section>
   </main></>;
 }
+
+function whatsappLink(phone: string) { const digits = phone.replace(/\D/g, ''); return `https://wa.me/${digits.startsWith('39') || digits.length > 10 ? digits : `39${digits}`}`; }
 
 function initials(value: string) { return value.split(' ').filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase(); }
 
