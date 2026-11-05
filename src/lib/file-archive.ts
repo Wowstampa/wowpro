@@ -22,7 +22,12 @@ export async function getFileStorageSummary(fileIds?: string[]) {
   if (error) throw error;
 
   const rows = data || [];
-  const usedBytes = rows.reduce((total, row) => total + Number(row.size_bytes || 0), 0);
+  let usedBytes = rows.reduce((total, row) => total + Number(row.size_bytes || 0), 0);
+  if (!fileIds) {
+    // Chat attachments share the same storage space.
+    const {data: chatFiles} = await createAdminClient().from('support_messages').select('file_size').not('file_path', 'is', null);
+    usedBytes += (chatFiles || []).reduce((total, row) => total + Number(row.file_size || 0), 0);
+  }
   const threshold = Date.now() - ARCHIVE_AFTER_DAYS * 24 * 60 * 60 * 1000;
   const closed = rows.filter((row) => {
     const request = row.graphic_requests;
