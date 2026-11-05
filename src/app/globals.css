@@ -171,7 +171,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .client-toolbar { display: flex; align-items: end; justify-content: space-between; gap: 24px; }.client-toolbar h2 { margin: 5px 0 0; color: var(--muted); font-size: 13px; font-weight: 500; }
 .directory-error { margin: -18px 0 0; color: var(--red); font-size: 12px; font-weight: 700; }
 .directory-notice { margin: -18px 0 0; color: var(--green-dark); font-size: 12px; font-weight: 700; }
-.client-toolbar__actions { display: flex; align-items: center; gap: 12px; }
+.client-toolbar__actions { display: flex; align-items: center; gap: 12px; }.client-toolbar__actions .button { min-height: 42px; height: 42px; padding: 0 16px; flex-shrink: 0; white-space: nowrap; font-size: 13px; }
 .client-form label.client-form__check { grid-column: 1/-1; display: flex; align-items: center; gap: 9px; font-weight: 600; }.client-form .client-form__check input { width: 17px; min-height: 17px; height: 17px; accent-color: var(--green); }
 .client-search { width: min(320px, 100%); height: 42px; padding: 0 13px; display: flex; align-items: center; gap: 9px; border: 1px solid var(--line); border-radius: 11px; background: white; color: #a2aaba; box-shadow: var(--shadow); }.client-search input { width: 100%; border: 0; outline: 0; color: var(--ink); }
 .client-list__head, .client-table-row { display: grid; grid-template-columns: minmax(210px, 1.35fr) minmax(125px, .8fr) minmax(125px, .85fr) minmax(90px, .5fr) minmax(155px, .9fr) minmax(185px, .95fr); gap: 18px; align-items: center; }
