@@ -1,7 +1,7 @@
 'use client';
 
 import {FormEvent, useState} from 'react';
-import {Archive, Check, Coins, Pencil, RotateCcw, Search, X} from 'lucide-react';
+import {Archive, Check, Coins, Pencil, RotateCcw, Search, UserRoundPlus, X} from 'lucide-react';
 
 export type AdminClient = {
   recordId: string;
@@ -26,6 +26,8 @@ export function AdminClientDirectory({archived, initialClients}: {archived: bool
   const [archivingClient, setArchivingClient] = useState<AdminClient | null>(null);
   const [restoringClientId, setRestoringClientId] = useState<string | null>(null);
   const [actionError, setActionError] = useState('');
+  const [isCreating, setIsCreating] = useState(false);
+  const [notice, setNotice] = useState('');
 
   const visibleClients = clients.filter((client) => {
     const searchTerm = query.trim().toLocaleLowerCase('it-IT');
@@ -56,9 +58,10 @@ export function AdminClientDirectory({archived, initialClients}: {archived: bool
     <>
       <section className="client-toolbar">
         <div><span className="eyebrow">{archived ? 'ARCHIVIO CLIENTI' : 'ANAGRAFICA CLIENTI'}</span><h2>{archived ? 'Clienti rimossi dalla gestione operativa' : 'Stato abbonamento, saldi crediti e account manager'}</h2></div>
-        <label className="client-search"><Search size={17} /><input onChange={(event) => setQuery(event.target.value)} placeholder="Cerca cliente o azienda..." value={query} /></label>
+        <div className="client-toolbar__actions"><label className="client-search"><Search size={17} /><input onChange={(event) => setQuery(event.target.value)} placeholder="Cerca cliente o azienda..." value={query} /></label>{archived ? null : <button className="button button--primary" onClick={() => { setNotice(''); setIsCreating(true); }} type="button"><UserRoundPlus size={17} />Nuovo cliente</button>}</div>
       </section>
       {actionError ? <p className="directory-error">{actionError}</p> : null}
+      {notice ? <p className="directory-notice">{notice}</p> : null}
 
       <section className="client-list" aria-label="Elenco clienti WOWPRO">
         <div className="client-list__head"><span>Cliente</span><span>Abbonamento</span><span>Crediti inclusi</span><span>Extra</span><span>Account manager</span><span>Azioni</span></div>
@@ -66,6 +69,7 @@ export function AdminClientDirectory({archived, initialClients}: {archived: bool
         {!visibleClients.length ? <p className="client-list__empty">Nessun cliente corrisponde alla ricerca.</p> : null}
       </section>
 
+      {isCreating ? <CreateClientModal onClose={() => setIsCreating(false)} onCreated={(client, warning) => { setClients((current) => [client, ...current]); setIsCreating(false); setNotice(warning || `${client.companyName} è stato aggiunto ai clienti.`); }} /> : null}
       {editingClient ? <EditClientModal client={editingClient} onClose={() => setEditingClient(null)} onSaved={(patch) => { replaceClient(editingClient.recordId, patch); setEditingClient(null); }} /> : null}
       {creditClient ? <CreditModal client={creditClient} onClose={() => setCreditClient(null)} onSaved={(patch) => { replaceClient(creditClient.recordId, patch); setCreditClient(null); }} /> : null}
       {archivingClient ? <ArchiveClientModal client={archivingClient} onArchived={() => { replaceClient(archivingClient.recordId, {isArchived: true}); setArchivingClient(null); }} onClose={() => setArchivingClient(null)} /> : null}
@@ -91,6 +95,64 @@ function ClientRow({archived, client, isRestoring, onArchive, onEdit, onCredits,
 function CreditBalance({current, label}: {current: number; label: string}) {
   const ratio = Math.min(current / 12_000, 1) * 100;
   return <div><strong>{formatNumber(current)}</strong><small>{label}</small><span className="credit-meter"><i style={{width: `${ratio}%`}} /></span></div>;
+}
+
+function CreateClientModal({onClose, onCreated}: {onClose: () => void; onCreated: (client: AdminClient, warning?: string) => void}) {
+  const [error, setError] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+
+  async function save(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setIsSaving(true); setError('');
+    const form = new FormData(event.currentTarget);
+    const payload = {
+      ragione_sociale: String(form.get('companyName') || ''),
+      email_login: String(form.get('email') || ''),
+      piano: String(form.get('plan') || ''),
+      stato_abbonamento: String(form.get('status') || ''),
+      account_manager_nome: String(form.get('manager') || ''),
+      shopify_customer_id: String(form.get('shopifyCustomerId') || ''),
+      crediti_inclusi_mese: String(form.get('monthlyCredits') || '0'),
+      invia_invito: form.get('sendInvite') === 'on',
+    };
+    try {
+      const response = await fetch('/api/admin/clients', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)});
+      const result = await readApiResponse(response);
+      if (!response.ok || !result.fields || !result.recordId) throw new Error(result.error || 'Creazione non riuscita.');
+      const fields = result.fields;
+      onCreated({
+        recordId: result.recordId,
+        clientId: fields.cliente_id || 'NUOVO',
+        companyName: fields.ragione_sociale || payload.ragione_sociale,
+        email: fields.email_login || payload.email_login,
+        plan: fields.piano || payload.piano,
+        subscriptionStatus: fields.stato_abbonamento || payload.stato_abbonamento,
+        accountManager: fields.account_manager_nome || '',
+        shopifyCustomerId: fields.shopify_customer_id || '',
+        includedCredits: Number(fields.crediti_inclusi_residui || 0),
+        extraCredits: Number(fields.crediti_extra_residui || 0),
+        renewalDate: '',
+        isArchived: false,
+      }, result.warning);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Creazione non riuscita.');
+    } finally { setIsSaving(false); }
+  }
+
+  return <Modal onClose={onClose} subtitle="Il cliente verrà aggiunto all’anagrafica WOWPRO." title="Nuovo cliente">
+    <form className="client-form" onSubmit={save}>
+      <label>Azienda<input name="companyName" placeholder="Ragione sociale" required /></label>
+      <label>Email di accesso<input name="email" placeholder="nome@azienda.it" required type="email" /></label>
+      <label>Piano<select defaultValue="Premium" name="plan"><option>Basic</option><option>Standard</option><option>Premium</option></select></label>
+      <label>Stato abbonamento<select defaultValue="Attivo" name="status"><option>Attivo</option><option>Sospeso</option><option>Disdetto</option></select></label>
+      <label>Crediti inclusi al mese<input defaultValue="0" min="0" name="monthlyCredits" type="number" /></label>
+      <label>Account manager<input name="manager" /></label>
+      <label className="client-form__wide">Shopify Customer ID<input name="shopifyCustomerId" placeholder="Facoltativo" /></label>
+      <label className="client-form__check"><input defaultChecked name="sendInvite" type="checkbox" />Invia al cliente l’email di accesso al portale</label>
+      {error ? <p className="form-error">{error}</p> : null}
+      <ModalActions isSubmitting={isSaving} submitLabel="Crea cliente" onClose={onClose} />
+    </form>
+  </Modal>;
 }
 
 function EditClientModal({client, onClose, onSaved}: {client: AdminClient; onClose: () => void; onSaved: (patch: Partial<AdminClient>) => void}) {
@@ -218,7 +280,10 @@ async function readApiResponse(response: Response) {
 
 type ClientMutationResponse = {
   error?: string;
+  warning?: string;
+  recordId?: string;
   fields?: {
+    cliente_id?: string;
     ragione_sociale?: string;
     email_login?: string;
     piano?: string;
