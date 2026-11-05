@@ -95,6 +95,45 @@ export async function updateWowproClient(recordId: string, fields: Partial<Airta
   return record;
 }
 
+export async function createWowproClient(fields: Partial<AirtableWowproClient>) {
+  const {token, baseId, table} = getAirtableConfig();
+  const send = (payload: Partial<AirtableWowproClient>) => fetch(
+    `https://api.airtable.com/v0/${baseId}/${encodeURIComponent(table)}`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({fields: payload, typecast: true}),
+      cache: 'no-store',
+      signal: AbortSignal.timeout(10_000),
+    },
+  );
+
+  let response = await send(fields);
+  // If cliente_id is a computed field in Airtable (formula/autonumber) it cannot be written:
+  // retry without it and let Airtable assign the identifier.
+  if (response.status === 422 && fields.cliente_id) {
+    const {cliente_id: _ignored, ...rest} = fields;
+    void _ignored;
+    response = await send(rest);
+  }
+  if (!response.ok) throw new Error(`Airtable ha risposto con stato ${response.status}.`);
+  const record = await response.json() as AirtableRecord<AirtableWowproClient>;
+  revalidateTag('airtable-wowpro-clients', 'max');
+  return record;
+}
+
+export async function nextWowproClientId() {
+  const records = await readWowproClients();
+  const highest = records.reduce((max, {fields}) => {
+    const match = /^CL(\d+)$/i.exec(fields.cliente_id?.trim() || '');
+    return match ? Math.max(max, Number(match[1])) : max;
+  }, 0);
+  return `CL${String(highest + 1).padStart(3, '0')}`;
+}
+
 export async function listAuthorizedWowproClients() {
   const records = await listWowproClients();
   return records.filter(({fields}) => fields.stato_abbonamento?.toLowerCase() === 'attivo');
