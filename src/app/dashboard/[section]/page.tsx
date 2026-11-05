@@ -7,6 +7,7 @@ import {CreditPurchase} from '@/components/credit-purchase';
 import {requireProfile} from '@/lib/auth';
 import {getWowproClient} from '@/lib/integrations/airtable';
 import {listCustomerOrders, type CustomerOrder} from '@/lib/integrations/shopify';
+import {listRequestFiles} from '@/lib/request-files';
 import {createClient} from '@/lib/supabase/server';
 
 const titles: Record<string, string> = {crediti: 'Crediti', richieste: 'Richieste grafiche', ordini: 'Ordini', supporto: 'Supporto', feedback: 'Feedback & idee'};
@@ -68,13 +69,14 @@ async function RequestsPage() {
   const {data: company} = await supabase.from('companies').select('airtable_record_id').eq('id', profile.company_id || '').maybeSingle();
   if (company?.airtable_record_id) { try { const record = await getWowproClient(company.airtable_record_id, {fresh: true}); includedCredits = Number(record.fields.crediti_inclusi_residui || 0); extraCredits = Number(record.fields.crediti_extra_residui || 0); } catch { /* The request form will show an unavailable balance. */ } }
   const requestIds = (requests || []).map((request) => request.id);
+  const filesByRequest = await listRequestFiles(requestIds, {customerVisibleOnly: true});
   const messagesByRequest = new Map<string, Array<{id: string; body: string; created_at: string}>>();
   if (requestIds.length) {
     // The message log is optional until the graphic-workspace migration is applied.
     const {data: messages, error} = await supabase.from('request_messages').select('id,request_id,body,created_at').in('request_id', requestIds).order('created_at', {ascending: true});
     if (!error) for (const message of messages || []) messagesByRequest.set(message.request_id, [...(messagesByRequest.get(message.request_id) || []), message]);
   }
-  const workspaceRequests = (requests || []).map((request) => ({id: request.id, publicId: request.public_id, title: request.title, brief: request.brief, status: request.status, type: request.type, creditCost: request.credit_cost, createdAt: request.created_at, messages: (messagesByRequest.get(request.id) || []).map((message) => ({id: message.id, body: message.body, createdAt: message.created_at}))}));
+  const workspaceRequests = (requests || []).map((request) => ({id: request.id, publicId: request.public_id, title: request.title, brief: request.brief, status: request.status, type: request.type, creditCost: request.credit_cost, createdAt: request.created_at, messages: (messagesByRequest.get(request.id) || []).map((message) => ({id: message.id, body: message.body, createdAt: message.created_at})), files: filesByRequest.get(request.id) || []}));
   return <><PageHeader eyebrow="WOWPRO · Area cliente" title="Richieste grafiche" action={<div className="credit-chip"><i /> <strong>{number(includedCredits + extraCredits)}</strong> crediti disponibili</div>} /><main className="page-content"><ClientRequestsWorkspace extraCredits={extraCredits} includedCredits={includedCredits} requests={workspaceRequests} /></main></>;
 }
 
