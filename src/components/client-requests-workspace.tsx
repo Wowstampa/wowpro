@@ -1,10 +1,11 @@
 'use client';
 
 import {Check, MessageSquareText, Plus, Upload, X} from 'lucide-react';
-import {ChangeEvent, DragEvent, FormEvent, useState} from 'react';
+import {ChangeEvent, DragEvent, FormEvent, useCallback, useState} from 'react';
 import {useRouter} from 'next/navigation';
 
-import {ACCEPTED_FILES, ACCEPTED_LABEL, AddFilesButton, FileList, type RequestFileItem, uploadRequestFiles, validateFiles} from '@/components/request-files';
+import {ACCEPTED_FILES, ACCEPTED_LABEL, type RequestFileItem, uploadRequestFiles, validateFiles} from '@/components/request-files';
+import {RequestDrawer, RequestThread, useRequestFromUrl} from '@/components/request-thread';
 
 export type ClientWorkspaceRequest = {
   id: string;
@@ -26,7 +27,8 @@ export function ClientRequestsWorkspace({extraCredits, includedCredits, requests
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [notice, setNotice] = useState('');
-  const selected = items.find((request) => request.id === selectedId);
+  const closeDrawer = useCallback(() => { setSelectedId(null); if (window.location.search.includes('r=')) window.history.replaceState(null, '', window.location.pathname); }, []);
+  useRequestFromUrl(useCallback((id: string) => setSelectedId(id), []));
 
   return <section className="client-requests-workspace">
     <header className="client-requests-toolbar">
@@ -39,7 +41,7 @@ export function ClientRequestsWorkspace({extraCredits, includedCredits, requests
       </button>
     </header>
     {notice ? <p className="form-error request-notice">{notice}</p> : null}
-    {!items.length ? <section className="empty-card empty-card--section"><span className="eyebrow">NESSUNA RICHIESTA</span><h2>Non hai richieste attive</h2><p>Inizia con una nuova richiesta per coinvolgere il tuo team grafico.</p></section> : <div className="client-requests-grid">
+    {!items.length ? <section className="empty-card empty-card--section"><span className="eyebrow">NESSUNA RICHIESTA</span><h2>Non hai richieste attive</h2><p>Inizia con una nuova richiesta per coinvolgere il tuo team grafico.</p></section> : <div className="client-requests-grid client-requests-grid--single">
       <div className="client-request-list client-request-list--workspace">
         {items.map((request) => <button aria-pressed={selectedId === request.id} className={'client-request-row' + (selectedId === request.id ? ' client-request-row--selected' : '')} key={request.id} onClick={() => setSelectedId(request.id)} type="button">
           <span className="client-request-row__icon"><MessageSquareText size={17} /></span>
@@ -51,10 +53,8 @@ export function ClientRequestsWorkspace({extraCredits, includedCredits, requests
           <span className="client-request-row__meta"><b className={'client-request-status client-request-status--' + statusClass(request.status)}>{status(request.status)}</b><small>{shortDate(request.createdAt)}</small></span>
         </button>)}
       </div>
-      <aside className="client-request-detail">
-        {selected ? <RequestDetail onFilesAdded={(files) => setItems((current) => current.map((item) => item.id === selected.id ? {...item, files: [...item.files, ...files]} : item))} request={selected} /> : <div className="client-request-detail__empty"><MessageSquareText size={29} /><p>Seleziona una richiesta dalla lista<br />per vederne i dettagli.</p></div>}
-      </aside>
     </div>}
+    {selectedId ? <RequestDrawer onClose={closeDrawer}><RequestThread onStatusChange={(value) => setItems((current) => current.map((item) => item.id === selectedId ? {...item, status: value} : item))} requestId={selectedId} viewer="client" /></RequestDrawer> : null}
     {isCreating ? <CreateRequestModal extraCredits={balances.extra} includedCredits={balances.included} onClose={() => setIsCreating(false)} onCreated={(request, warning) => { setNotice(warning || ''); const usedIncluded = Math.min(balances.included, request.creditCost); setBalances({included: balances.included - usedIncluded, extra: balances.extra - (request.creditCost - usedIncluded)}); setItems((current) => [request, ...current]); setSelectedId(request.id); setIsCreating(false); router.refresh(); }} /> : null}
   </section>;
 }
@@ -117,22 +117,11 @@ function CreateRequestModal({extraCredits, includedCredits, onClose, onCreated}:
   </section></div>;
 }
 
-function RequestDetail({onFilesAdded, request}: {onFilesAdded: (files: RequestFileItem[]) => void; request: ClientWorkspaceRequest}) {
-  return <div className="client-request-detail__content">
-    <div className="client-request-detail__head"><div><small>{request.publicId}</small><h3>{request.title}</h3></div><b className={'client-request-status client-request-status--' + statusClass(request.status)}>{status(request.status)}</b></div>
-    <p>{request.brief}</p>
-    <div className="client-request-detail__info"><span>{requestType(request.type)} · {number(request.creditCost)} crediti</span><span>Inviata il {longDate(request.createdAt)}</span></div>
-    <div className="client-request-detail__files"><strong>File allegati</strong>{request.files.length ? <FileList files={request.files} /> : <p>Nessun file allegato.</p>}<AddFilesButton key={request.id} onUploaded={onFilesAdded} requestId={request.id} /></div>
-    <div className="client-request-detail__messages"><strong>Messaggi dal team</strong>{request.messages.length ? request.messages.map((message) => <article key={message.id}><small>{longDate(message.createdAt)}</small><p>{message.body}</p></article>) : <p>Nessun messaggio dal team per il momento.</p>}</div>
-  </div>;
-}
-
-function status(value: string) { return ({new: 'Nuova', in_progress: 'In lavorazione', completed: 'Completata', rejected: 'Rifiutata'} as Record<string, string>)[value] || 'Aggiornata'; }
-function statusClass(value: string) { return value === 'in_progress' ? 'working' : value === 'completed' ? 'completed' : value === 'rejected' ? 'rejected' : 'new'; }
+function status(value: string) { return ({new: 'Nuova', in_progress: 'In lavorazione', review: 'Bozza da approvare', completed: 'Completata', rejected: 'Rifiutata'} as Record<string, string>)[value] || 'Aggiornata'; }
+function statusClass(value: string) { return value === 'in_progress' ? 'working' : value === 'review' ? 'review' : value === 'completed' ? 'completed' : value === 'rejected' ? 'rejected' : 'new'; }
 function requestType(value: string) { return ({revision: 'Revisione', modification: 'Modifica', creation: 'Creazione'} as Record<string, string>)[value] || value || 'Richiesta'; }
 function number(value: number) { return new Intl.NumberFormat('it-IT').format(value); }
 function shortDate(value: string) { return new Intl.DateTimeFormat('it-IT', {day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'}).format(new Date(value)); }
-function longDate(value: string) { return new Intl.DateTimeFormat('it-IT', {day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'}).format(new Date(value)); }
 
 async function readResponse(response: Response) {
   const contentType = response.headers.get('content-type') || '';

@@ -1,9 +1,10 @@
 'use client';
 
 import {CheckCircle2, Clock3, MessageSquareText, Plus, Search, TriangleAlert, X} from 'lucide-react';
-import {FormEvent, useState} from 'react';
+import {FormEvent, useCallback, useState} from 'react';
 
 import {FileList, type RequestFileItem} from '@/components/request-files';
+import {RequestDrawer, RequestThread, useRequestFromUrl} from '@/components/request-thread';
 
 export type AdminGraphicRequest = {
   id: string;
@@ -19,12 +20,12 @@ export type AdminGraphicRequest = {
   files?: RequestFileItem[];
 };
 
-type RequestStatus = 'new' | 'in_progress' | 'completed' | 'rejected';
+type RequestStatus = 'new' | 'in_progress' | 'review' | 'completed' | 'rejected';
 
 export type RequestClientOption = {recordId: string; companyName: string};
 export type GraphicOperatorOption = {id: string; name: string};
 
-const statusLabels: Record<RequestStatus, string> = {new: 'Nuova', in_progress: 'In lavorazione', completed: 'Completata', rejected: 'Rifiutata'};
+const statusLabels: Record<RequestStatus, string> = {new: 'Nuova', in_progress: 'In lavorazione', review: 'Bozza da approvare', completed: 'Completata', rejected: 'Rifiutata'};
 const typeLabels: Record<AdminGraphicRequest['type'], string> = {revision: 'Revisione', modification: 'Modifica', creation: 'Creazione'};
 
 export function AdminRequestBoard({clients, graphicOperators, initialRequests}: {clients: RequestClientOption[]; graphicOperators: GraphicOperatorOption[]; initialRequests: AdminGraphicRequest[]}) {
@@ -34,6 +35,9 @@ export function AdminRequestBoard({clients, graphicOperators, initialRequests}: 
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState('');
+  const [openId, setOpenId] = useState<string | null>(null);
+  const closeDrawer = useCallback(() => { setOpenId(null); if (window.location.search.includes('r=')) window.history.replaceState(null, '', window.location.pathname); }, []);
+  useRequestFromUrl(useCallback((id: string) => setOpenId(id), []));
   const normalizedQuery = query.trim().toLocaleLowerCase('it-IT');
   const visibleRequests = requests.filter((request) => {
     const matchesFilter = filter === 'all' || request.status === filter;
@@ -81,9 +85,10 @@ export function AdminRequestBoard({clients, graphicOperators, initialRequests}: 
         </div>
       </div>
       <div className="request-board__head"><span>Richiesta</span><span>Cliente</span><span>Brief</span><span>Crediti</span><span>Data</span><span>Stato</span></div>
-      {visibleRequests.map((request) => <RequestRow isUpdating={updatingId === request.id} key={request.id} onStatusChange={(status) => updateStatus(request.id, status)} request={request} />)}
+      {visibleRequests.map((request) => <RequestRow isUpdating={updatingId === request.id} key={request.id} onOpen={() => setOpenId(request.id)} onStatusChange={(status) => updateStatus(request.id, status)} request={request} />)}
       {!visibleRequests.length ? <div className="request-board__empty"><MessageSquareText size={22} /><strong>Nessuna richiesta trovata</strong><p>{requests.length ? 'Modifica i filtri o la ricerca per vedere altre richieste.' : 'Le richieste inviate dai clienti compariranno qui.'}</p></div> : null}
     </section>
+    {openId ? <RequestDrawer onClose={closeDrawer}><RequestThread canReject onStatusChange={(value) => setRequests((current) => current.map((item) => item.id === openId ? {...item, status: value} : item))} requestId={openId} viewer="team" /></RequestDrawer> : null}
     {isCreating ? <CreateRequestModal clients={clients} graphicOperators={graphicOperators} onClose={() => setIsCreating(false)} onCreated={(request) => { setRequests((current) => [request, ...current]); setIsCreating(false); }} /> : null}
   </>;
 }
@@ -132,9 +137,9 @@ function CreateRequestModal({clients, graphicOperators, onClose, onCreated}: {cl
   </section></div>;
 }
 
-function RequestRow({isUpdating, onStatusChange, request}: {isUpdating: boolean; onStatusChange: (status: RequestStatus) => void; request: AdminGraphicRequest}) {
+function RequestRow({isUpdating, onOpen, onStatusChange, request}: {isUpdating: boolean; onOpen: () => void; onStatusChange: (status: RequestStatus) => void; request: AdminGraphicRequest}) {
   return <article className="request-board__row">
-    <div><span className="admin-row__id">{request.publicId}</span><strong>{request.title}</strong><small>{typeLabels[request.type]}</small></div>
+    <div><span className="admin-row__id">{request.publicId}</span><button className="request-row-open" onClick={onOpen} type="button">{request.title}</button><small>{typeLabels[request.type]} · <button className="request-row-open request-row-open--link" onClick={onOpen} type="button">Apri timeline</button></small></div>
     <div><strong>{request.companyName}</strong><small>{request.requesterName}</small></div>
     <div className="request-board__brief"><p title={request.brief}>{request.brief}</p><FileList compact files={request.files || []} /></div>
     <strong className="request-cost">{formatNumber(request.creditCost)}</strong>
@@ -149,7 +154,7 @@ function RequestMetric({icon, label, note, tone = 'green', value}: {icon: React.
   return <article className="credit-overview__metric"><span className={`metric-icon metric-icon--${tone}`}>{icon}</span><p>{label}</p><strong>{value}</strong><small>{note}</small></article>;
 }
 
-function countStatuses(requests: AdminGraphicRequest[]) { return requests.reduce<Record<RequestStatus, number>>((counts, request) => ({...counts, [request.status]: counts[request.status] + 1}), {new: 0, in_progress: 0, completed: 0, rejected: 0}); }
+function countStatuses(requests: AdminGraphicRequest[]) { return requests.reduce<Record<RequestStatus, number>>((counts, request) => ({...counts, [request.status]: counts[request.status] + 1}), {new: 0, in_progress: 0, review: 0, completed: 0, rejected: 0}); }
 function formatDate(value: string) { return new Intl.DateTimeFormat('it-IT', {day: '2-digit', month: 'short', year: 'numeric'}).format(new Date(value)); }
 function formatNumber(value: number) { return new Intl.NumberFormat('it-IT').format(value); }
 
