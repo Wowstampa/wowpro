@@ -12,6 +12,7 @@ const createSchema = z.object({
   stato_abbonamento: z.string().trim().min(1).max(80),
   account_manager_nome: z.string().trim().max(120).optional(),
   account_manager_id: z.union([z.string().uuid(), z.literal('')]).optional(),
+  designer_id: z.union([z.string().uuid(), z.literal('')]).optional(),
   shopify_customer_id: z.string().trim().max(120).optional(),
   crediti_inclusi_mese: z.coerce.number().int().min(0).max(100_000).optional(),
   invia_invito: z.boolean().optional(),
@@ -27,7 +28,7 @@ export async function POST(request: Request) {
   const parsed = createSchema.safeParse(await request.json());
   if (!parsed.success) return NextResponse.json({error: 'Dati cliente non validi.'}, {status: 400});
 
-  const {invia_invito: sendInvite = true, crediti_inclusi_mese: monthlyCredits = 0, account_manager_id: managerId, ...data} = parsed.data;
+  const {invia_invito: sendInvite = true, crediti_inclusi_mese: monthlyCredits = 0, account_manager_id: managerId, designer_id: designerId, ...data} = parsed.data;
   const email = data.email_login.toLowerCase();
 
   let record;
@@ -63,6 +64,10 @@ export async function POST(request: Request) {
     if (managerId) {
       const {error: managerError} = await admin.from('companies').update({account_manager_id: managerId}).eq('id', company.id);
       if (managerError) console.error('[Client manager link]', managerError);
+    }
+    if (designerId) {
+      const {error: designerError} = await admin.from('companies').update({designer_id: designerId}).eq('id', company.id);
+      if (designerError) console.error('[Client designer link]', designerError);
     }
 
     if (sendInvite) {
