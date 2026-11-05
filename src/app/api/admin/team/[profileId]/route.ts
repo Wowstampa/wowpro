@@ -8,6 +8,7 @@ const updateOperatorSchema = z.object({
   fullName: z.string().trim().min(2).max(120),
   role: z.enum(['admin', 'staff', 'graphic_operator']),
   status: z.enum(['active', 'suspended', 'revoked']),
+  phone: z.string().trim().max(40).regex(/^[+\d\s().-]*$/).optional(),
 });
 
 export async function PATCH(request: Request, {params}: {params: Promise<{profileId: string}>}) {
@@ -23,7 +24,12 @@ export async function PATCH(request: Request, {params}: {params: Promise<{profil
   try {
     const {data, error} = await createAdminClient().from('profiles').update({full_name: parsed.data.fullName, role: parsed.data.role, status: parsed.data.status}).eq('id', profileId).select('id,email,full_name,role,status,created_at').single();
     if (error || !data) throw error || new Error('Operatore non aggiornato.');
-    return NextResponse.json({operator: data});
+    let phone: string | null = null;
+    if (parsed.data.phone !== undefined) {
+      const {error: phoneError} = await createAdminClient().from('profiles').update({phone: parsed.data.phone || null}).eq('id', profileId);
+      if (phoneError) console.error('[Team phone]', phoneError); else phone = parsed.data.phone || null;
+    }
+    return NextResponse.json({operator: {...data, phone}});
   } catch (error) {
     console.error('[Team update]', error);
     return NextResponse.json({error: 'Impossibile aggiornare l’operatore.'}, {status: 502});
