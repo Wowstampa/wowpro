@@ -5,6 +5,7 @@ import {ArrowRight, Mail} from 'lucide-react';
 import {useRouter} from 'next/navigation';
 
 import {PasswordInput} from '@/components/password-input';
+import {WorkspaceLoading} from '@/components/workspace-loading';
 import {createClient} from '@/lib/supabase/client';
 
 export function AdminLoginForm() {
@@ -13,6 +14,7 @@ export function AdminLoginForm() {
   const [error, setError] = useState('');
   const [email, setEmail] = useState('');
   const [resetSent, setResetSent] = useState(false);
+  const [isEntering, setIsEntering] = useState(false);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setError(''); setIsSubmitting(true);
@@ -26,7 +28,8 @@ export function AdminLoginForm() {
         await supabase.auth.signOut();
         throw new Error('Questo accesso è riservato al team WOWPRO.');
       }
-      router.push('/auth/redirect');
+      setIsEntering(true);
+      router.replace(profile.role === 'graphic_operator' ? '/operatore' : '/admin');
     } catch (caught) { setError(caught instanceof Error ? caught.message : 'Accesso non riuscito.'); setIsSubmitting(false); }
   }
 
@@ -38,12 +41,12 @@ export function AdminLoginForm() {
     setResetSent(true);
   }
 
-  return <form className="login-form" onSubmit={submit}>
+  return <>{isEntering ? <div className="login-loading-overlay"><WorkspaceLoading label="Accesso effettuato, sto aprendo il pannello" /></div> : null}<form className="login-form" onSubmit={submit}>
     <label htmlFor="staff-email">Email aziendale</label><div className="input-wrap"><Mail aria-hidden="true" size={18} /><input autoComplete="email" id="staff-email" name="email" onChange={(event) => setEmail(event.target.value)} placeholder="nome@wowstampa.it" required type="email" value={email} /></div>
     <label htmlFor="staff-password">Password</label><PasswordInput autoComplete="current-password" id="staff-password" name="password" />
     {error ? <p className="login-error">{error}</p> : null}
     <button className="button button--primary" disabled={isSubmitting} type="submit">{isSubmitting ? 'Accesso in corso...' : 'Accedi al pannello'} <ArrowRight aria-hidden="true" size={18} /></button>
     <button className="login-reset-link" onClick={() => void requestPasswordSetup()} type="button">Imposta o reimposta la password</button>
     {resetSent ? <p className="login-reset-notice">Se l&apos;email è abilitata, riceverai a breve un link sicuro per impostare la password.</p> : null}
-  </form>;
+  </form></>;
 }
