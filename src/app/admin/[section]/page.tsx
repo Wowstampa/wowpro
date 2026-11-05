@@ -61,9 +61,12 @@ async function TeamRolesPage() {
   let operators: TeamOperator[] = [];
   let hasLoadError = false;
   try {
-    const {data, error} = await createAdminClient().from('profiles').select('id,email,full_name,role,status,created_at').order('full_name');
+    const admin = createAdminClient();
+    const {data, error} = await admin.from('profiles').select('id,email,full_name,role,status,created_at').order('full_name');
+    const {data: phones} = await admin.from('profiles').select('id,phone');
+    const phoneById = new Map((phones || []).map((row) => [row.id, row.phone as string | null]));
     if (error) throw error;
-    operators = (data || []).filter((operator) => ['admin', 'staff', 'graphic_operator'].includes(operator.role)).map((operator) => ({id: operator.id, email: operator.email, fullName: operator.full_name || operator.email, role: operator.role, status: operator.status, createdAt: operator.created_at}));
+    operators = (data || []).filter((operator) => ['admin', 'staff', 'graphic_operator'].includes(operator.role)).map((operator) => ({id: operator.id, email: operator.email, fullName: operator.full_name || operator.email, role: operator.role, status: operator.status, createdAt: operator.created_at, phone: phoneById.get(operator.id) || null}));
   } catch (error) { console.error('[Team directory]', error); hasLoadError = true; }
   return <><PageHeader eyebrow="WowStampa · Amministrazione" title="Team & ruoli" /><main className="page-content">{hasLoadError ? <section className="empty-card empty-card--section"><span className="eyebrow">REGISTRO NON DISPONIBILE</span><h2>Impossibile caricare il team</h2><p>Verifica la configurazione Supabase del servizio e riprova.</p></section> : <AdminTeamDirectory initialOperators={operators} />}</main></>;
 }
