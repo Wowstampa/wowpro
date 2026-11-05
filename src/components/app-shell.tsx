@@ -12,6 +12,7 @@ import {
   Lightbulb,
   LogOut,
   MessageSquareText,
+  MessagesSquare,
   PackageCheck,
   UsersRound,
 } from 'lucide-react';
@@ -35,7 +36,7 @@ function getClientLinks(notificationCounts: AdminNotificationCounts): Navigation
   {href: '/dashboard/richieste', label: 'Richieste grafiche', icon: MessageSquareText, count: notificationCounts.requests || undefined, section: 'GESTIONE'},
   {href: '/dashboard/ordini', label: 'Ordini', icon: PackageCheck},
   {href: '/dashboard/crediti', label: 'Crediti', icon: CreditCard},
-  {href: '/dashboard/supporto', label: 'Supporto', icon: Headphones, section: 'SUPPORTO'},
+  {href: '/dashboard/supporto', label: 'Supporto', icon: Headphones, count: notificationCounts.support || undefined, section: 'SUPPORTO'},
   {href: '/dashboard/feedback', label: 'Feedback & idee', icon: Lightbulb, section: 'COMMUNITY'},
   ];
 }
@@ -50,6 +51,7 @@ function getAdminLinks(notificationCounts: AdminNotificationCounts, isAdministra
   {href: '/admin', label: isAdministrator ? 'Panoramica' : 'Dashboard', icon: ChartNoAxesCombined},
   {href: '/admin/clienti', label: 'Clienti', icon: UsersRound, section: 'GESTIONE', separated: true, children: [{href: '/admin/archivio-clienti', label: 'Archivio clienti', icon: PackageCheck}]},
   {href: '/admin/richieste', label: 'Richieste', icon: MessageSquareText, count: notificationCounts.requests || undefined},
+  {href: '/admin/messaggi', label: 'Messaggi', icon: MessagesSquare, count: notificationCounts.support || undefined},
   {href: '/admin/crediti', label: 'Crediti', icon: BadgeEuro},
   {href: '/admin/feedback', label: 'Feedback & idee', icon: Lightbulb, count: notificationCounts.feedback || undefined, section: 'COMMUNITY'},
   ];
@@ -57,7 +59,7 @@ function getAdminLinks(notificationCounts: AdminNotificationCounts, isAdministra
   return links;
 }
 
-export type AdminNotificationCounts = {requests: number; feedback: number};
+export type AdminNotificationCounts = {requests: number; feedback: number; support?: number};
 
 export function AppShell({mode, children, notificationCounts = {requests: 0, feedback: 0}, operatorName, isAdministrator = false, subscription}: {mode: ShellMode; children: React.ReactNode; notificationCounts?: AdminNotificationCounts; operatorName?: string; isAdministrator?: boolean; subscription?: {plan: string; monthlyCredits: number; renewalDate: string; status: string}}) {
   const pathname = usePathname();

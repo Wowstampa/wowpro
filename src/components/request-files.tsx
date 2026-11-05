@@ -39,7 +39,7 @@ export async function uploadRequestFiles(requestId: string, files: File[], onPro
   return {uploaded, failed};
 }
 
-function putWithProgress(url: string, file: File, onLoaded: (bytes: number) => void) {
+export function putWithProgress(url: string, file: File, onLoaded: (bytes: number) => void) {
   return new Promise<void>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open('PUT', url);
