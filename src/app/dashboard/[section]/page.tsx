@@ -4,6 +4,7 @@ import {PageHeader} from '@/components/app-shell';
 import {ClientRequestsWorkspace} from '@/components/client-requests-workspace';
 import {ClientOrders} from '@/components/client-orders';
 import {CreditPurchase} from '@/components/credit-purchase';
+import {SupportChat} from '@/components/support-chat';
 import {requireProfile} from '@/lib/auth';
 import {getWowproClient} from '@/lib/integrations/airtable';
 import {listCustomerOrders, type CustomerOrder} from '@/lib/integrations/shopify';
@@ -17,6 +18,7 @@ export default async function ClientSectionPage({params}: {params: Promise<{sect
   if (section === 'crediti') return <CreditsPage />;
   if (section === 'richieste') return <RequestsPage />;
   if (section === 'ordini') return <OrdersPage />;
+  if (section === 'supporto') return <><PageHeader eyebrow="WOWPRO · Area cliente" title="Supporto" /><main className="page-content"><SupportChat emptyHint="Scrivi al tuo account manager: ti risponderà qui e riceverai un avviso via email." viewer="client" /></main></>;
   const title = titles[section] || 'WOWPRO';
   return <><PageHeader eyebrow="WOWPRO · Area cliente" title={title} /><main className="page-content"><section className="empty-card empty-card--section"><span className="eyebrow">IN PREPARAZIONE</span><h2>{title}</h2><p>Questo spazio verrà collegato ai dati del tuo account.</p></section></main></>;
 }
