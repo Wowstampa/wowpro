@@ -6,6 +6,7 @@ import {ClientRequestsWorkspace} from '@/components/client-requests-workspace';
 import {ClientOrders} from '@/components/client-orders';
 import {CreditPurchase} from '@/components/credit-purchase';
 import {OpenChatButton} from '@/components/support-widget';
+import {ClientFeedbackBoard, type FeedbackItem} from '@/components/client-feedback-board';
 import {getConversationCompany} from '@/lib/support';
 import {createAdminClient} from '@/lib/supabase/admin.server';
 import {requireProfile} from '@/lib/auth';
@@ -22,6 +23,7 @@ export default async function ClientSectionPage({params}: {params: Promise<{sect
   if (section === 'richieste') return <RequestsPage />;
   if (section === 'ordini') return <OrdersPage />;
   if (section === 'supporto') return <SupportPage />;
+  if (section === 'feedback') return <FeedbackPage />;
   const title = titles[section] || 'WOWPRO';
   return <><PageHeader eyebrow="WOWPRO · Area cliente" title={title} /><main className="page-content"><section className="empty-card empty-card--section"><span className="eyebrow">IN PREPARAZIONE</span><h2>{title}</h2><p>Questo spazio verrà collegato ai dati del tuo account.</p></section></main></>;
 }
@@ -65,6 +67,36 @@ async function OrdersPage() {
   }
   return <><PageHeader eyebrow="WOWPRO · Area cliente" title="Ordini" /><main className="page-content">{hasLoadError ? <section className="empty-card empty-card--section"><span className="eyebrow">COLLEGAMENTO NON DISPONIBILE</span><h2>Impossibile caricare gli ordini</h2><p>Riprova tra qualche istante. Se il problema continua, contatta il tuo account manager.</p></section> : <ClientOrders orders={orders} />}</main></>;
 }
+
+async function FeedbackPage() {
+  const profile = await requireProfile(['client']);
+  let items: FeedbackItem[] = [];
+  let hasLoadError = false;
+  const now = new Date().getTime();
+  try {
+    const admin = createAdminClient();
+    const [{data, error}, {data: votes, error: votesError}] = await Promise.all([
+      admin.from('feedback').select('id,title,description,category,status,public_response,created_at,updated_at,author:author_id(full_name,email),companies(name)').order('created_at', {ascending: false}),
+      admin.from('feedback_votes').select('feedback_id,voter_id'),
+    ]);
+    if (error || votesError) throw error || votesError;
+    const counts = new Map<string, number>();
+    const mine = new Set<string>();
+    for (const vote of votes || []) {
+      counts.set(vote.feedback_id, (counts.get(vote.feedback_id) || 0) + 1);
+      if (vote.voter_id === profile.id) mine.add(vote.feedback_id);
+    }
+    items = (data || []).map((row) => {
+      const author = (Array.isArray(row.author) ? row.author[0] : row.author) as {full_name?: string; email?: string} | null;
+      const company = (Array.isArray(row.companies) ? row.companies[0] : row.companies) as {name?: string} | null;
+      return {id: row.id, title: row.title, description: row.description, category: row.category, status: row.status, publicResponse: row.public_response || '', authorName: shortName(author?.full_name || company?.name || 'Cliente WOWPRO'), votes: counts.get(row.id) || 0, voted: mine.has(row.id), createdAt: row.created_at, updatedAt: row.updated_at};
+    });
+  } catch (error) { console.error('[Client feedback]', error); hasLoadError = true; }
+  return <><PageHeader eyebrow="WOWPRO · Area cliente" title="Feedback & Feature Request" /><main className="page-content">{hasLoadError ? <section className="empty-card empty-card--section"><span className="eyebrow">BACHECA NON DISPONIBILE</span><h2>Impossibile caricare le proposte</h2><p>Riprova tra qualche istante.</p></section> : <ClientFeedbackBoard initialItems={items} now={now} />}</main></>;
+}
+
+// "Andrea Rossi" → "Andrea R.": other clients see only first name and initial.
+function shortName(value: string) { const [first, ...rest] = value.trim().split(/\s+/); return rest.length ? `${first} ${rest[rest.length - 1][0].toUpperCase()}.` : first; }
 
 async function SupportPage() {
   const profile = await requireProfile(['client']);
