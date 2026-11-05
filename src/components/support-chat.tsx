@@ -11,7 +11,7 @@ type Conversation = {messages: Message[]; teamReadAt: string | null; clientReadA
 
 const POLL_MS = 5_000;
 
-export function SupportChat({companyId, viewer, emptyHint}: {companyId?: string; viewer: 'client' | 'team'; emptyHint?: string}) {
+export function SupportChat({companyId, viewer, emptyHint, variant = 'page'}: {companyId?: string; viewer: 'client' | 'team'; emptyHint?: string; variant?: 'page' | 'popup'}) {
   const router = useRouter();
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [error, setError] = useState('');
@@ -88,7 +88,7 @@ export function SupportChat({companyId, viewer, emptyHint}: {companyId?: string;
   const mine = (message: Message) => (viewer === 'client' ? message.fromClient : !message.fromClient);
   const lastMine = [...(conversation?.messages || [])].reverse().find(mine);
 
-  return <section className="support-chat">
+  return <section className={variant === 'popup' ? 'support-chat support-chat--popup' : 'support-chat'}>
     <header className="support-chat__head">
       <span className="support-chat__avatar">{initials(viewer === 'client' ? conversation?.manager || 'WowStampa' : conversation?.companyName || '…')}</span>
       <div>
