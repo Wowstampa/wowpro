@@ -12,6 +12,7 @@ const updateSchema = z.object({
   stato_abbonamento: z.string().trim().min(1).max(80),
   account_manager_nome: z.string().trim().max(120).optional(),
   account_manager_id: z.union([z.string().uuid(), z.literal('')]).optional(),
+  designer_id: z.union([z.string().uuid(), z.literal('')]).optional(),
   shopify_customer_id: z.string().trim().max(120).optional(),
 });
 
@@ -27,12 +28,17 @@ export async function PATCH(request: Request, {params}: {params: Promise<{record
 
   try {
     const {recordId} = await params;
-    const {account_manager_id: managerId, ...fields} = parsed.data;
+    const {account_manager_id: managerId, designer_id: designerId, ...fields} = parsed.data;
     const record = await updateWowproClient(recordId, fields);
     if (managerId !== undefined) {
       // The account manager link lives in Supabase: it decides who receives the client's chat messages.
       const {error} = await createAdminClient().from('companies').upsert({airtable_record_id: recordId, name: fields.ragione_sociale, shopify_customer_id: fields.shopify_customer_id || null, account_manager_id: managerId || null}, {onConflict: 'airtable_record_id'});
       if (error) console.error('[Client manager link]', error);
+    }
+    if (designerId !== undefined) {
+      // Separate update: the designer column may not exist until its migration has run.
+      const {error} = await createAdminClient().from('companies').update({designer_id: designerId || null}).eq('airtable_record_id', recordId);
+      if (error) console.error('[Client designer link]', error);
     }
     return NextResponse.json({fields: record.fields});
   } catch (error) {
