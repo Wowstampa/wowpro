@@ -67,7 +67,7 @@ export async function POST(request: Request) {
 
     if (sendInvite) {
       const origin = process.env.NEXT_PUBLIC_APP_URL || new URL(request.url).origin;
-      const {data: invitation, error: invitationError} = await admin.auth.admin.inviteUserByEmail(email, {redirectTo: `${origin}/auth/callback?next=/dashboard/home`});
+      const {data: invitation, error: invitationError} = await admin.auth.admin.inviteUserByEmail(email, {redirectTo: `${origin}/auth/callback?next=/auth/set-password`});
       if (invitationError || !invitation.user) {
         if (invitationError?.message.toLowerCase().includes('already')) {
           warning = 'Cliente creato. Esiste già un account con questa email, quindi non è stato inviato un nuovo invito.';
