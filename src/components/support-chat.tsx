@@ -2,7 +2,7 @@
 
 import {useCallback, useEffect, useRef, useState, type FormEvent, type KeyboardEvent} from 'react';
 import {useRouter} from 'next/navigation';
-import {CheckCheck, FileText, Loader2, MessageCircle, Paperclip, Send, X} from 'lucide-react';
+import {CheckCheck, FileText, Loader2, Lock, MessageCircle, Paperclip, Send, X} from 'lucide-react';
 
 import {ACCEPTED_FILES, formatBytes, putWithProgress, validateFiles} from '@/components/request-files';
 
@@ -93,7 +93,7 @@ export function SupportChat({companyId, viewer, emptyHint, variant = 'page'}: {c
       <span className="support-chat__avatar">{initials(viewer === 'client' ? conversation?.manager || 'WowStampa' : conversation?.companyName || '…')}</span>
       <div>
         <strong>{viewer === 'client' ? conversation?.manager || 'Team WowStampa' : conversation?.companyName || 'Caricamento…'}</strong>
-        <small>{viewer === 'client' ? 'Il tuo account manager WowStampa' : conversation?.manager ? `Account manager: ${conversation.manager}` : 'Account manager non assegnato'}</small>
+        <small>{viewer === 'client' ? <><i className="support-chat__dot" />Account Manager · WOWPRO</> : conversation?.manager ? `Account manager: ${conversation.manager}` : 'Account manager non assegnato'}</small>
       </div>
     </header>
 
@@ -127,6 +127,7 @@ export function SupportChat({companyId, viewer, emptyHint, variant = 'page'}: {c
       </div>
       <small className="support-chat__hint">Invio per inviare · Maiusc+Invio per andare a capo</small>
     </form>
+    {variant === 'popup' ? <p className="support-chat__secure"><Lock size={12} /> Conversazione privata con il tuo account manager</p> : null}
   </section>;
 }
 
