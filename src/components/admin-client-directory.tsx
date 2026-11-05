@@ -12,6 +12,7 @@ export type AdminClient = {
   subscriptionStatus: string;
   accountManager: string;
   accountManagerId: string;
+  designerId: string;
   shopifyCustomerId: string;
   includedCredits: number;
   extraCredits: number;
@@ -21,7 +22,7 @@ export type AdminClient = {
 
 export type TeamMemberOption = {id: string; name: string};
 
-export function AdminClientDirectory({archived, initialClients, teamMembers = []}: {archived: boolean; initialClients: AdminClient[]; teamMembers?: TeamMemberOption[]}) {
+export function AdminClientDirectory({archived, designers = [], initialClients, teamMembers = []}: {archived: boolean; designers?: TeamMemberOption[]; initialClients: AdminClient[]; teamMembers?: TeamMemberOption[]}) {
   const [clients, setClients] = useState(initialClients);
   const [query, setQuery] = useState('');
   const [editingClient, setEditingClient] = useState<AdminClient | null>(null);
@@ -72,8 +73,8 @@ export function AdminClientDirectory({archived, initialClients, teamMembers = []
         {!visibleClients.length ? <p className="client-list__empty">Nessun cliente corrisponde alla ricerca.</p> : null}
       </section>
 
-      {isCreating ? <CreateClientModal teamMembers={teamMembers} onClose={() => setIsCreating(false)} onCreated={(client, warning) => { setClients((current) => [client, ...current]); setIsCreating(false); setNotice(warning || `${client.companyName} è stato aggiunto ai clienti.`); }} /> : null}
-      {editingClient ? <EditClientModal teamMembers={teamMembers} client={editingClient} onClose={() => setEditingClient(null)} onSaved={(patch) => { replaceClient(editingClient.recordId, patch); setEditingClient(null); }} /> : null}
+      {isCreating ? <CreateClientModal designers={designers} teamMembers={teamMembers} onClose={() => setIsCreating(false)} onCreated={(client, warning) => { setClients((current) => [client, ...current]); setIsCreating(false); setNotice(warning || `${client.companyName} è stato aggiunto ai clienti.`); }} /> : null}
+      {editingClient ? <EditClientModal designers={designers} teamMembers={teamMembers} client={editingClient} onClose={() => setEditingClient(null)} onSaved={(patch) => { replaceClient(editingClient.recordId, patch); setEditingClient(null); }} /> : null}
       {creditClient ? <CreditModal client={creditClient} onClose={() => setCreditClient(null)} onSaved={(patch) => { replaceClient(creditClient.recordId, patch); setCreditClient(null); }} /> : null}
       {archivingClient ? <ArchiveClientModal client={archivingClient} onArchived={() => { replaceClient(archivingClient.recordId, {isArchived: true}); setArchivingClient(null); }} onClose={() => setArchivingClient(null)} /> : null}
     </>
@@ -100,7 +101,7 @@ function CreditBalance({current, label}: {current: number; label: string}) {
   return <div><strong>{formatNumber(current)}</strong><small>{label}</small><span className="credit-meter"><i style={{width: `${ratio}%`}} /></span></div>;
 }
 
-function CreateClientModal({onClose, onCreated, teamMembers}: {onClose: () => void; onCreated: (client: AdminClient, warning?: string) => void; teamMembers: TeamMemberOption[]}) {
+function CreateClientModal({designers, onClose, onCreated, teamMembers}: {designers: TeamMemberOption[]; onClose: () => void; onCreated: (client: AdminClient, warning?: string) => void; teamMembers: TeamMemberOption[]}) {
   const [error, setError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
@@ -115,6 +116,7 @@ function CreateClientModal({onClose, onCreated, teamMembers}: {onClose: () => vo
       stato_abbonamento: String(form.get('status') || ''),
       account_manager_id: String(form.get('managerId') || ''),
       account_manager_nome: teamMembers.find((member) => member.id === form.get('managerId'))?.name || '',
+      designer_id: String(form.get('designerId') || ''),
       shopify_customer_id: String(form.get('shopifyCustomerId') || ''),
       crediti_inclusi_mese: String(form.get('monthlyCredits') || '0'),
       invia_invito: form.get('sendInvite') === 'on',
@@ -133,6 +135,7 @@ function CreateClientModal({onClose, onCreated, teamMembers}: {onClose: () => vo
         subscriptionStatus: fields.stato_abbonamento || payload.stato_abbonamento,
         accountManager: fields.account_manager_nome || '',
         accountManagerId: payload.account_manager_id,
+        designerId: payload.designer_id,
         shopifyCustomerId: fields.shopify_customer_id || '',
         includedCredits: Number(fields.crediti_inclusi_residui || 0),
         extraCredits: Number(fields.crediti_extra_residui || 0),
@@ -152,6 +155,7 @@ function CreateClientModal({onClose, onCreated, teamMembers}: {onClose: () => vo
       <label>Stato abbonamento<select defaultValue="Attivo" name="status"><option>Attivo</option><option>Sospeso</option><option>Disdetto</option></select></label>
       <label>Crediti inclusi al mese<input defaultValue="0" min="0" name="monthlyCredits" type="number" /></label>
       <label>Account manager<ManagerSelect defaultValue="" teamMembers={teamMembers} /></label>
+      <label>Grafico dedicato<DesignerSelect defaultValue="" designers={designers} /></label>
       <label className="client-form__wide">Shopify Customer ID<input name="shopifyCustomerId" placeholder="Facoltativo" /></label>
       <label className="client-form__check"><input defaultChecked name="sendInvite" type="checkbox" />Invia al cliente l’email di accesso al portale</label>
       {error ? <p className="form-error">{error}</p> : null}
@@ -160,7 +164,7 @@ function CreateClientModal({onClose, onCreated, teamMembers}: {onClose: () => vo
   </Modal>;
 }
 
-function EditClientModal({client, onClose, onSaved, teamMembers}: {client: AdminClient; onClose: () => void; onSaved: (patch: Partial<AdminClient>) => void; teamMembers: TeamMemberOption[]}) {
+function EditClientModal({client, designers, onClose, onSaved, teamMembers}: {client: AdminClient; designers: TeamMemberOption[]; onClose: () => void; onSaved: (patch: Partial<AdminClient>) => void; teamMembers: TeamMemberOption[]}) {
   const [error, setError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
@@ -175,13 +179,14 @@ function EditClientModal({client, onClose, onSaved, teamMembers}: {client: Admin
       stato_abbonamento: String(form.get('status') || ''),
       account_manager_id: String(form.get('managerId') || ''),
       account_manager_nome: teamMembers.find((member) => member.id === form.get('managerId'))?.name || '',
+      designer_id: String(form.get('designerId') || ''),
       shopify_customer_id: String(form.get('shopifyCustomerId') || ''),
     };
     try {
       const response = await fetch(`/api/admin/clients/${client.recordId}`, {method: 'PATCH', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)});
       const result = await readApiResponse(response);
       if (!response.ok || !result.fields) throw new Error(result.error || 'Salvataggio non riuscito.');
-      onSaved({companyName: result.fields.ragione_sociale || '', email: result.fields.email_login || '', plan: result.fields.piano || '', subscriptionStatus: result.fields.stato_abbonamento || '', accountManager: result.fields.account_manager_nome || '', accountManagerId: payload.account_manager_id, shopifyCustomerId: result.fields.shopify_customer_id || ''});
+      onSaved({companyName: result.fields.ragione_sociale || '', email: result.fields.email_login || '', plan: result.fields.piano || '', subscriptionStatus: result.fields.stato_abbonamento || '', accountManager: result.fields.account_manager_nome || '', accountManagerId: payload.account_manager_id, designerId: payload.designer_id, shopifyCustomerId: result.fields.shopify_customer_id || ''});
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Salvataggio non riuscito.');
     } finally { setIsSaving(false); }
@@ -194,6 +199,7 @@ function EditClientModal({client, onClose, onSaved, teamMembers}: {client: Admin
       <label>Piano<select defaultValue={client.plan} name="plan"><option>Basic</option><option>Standard</option><option>Premium</option></select></label>
       <label>Stato abbonamento<select defaultValue={client.subscriptionStatus} name="status"><option>Attivo</option><option>Sospeso</option><option>Disdetto</option></select></label>
       <label>Account manager<ManagerSelect defaultValue={client.accountManagerId} fallbackName={client.accountManager} teamMembers={teamMembers} /></label>
+      <label>Grafico dedicato<DesignerSelect defaultValue={client.designerId} designers={designers} /></label>
       <label>Shopify Customer ID<input defaultValue={client.shopifyCustomerId} name="shopifyCustomerId" /></label>
       {error ? <p className="form-error">{error}</p> : null}
       <ModalActions isSubmitting={isSaving} submitLabel="Salva modifiche" onClose={onClose} />
@@ -261,6 +267,10 @@ function ArchiveClientModal({client, onArchived, onClose}: {client: AdminClient;
       <footer className="modal-actions"><button className="client-action" disabled={isSaving} onClick={onClose} type="button">Annulla</button><button className="client-action client-action--archive-confirm" disabled={!isConfirmed || isSaving} type="submit"><Archive size={16} />{isSaving ? 'Archiviazione...' : 'Archivia cliente'}</button></footer>
     </form>
   </Modal>;
+}
+
+function DesignerSelect({defaultValue, designers}: {defaultValue: string; designers: TeamMemberOption[]}) {
+  return <select defaultValue={defaultValue} name="designerId"><option value="">Non assegnato</option>{designers.map((designer) => <option key={designer.id} value={designer.id}>{designer.name}</option>)}</select>;
 }
 
 function ManagerSelect({defaultValue, fallbackName, teamMembers}: {defaultValue: string; fallbackName?: string; teamMembers: TeamMemberOption[]}) {
