@@ -3,6 +3,7 @@ import {z} from 'zod';
 
 import {getCurrentProfile} from '@/lib/auth';
 import {updateWowproClient} from '@/lib/integrations/airtable';
+import {createAdminClient} from '@/lib/supabase/admin.server';
 
 const updateSchema = z.object({
   ragione_sociale: z.string().trim().min(1).max(200),
@@ -10,6 +11,7 @@ const updateSchema = z.object({
   piano: z.string().trim().min(1).max(80),
   stato_abbonamento: z.string().trim().min(1).max(80),
   account_manager_nome: z.string().trim().max(120).optional(),
+  account_manager_id: z.union([z.string().uuid(), z.literal('')]).optional(),
   shopify_customer_id: z.string().trim().max(120).optional(),
 });
 
@@ -25,7 +27,13 @@ export async function PATCH(request: Request, {params}: {params: Promise<{record
 
   try {
     const {recordId} = await params;
-    const record = await updateWowproClient(recordId, parsed.data);
+    const {account_manager_id: managerId, ...fields} = parsed.data;
+    const record = await updateWowproClient(recordId, fields);
+    if (managerId !== undefined) {
+      // The account manager link lives in Supabase: it decides who receives the client's chat messages.
+      const {error} = await createAdminClient().from('companies').upsert({airtable_record_id: recordId, name: fields.ragione_sociale, shopify_customer_id: fields.shopify_customer_id || null, account_manager_id: managerId || null}, {onConflict: 'airtable_record_id'});
+      if (error) console.error('[Client manager link]', error);
+    }
     return NextResponse.json({fields: record.fields});
   } catch (error) {
     console.error('[Client update]', error);
