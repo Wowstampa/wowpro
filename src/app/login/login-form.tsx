@@ -5,6 +5,7 @@ import {ArrowRight, Mail} from 'lucide-react';
 import {useRouter} from 'next/navigation';
 
 import {PasswordInput} from '@/components/password-input';
+import {WorkspaceLoading} from '@/components/workspace-loading';
 import {createClient} from '@/lib/supabase/client';
 
 export function LoginForm() {
@@ -12,6 +13,7 @@ export function LoginForm() {
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isEntering, setIsEntering] = useState(false);
   const [resetState, setResetState] = useState<'idle' | 'sending' | 'sent'>('idle');
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -21,13 +23,14 @@ export function LoginForm() {
       const form = new FormData(event.currentTarget);
       const {data, error: signInError} = await supabase.auth.signInWithPassword({email: email.trim(), password: String(form.get('password') || '')});
       if (signInError || !data.user) throw new Error('Email o password non corrette.');
-      const {data: profile} = await supabase.from('profiles').select('status').eq('id', data.user.id).maybeSingle();
+      const {data: profile} = await supabase.from('profiles').select('role,status').eq('id', data.user.id).maybeSingle();
       if (!profile || profile.status !== 'active') {
         await supabase.auth.signOut();
         throw new Error('Questo account non è abilitato a WOWPRO. Contatta il tuo account manager.');
       }
-      // The redirect route sends each role to its own area.
-      router.push('/auth/redirect');
+      // Go straight to the right area and keep a loading screen up until it is ready.
+      setIsEntering(true);
+      router.replace(destinationFor(profile.role));
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Accesso non riuscito.');
       setIsSubmitting(false);
@@ -43,6 +46,8 @@ export function LoginForm() {
   }
 
   return (
+    <>
+    {isEntering ? <div className="login-loading-overlay"><WorkspaceLoading label="Accesso effettuato, sto aprendo WOWPRO" /></div> : null}
     <form className="login-form" onSubmit={submit}>
       <label htmlFor="email">Email aziendale</label>
       <div className="input-wrap">
@@ -59,5 +64,12 @@ export function LoginForm() {
       <button className="login-reset-link" disabled={resetState === 'sending'} onClick={() => void requestPasswordSetup()} type="button">Primo accesso o password dimenticata?</button>
       {resetState === 'sent' ? <p className="login-reset-notice">Se l&apos;email è abilitata a WOWPRO, riceverai a breve un link per impostare la password.</p> : null}
     </form>
+    </>
   );
+}
+
+function destinationFor(role: string) {
+  if (role === 'graphic_operator') return '/operatore';
+  if (role === 'staff' || role === 'admin') return '/admin';
+  return '/dashboard';
 }
