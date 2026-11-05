@@ -130,3 +130,66 @@ export async function ensureOrdersPaidWebhook(appOrigin: string) {
   }
   webhookEnsured = true;
 }
+
+/* ---------- Customer orders ---------- */
+
+export type CustomerOrder = {
+  id: string;
+  name: string;
+  createdAt: string;
+  cancelled: boolean;
+  financialStatus: string | null;
+  fulfillmentStatus: string | null;
+  total: number;
+  currency: string;
+  statusPageUrl: string | null;
+  items: Array<{title: string; variantTitle: string | null; quantity: number; imageUrl: string | null}>;
+  creditsOnly: boolean;
+  shipments: Array<{status: string | null; company: string | null; number: string | null; url: string | null}>;
+};
+
+type OrdersQuery = {orders: {nodes: Array<{
+  id: string; name: string; createdAt: string; cancelledAt: string | null;
+  displayFinancialStatus: string | null; displayFulfillmentStatus: string | null; statusPageUrl: string | null;
+  totalPriceSet: {shopMoney: {amount: string; currencyCode: string}};
+  lineItems: {nodes: Array<{title: string; variantTitle: string | null; quantity: number; image: {url: string} | null; product: {id: string} | null}>};
+  fulfillments: Array<{displayStatus: string | null; trackingInfo: Array<{company: string | null; number: string | null; url: string | null}>}>;
+}>}};
+
+// Only orders belonging to this customer are ever requested: by Shopify customer ID when known, otherwise by email.
+export async function listCustomerOrders({customerId, email}: {customerId?: string | null; email?: string | null}) {
+  const numericId = (customerId || '').replace(/\D/g, '');
+  const cleanEmail = (email || '').trim().toLowerCase().replace(/["\\]/g, '');
+  if (!numericId && !cleanEmail) return [];
+  const search = numericId ? `customer_id:${numericId}` : `email:"${cleanEmail}"`;
+  const data = await shopifyAdminQuery<OrdersQuery>(
+    `query CustomerOrders($search: String!) {
+      orders(first: 50, sortKey: CREATED_AT, reverse: true, query: $search) {
+        nodes {
+          id name createdAt cancelledAt displayFinancialStatus displayFulfillmentStatus statusPageUrl
+          totalPriceSet { shopMoney { amount currencyCode } }
+          lineItems(first: 30) { nodes { title variantTitle quantity product { id } image { url(transform: {maxWidth: 120, maxHeight: 120}) } } }
+          fulfillments(first: 10) { displayStatus trackingInfo(first: 5) { company number url } }
+        }
+      }
+    }`,
+    {search},
+  );
+  const creditsProduct = `gid://shopify/Product/${getCreditsProductId()}`;
+  return data.orders.nodes.map((order): CustomerOrder => ({
+    id: order.id,
+    name: order.name,
+    createdAt: order.createdAt,
+    cancelled: Boolean(order.cancelledAt),
+    financialStatus: order.displayFinancialStatus,
+    fulfillmentStatus: order.displayFulfillmentStatus,
+    total: Number(order.totalPriceSet.shopMoney.amount),
+    currency: order.totalPriceSet.shopMoney.currencyCode,
+    statusPageUrl: order.statusPageUrl,
+    items: order.lineItems.nodes.map((item) => ({title: item.title, variantTitle: item.variantTitle, quantity: item.quantity, imageUrl: item.image?.url || null})),
+    creditsOnly: order.lineItems.nodes.length > 0 && order.lineItems.nodes.every((item) => item.product?.id === creditsProduct),
+    shipments: order.fulfillments.flatMap((fulfillment) => fulfillment.trackingInfo.length
+      ? fulfillment.trackingInfo.map((tracking) => ({status: fulfillment.displayStatus, ...tracking}))
+      : [{status: fulfillment.displayStatus, company: null, number: null, url: null}]),
+  }));
+}
