@@ -158,10 +158,22 @@ type OrdersQuery = {orders: {nodes: Array<{
 
 // Only orders belonging to this customer are ever requested: by Shopify customer ID when known, otherwise by email.
 export async function listCustomerOrders({customerId, email}: {customerId?: string | null; email?: string | null}) {
-  const numericId = (customerId || '').replace(/\D/g, '');
   const cleanEmail = (email || '').trim().toLowerCase().replace(/["\\]/g, '');
-  if (!numericId && !cleanEmail) return [];
-  const search = numericId ? `customer_id:${numericId}` : `email:"${cleanEmail}"`;
+  const customerIds = new Set<string>();
+  const numericId = (customerId || '').replace(/\D/g, '');
+  if (numericId) customerIds.add(numericId);
+  if (cleanEmail) {
+    // The Shopify customer is looked up by email too, so a missing or outdated ID in the CRM does not hide orders.
+    const customers = await shopifyAdminQuery<{customers: {nodes: Array<{id: string}>}}>(
+      `query CustomerByEmail($search: String!) { customers(first: 5, query: $search) { nodes { id } } }`,
+      {search: `email:"${cleanEmail}"`},
+    );
+    for (const customer of customers.customers.nodes) customerIds.add(customer.id.split('/').pop() || '');
+  }
+  const filters = [...customerIds].filter(Boolean).map((id) => `customer_id:${id}`);
+  if (cleanEmail) filters.push(`email:"${cleanEmail}"`);
+  if (!filters.length) return [];
+  const search = filters.join(' OR ');
   const data = await shopifyAdminQuery<OrdersQuery>(
     `query CustomerOrders($search: String!) {
       orders(first: 50, sortKey: CREATED_AT, reverse: true, query: $search) {
