@@ -2,6 +2,7 @@ import {AppShell} from '@/components/app-shell';
 import {requireProfile} from '@/lib/auth';
 import {getWowproClient} from '@/lib/integrations/airtable';
 import {createClient} from '@/lib/supabase/server';
+import {countUnread} from '@/lib/support';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,5 +25,6 @@ export default async function DashboardLayout({children}: {children: React.React
       };
     } catch { /* The portal remains available if the Airtable subscription cannot be read. */ }
   }
-  return <AppShell mode="client" notificationCounts={{requests: count || 0, feedback: 0}} operatorName={company?.name || profile.full_name || profile.email} subscription={subscription}>{children}</AppShell>;
+  const support = await countUnread(profile).catch(() => 0);
+  return <AppShell mode="client" notificationCounts={{requests: count || 0, feedback: 0, support}} operatorName={company?.name || profile.full_name || profile.email} subscription={subscription}>{children}</AppShell>;
 }
