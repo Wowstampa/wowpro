@@ -24,7 +24,7 @@ export async function getRequestThread(profile: CurrentProfile, requestId: strin
   const admin = createAdminClient();
   const team = isTeam(profile);
   const [{data: request}, {data: events}, {data: messages}, {data: files}] = await Promise.all([
-    admin.from('graphic_requests').select('id,public_id,title,brief,type,status,credit_cost,created_at,completed_at,due_date,priority,awaiting_client_response,companies(name),requester:requested_by(full_name,email),designer:assigned_to(full_name,email)').eq('id', requestId).maybeSingle(),
+    admin.from('graphic_requests').select('id,public_id,title,brief,type,status,credit_cost,created_at,completed_at,due_date,priority,awaiting_client_response,assigned_to,companies(name),requester:requested_by(full_name,email),designer:assigned_to(full_name,email)').eq('id', requestId).maybeSingle(),
     admin.from('request_events').select('id,event_type,public_message,internal_note,created_at,actor:actor_id(full_name,email,role)').eq('request_id', requestId).not('event_type', 'like', 'email:%').order('created_at'),
     admin.from('request_messages').select('id,body,customer_visible,created_at,author_id,author:author_id(full_name,email,role)').eq('request_id', requestId).order('created_at'),
     admin.from('request_files').select('id,file_name,size_bytes,created_at,customer_visible,uploader:uploaded_by(full_name,email,role)').eq('request_id', requestId).order('created_at'),
@@ -57,8 +57,9 @@ export async function getRequestThread(profile: CurrentProfile, requestId: strin
       id: request.id, publicId: request.public_id, title: request.title, brief: request.brief, type: TYPE_LABELS[request.type] || request.type,
       status: request.status as RequestStatus, creditCost: request.credit_cost, createdAt: request.created_at, completedAt: request.completed_at,
       dueDate: request.due_date, priority: request.priority, awaitingClient: request.awaiting_client_response,
-      companyName: company?.name || 'Cliente', requesterName: nameOf(requester, 'Cliente'), designerName: designer ? nameOf(designer) : null,
+      companyName: company?.name || 'Cliente', requesterName: nameOf(requester, 'Cliente'), designerName: designer ? nameOf(designer) : null, designerId: request.assigned_to as string | null,
     },
+    designers: profile.role === 'staff' || profile.role === 'admin' ? ((await admin.from('profiles').select('id,full_name,email').eq('role', 'graphic_operator').eq('status', 'active').order('full_name')).data || []).map((row) => ({id: row.id, name: row.full_name || row.email})) : [],
     files: (files || []).filter((file) => team || file.customer_visible).map((file) => ({id: file.id, name: file.file_name, size: Number(file.size_bytes || 0), createdAt: file.created_at})),
     timeline,
   };
