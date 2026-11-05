@@ -2,7 +2,8 @@ import {AppShell} from '@/components/app-shell';
 import {requireProfile} from '@/lib/auth';
 import {getWowproClient} from '@/lib/integrations/airtable';
 import {createClient} from '@/lib/supabase/server';
-import {countUnread} from '@/lib/support';
+import {SupportWidget} from '@/components/support-widget';
+import {countUnread, getConversationCompany} from '@/lib/support';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,6 +15,8 @@ export default async function DashboardLayout({children}: {children: React.React
     supabase.from('graphic_requests').select('*', {count: 'exact', head: true}).in('status', ['new', 'in_progress']),
   ]);
   let subscription: {plan: string; monthlyCredits: number; renewalDate: string; status: string} | undefined;
+  const supportPromise = countUnread(profile).catch(() => 0);
+  const managerPromise = profile.company_id ? getConversationCompany(profile.company_id).then((item) => item?.manager?.name || null).catch(() => null) : Promise.resolve(null);
   if (company?.airtable_record_id) {
     try {
       const client = await getWowproClient(company.airtable_record_id);
@@ -25,6 +28,6 @@ export default async function DashboardLayout({children}: {children: React.React
       };
     } catch { /* The portal remains available if the Airtable subscription cannot be read. */ }
   }
-  const support = await countUnread(profile).catch(() => 0);
-  return <AppShell mode="client" notificationCounts={{requests: count || 0, feedback: 0, support}} operatorName={company?.name || profile.full_name || profile.email} subscription={subscription}>{children}</AppShell>;
+  const [support, managerName] = await Promise.all([supportPromise, managerPromise]);
+  return <AppShell mode="client" notificationCounts={{requests: count || 0, feedback: 0, support}} operatorName={company?.name || profile.full_name || profile.email} subscription={subscription}>{children}<SupportWidget initialUnread={support} managerName={managerName} /></AppShell>;
 }
