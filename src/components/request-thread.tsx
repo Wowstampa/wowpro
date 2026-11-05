@@ -11,7 +11,8 @@ type Item =
   | {kind: 'event'; id: string; at: string; text: string; tone: string; authorName: string}
   | {kind: 'file'; id: string; at: string; name: string; size: number; authorName: string; fromClient: boolean};
 type Thread = {
-  request: {id: string; publicId: string; title: string; brief: string; type: string; status: Status; creditCost: number; createdAt: string; completedAt: string | null; dueDate: string | null; priority: string; awaitingClient: boolean; companyName: string; requesterName: string; designerName: string | null};
+  request: {id: string; publicId: string; title: string; brief: string; type: string; status: Status; creditCost: number; createdAt: string; completedAt: string | null; dueDate: string | null; priority: string; awaitingClient: boolean; companyName: string; requesterName: string; designerName: string | null; designerId: string | null};
+  designers: Array<{id: string; name: string}>;
   files: RequestFileItem[];
   timeline: Item[];
 };
@@ -64,6 +65,16 @@ export function RequestThread({requestId, viewer, canReject = false, onStatusCha
     } catch (caught) { setError(caught instanceof Error ? caught.message : 'Azione non riuscita.'); } finally { setIsActing(false); }
   }
 
+  async function assign(designerId: string) {
+    setIsActing(true); setError('');
+    try {
+      const response = await fetch(`/api/requests/${requestId}/assign`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({designerId})});
+      const result = await response.json() as {error?: string};
+      if (!response.ok) throw new Error(result.error || 'Assegnazione non riuscita.');
+      await load();
+    } catch (caught) { setError(caught instanceof Error ? caught.message : 'Assegnazione non riuscita.'); } finally { setIsActing(false); }
+  }
+
   async function sendComment(event?: FormEvent) {
     event?.preventDefault();
     const body = comment.trim();
@@ -93,7 +104,7 @@ export function RequestThread({requestId, viewer, canReject = false, onStatusCha
       <div className="rt-meta">
         <span><CircleDot size={14} />{request.type} · {request.creditCost.toLocaleString('it-IT')} crediti</span>
         {viewer === 'team' ? <span><User size={14} />{request.companyName} · {request.requesterName}</span> : null}
-        <span><Wrench size={14} />{request.designerName ? `Grafico: ${request.designerName}` : 'Grafico da assegnare'}</span>
+        {thread.designers.length ? <label className="rt-assign"><Wrench size={14} />Grafico<select disabled={isActing} onChange={(event) => void assign(event.target.value)} value={request.designerId || ''}><option value="">Da assegnare</option>{thread.designers.map((designer) => <option key={designer.id} value={designer.id}>{designer.name}</option>)}</select></label> : <span><Wrench size={14} />{request.designerName ? `Grafico: ${request.designerName}` : 'Grafico da assegnare'}</span>}
         <span><CalendarDays size={14} />Inviata il {longDate(request.createdAt)}</span>
         {request.dueDate ? <span><CalendarDays size={14} />Scadenza {longDate(request.dueDate)}</span> : null}
       </div>
