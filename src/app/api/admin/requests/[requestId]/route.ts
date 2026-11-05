@@ -5,7 +5,7 @@ import {getCurrentProfile} from '@/lib/auth';
 import {createAdminClient} from '@/lib/supabase/admin.server';
 
 const updateRequestSchema = z.object({
-  status: z.enum(['new', 'in_progress', 'completed', 'rejected']),
+  status: z.enum(['new', 'in_progress', 'review', 'completed', 'rejected']),
 });
 
 export async function PATCH(request: Request, {params}: {params: Promise<{requestId: string}>}) {
@@ -49,6 +49,6 @@ export async function PATCH(request: Request, {params}: {params: Promise<{reques
   }
 }
 
-function statusLabel(status: 'new' | 'in_progress' | 'completed' | 'rejected') {
-  return {new: 'Nuova', in_progress: 'In lavorazione', completed: 'Completata', rejected: 'Rifiutata'}[status];
+function statusLabel(status: 'new' | 'in_progress' | 'review' | 'completed' | 'rejected') {
+  return {new: 'Nuova', in_progress: 'In lavorazione', review: 'Bozza da approvare', completed: 'Completata', rejected: 'Rifiutata'}[status];
 }
