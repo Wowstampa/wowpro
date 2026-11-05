@@ -41,6 +41,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .input-wrap { display: flex; align-items: center; gap: 10px; height: 54px; padding: 0 16px; border: 1px solid #d8e0e6; border-radius: 12px; background: white; color: #9aa5b4; }
 .input-wrap:focus-within { border-color: var(--green); box-shadow: 0 0 0 3px rgba(25, 187, 99, .12); }
 .input-wrap input { width: 100%; border: 0; outline: 0; font-size: 16px; color: var(--ink); }
+.password-toggle { width: 34px; height: 34px; margin-right: -8px; flex-shrink: 0; display: grid; place-items: center; border: 0; border-radius: 9px; background: transparent; color: #8a95a5; cursor: pointer; }.password-toggle:hover { background: #f1f4f7; color: var(--ink); }.password-toggle:focus-visible { outline: 2px solid var(--green); outline-offset: 1px; }
 .button { min-height: 44px; padding: 0 18px; border: 0; border-radius: 11px; display: inline-flex; align-items: center; justify-content: center; gap: 9px; font-weight: 800; cursor: pointer; }
 .button--primary { background: var(--green); color: white; box-shadow: var(--glow); }
 .button--primary:hover { background: #169f4e; box-shadow: var(--glow-strong); transform: translateY(-1px); }
