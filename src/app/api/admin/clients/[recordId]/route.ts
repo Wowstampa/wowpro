@@ -39,6 +39,12 @@ export async function PATCH(request: Request, {params}: {params: Promise<{record
       // Separate update: the designer column may not exist until its migration has run.
       const {error} = await createAdminClient().from('companies').update({designer_id: designerId || null}).eq('airtable_record_id', recordId);
       if (error) console.error('[Client designer link]', error);
+      else if (designerId) {
+        // Open requests still without a designer go to the newly chosen one.
+        const admin = createAdminClient();
+        const {data: company} = await admin.from('companies').select('id').eq('airtable_record_id', recordId).maybeSingle();
+        if (company) await admin.from('graphic_requests').update({assigned_to: designerId}).eq('company_id', company.id).is('assigned_to', null).in('status', ['new', 'in_progress', 'review']);
+      }
     }
     return NextResponse.json({fields: record.fields});
   } catch (error) {
