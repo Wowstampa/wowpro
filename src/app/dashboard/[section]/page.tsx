@@ -2,9 +2,11 @@ import {BadgeCheck, CreditCard, Info, Pencil, Sparkles} from 'lucide-react';
 
 import {PageHeader} from '@/components/app-shell';
 import {ClientRequestsWorkspace} from '@/components/client-requests-workspace';
+import {ClientOrders} from '@/components/client-orders';
 import {CreditPurchase} from '@/components/credit-purchase';
 import {requireProfile} from '@/lib/auth';
 import {getWowproClient} from '@/lib/integrations/airtable';
+import {listCustomerOrders, type CustomerOrder} from '@/lib/integrations/shopify';
 import {createClient} from '@/lib/supabase/server';
 
 const titles: Record<string, string> = {crediti: 'Crediti', richieste: 'Richieste grafiche', ordini: 'Ordini', supporto: 'Supporto', feedback: 'Feedback & idee'};
@@ -13,6 +15,7 @@ export default async function ClientSectionPage({params}: {params: Promise<{sect
   const {section} = await params;
   if (section === 'crediti') return <CreditsPage />;
   if (section === 'richieste') return <RequestsPage />;
+  if (section === 'ordini') return <OrdersPage />;
   const title = titles[section] || 'WOWPRO';
   return <><PageHeader eyebrow="WOWPRO · Area cliente" title={title} /><main className="page-content"><section className="empty-card empty-card--section"><span className="eyebrow">IN PREPARAZIONE</span><h2>{title}</h2><p>Questo spazio verrà collegato ai dati del tuo account.</p></section></main></>;
 }
@@ -33,6 +36,28 @@ async function CreditsPage() {
     <section><div className="credits-section-title"><h2>Listino servizi grafici</h2><p>Costo in crediti per ogni tipo di richiesta</p></div><div className="service-price-grid"><Service icon={<BadgeCheck size={18} />} title="Revisione" text="Controllo file e piccole correzioni su un progetto esistente." credits="1.000" /><Service icon={<Pencil size={18} />} title="Modifica" text="Interventi sostanziali su grafica, testi o impaginazione." credits="2.000" /><Service icon={<Sparkles size={18} />} title="Creazione" text="Progettazione di una grafica nuova partendo da zero." credits="3.000" /></div></section>
     <section><div className="credits-section-title"><h2>Storico movimenti</h2></div><div className="credits-ledger"><div className="credits-ledger__head"><span>Data</span><span>Descrizione</span><span>Tipo</span><span>Crediti</span><span>Saldo</span></div>{ledger.map((transaction) => <div className="credits-ledger__row" key={transaction.id}><strong>{date(transaction.created_at)}</strong><span>{transaction.description}</span><span><i className={transaction.bucket === 'extra' ? 'ledger-tag ledger-tag--extra' : 'ledger-tag'}>{transaction.bucket === 'extra' ? 'Extra' : 'Inclusi'}</i></span><b className={transaction.amount > 0 ? 'positive' : 'negative'}>{transaction.amount > 0 ? '+' : ''}{number(transaction.amount)}</b><strong>{number(transaction.balance)}</strong></div>)}{!ledger.length ? <div className="credits-ledger__empty"><CreditCard size={20} /><strong>Nessun movimento</strong><p>Gli accrediti registrati dal team compariranno qui.</p></div> : null}</div></section>
   </main></>;
+}
+
+async function OrdersPage() {
+  const profile = await requireProfile(['client']);
+  const supabase = await createClient();
+  const {data: company} = await supabase.from('companies').select('airtable_record_id,shopify_customer_id').eq('id', profile.company_id || '').maybeSingle();
+  let orders: CustomerOrder[] = [];
+  let hasLoadError = false;
+  try {
+    let customerId = company?.shopify_customer_id || '';
+    let email = profile.email;
+    if (company?.airtable_record_id) {
+      const record = await getWowproClient(company.airtable_record_id);
+      customerId = record.fields.shopify_customer_id || customerId;
+      email = record.fields.email_login || email;
+    }
+    orders = await listCustomerOrders({customerId, email});
+  } catch (error) {
+    console.error('[Client orders]', error);
+    hasLoadError = true;
+  }
+  return <><PageHeader eyebrow="WOWPRO · Area cliente" title="Ordini" /><main className="page-content">{hasLoadError ? <section className="empty-card empty-card--section"><span className="eyebrow">COLLEGAMENTO NON DISPONIBILE</span><h2>Impossibile caricare gli ordini</h2><p>Riprova tra qualche istante. Se il problema continua, contatta il tuo account manager.</p></section> : <ClientOrders orders={orders} />}</main></>;
 }
 
 async function RequestsPage() {
