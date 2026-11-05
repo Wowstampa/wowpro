@@ -33,10 +33,13 @@ export async function POST(request: Request) {
 
     const usedIncluded = Math.min(included, creditCost);
     const usedExtra = creditCost - usedIncluded;
+    const {data: designerLink} = await admin.from('companies').select('designer_id').eq('id', company.id).maybeSingle();
+    const designerId = (designerLink as {designer_id?: string | null} | null)?.designer_id || null;
     const {data: graphicRequest, error: createError} = await admin.from('graphic_requests').insert({
       public_id: createPublicId(),
       company_id: company.id,
       requested_by: profile.id,
+      assigned_to: designerId,
       type: parsed.data.type,
       title: createTitle(parsed.data.type, parsed.data.brief),
       brief: parsed.data.brief,
