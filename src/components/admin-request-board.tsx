@@ -3,6 +3,8 @@
 import {CheckCircle2, Clock3, MessageSquareText, Plus, Search, TriangleAlert, X} from 'lucide-react';
 import {FormEvent, useState} from 'react';
 
+import {FileList, type RequestFileItem} from '@/components/request-files';
+
 export type AdminGraphicRequest = {
   id: string;
   publicId: string;
@@ -14,6 +16,7 @@ export type AdminGraphicRequest = {
   status: RequestStatus;
   creditCost: number;
   createdAt: string;
+  files?: RequestFileItem[];
 };
 
 type RequestStatus = 'new' | 'in_progress' | 'completed' | 'rejected';
@@ -133,7 +136,7 @@ function RequestRow({isUpdating, onStatusChange, request}: {isUpdating: boolean;
   return <article className="request-board__row">
     <div><span className="admin-row__id">{request.publicId}</span><strong>{request.title}</strong><small>{typeLabels[request.type]}</small></div>
     <div><strong>{request.companyName}</strong><small>{request.requesterName}</small></div>
-    <p title={request.brief}>{request.brief}</p>
+    <div className="request-board__brief"><p title={request.brief}>{request.brief}</p><FileList compact files={request.files || []} /></div>
     <strong className="request-cost">{formatNumber(request.creditCost)}</strong>
     <span className="request-date">{formatDate(request.createdAt)}</span>
     <select aria-label={`Aggiorna stato ${request.publicId}`} disabled={isUpdating} onChange={(event) => onStatusChange(event.target.value as RequestStatus)} value={request.status}>
