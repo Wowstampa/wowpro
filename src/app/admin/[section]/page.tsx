@@ -186,6 +186,7 @@ async function CreditsPage() {
 async function ClientsPage({archived}: {archived: boolean}) {
   let clients: AdminClient[] = [];
   let teamMembers: {id: string; name: string}[] = [];
+  let designers: {id: string; name: string}[] = [];
   let hasLoadError = false;
   try {
     const [records, team, {data: companies}] = await Promise.all([
@@ -194,12 +195,20 @@ async function ClientsPage({archived}: {archived: boolean}) {
       createAdminClient().from('companies').select('airtable_record_id,account_manager_id'),
     ]);
     teamMembers = team.map((member) => ({id: member.id, name: member.name}));
+    const admin = createAdminClient();
+    const [{data: designerRows}, {data: designerLinks}] = await Promise.all([
+      admin.from('profiles').select('id,full_name,email').eq('role', 'graphic_operator').eq('status', 'active').order('full_name'),
+      // designer_id exists once migration 0006 has run; until then links are simply empty.
+      admin.from('companies').select('airtable_record_id,designer_id'),
+    ]);
+    designers = (designerRows || []).map((row) => ({id: row.id, name: row.full_name || row.email}));
+    const designerByRecord = new Map((designerLinks || []).map((row) => [row.airtable_record_id, (row as {designer_id?: string | null}).designer_id || '']));
     const linked = new Map((companies || []).map((company) => [company.airtable_record_id, company.account_manager_id as string | null]));
     clients = records.map(({id, fields}) => {
       const client = toAdminClient(id, fields);
       // Linked profile first, otherwise the team member whose name matches the CRM text.
       const managerId = linked.get(id) || team.find((member) => member.name.trim().toLocaleLowerCase('it-IT') === client.accountManager.trim().toLocaleLowerCase('it-IT'))?.id || '';
-      return {...client, accountManagerId: managerId};
+      return {...client, accountManagerId: managerId, designerId: designerByRecord.get(id) || ''};
     });
   } catch {
     hasLoadError = true;
@@ -213,7 +222,7 @@ async function ClientsPage({archived}: {archived: boolean}) {
           <span className="eyebrow">COLLEGAMENTO NON DISPONIBILE</span>
           <h2>Impossibile caricare i clienti</h2>
           <p>Verifica le credenziali Airtable configurate nel servizio e riprova.</p>
-        </section> : <AdminClientDirectory archived={archived} initialClients={clients} teamMembers={teamMembers} />}
+        </section> : <AdminClientDirectory archived={archived} designers={designers} initialClients={clients} teamMembers={teamMembers} />}
       </main>
     </>
   );
@@ -229,6 +238,7 @@ function toAdminClient(recordId: string, fields: AirtableWowproClient): AdminCli
     subscriptionStatus: fields.stato_abbonamento || '',
     accountManager: fields.account_manager_nome || '',
     accountManagerId: '',
+    designerId: '',
     shopifyCustomerId: fields.shopify_customer_id || '',
     includedCredits: Number(fields.crediti_inclusi_residui || 0),
     extraCredits: Number(fields.crediti_extra_residui || 0),
