@@ -10,6 +10,8 @@ import {AdminTeamDirectory, type TeamOperator} from '@/components/admin-team-dir
 import {AdminFileStorage} from '@/components/admin-file-storage';
 import {getFileStorageSummary} from '@/lib/file-archive';
 import {ARCHIVE_AFTER_DAYS, STORAGE_LIMIT_BYTES, listRequestFiles} from '@/lib/request-files';
+import {AdminInbox} from '@/components/admin-inbox';
+import {listConversations, listTeamMembers, type SupportPerson} from '@/lib/support';
 
 const titles: Record<string, string> = {
   clienti: 'Clienti',
@@ -17,9 +19,10 @@ const titles: Record<string, string> = {
   richieste: 'Richieste',
   crediti: 'Crediti',
   feedback: 'Feedback & idee',
+  messaggi: 'Messaggi',
 };
 
-export default async function AdminSectionPage({params}: {params: Promise<{section: string}>}) {
+export default async function AdminSectionPage({params, searchParams}: {params: Promise<{section: string}>; searchParams: Promise<{c?: string}>}) {
   const {section} = await params;
   const title = titles[section] || 'Back-office';
 
@@ -29,6 +32,7 @@ export default async function AdminSectionPage({params}: {params: Promise<{secti
   if (section === 'richieste') return <RequestsPage />;
   if (section === 'feedback') return <FeedbackPage />;
   if (section === 'team-ruoli') return <TeamRolesPage />;
+  if (section === 'messaggi') return <MessagesPage companyId={(await searchParams).c} />;
 
   return (
     <>
@@ -42,6 +46,14 @@ export default async function AdminSectionPage({params}: {params: Promise<{secti
       </main>
     </>
   );
+}
+
+async function MessagesPage({companyId}: {companyId?: string}) {
+  const profile = await requireProfile(['staff', 'admin']);
+  let conversations: Awaited<ReturnType<typeof listConversations>> = [];
+  let hasLoadError = false;
+  try { conversations = await listConversations(profile); } catch (error) { console.error('[Support inbox]', error); hasLoadError = true; }
+  return <><PageHeader eyebrow="WowStampa · Programma WOWPRO" title="Messaggi" /><main className="page-content">{hasLoadError ? <section className="empty-card empty-card--section"><span className="eyebrow">MESSAGGI NON DISPONIBILI</span><h2>Impossibile caricare le conversazioni</h2><p>Verifica che la migrazione del database per la chat sia stata eseguita, poi riprova.</p></section> : <AdminInbox initialCompanyId={conversations.some((item) => item.companyId === companyId) ? companyId : undefined} initialConversations={conversations} />}</main></>;
 }
 
 async function TeamRolesPage() {
@@ -170,10 +182,22 @@ async function CreditsPage() {
 
 async function ClientsPage({archived}: {archived: boolean}) {
   let clients: AdminClient[] = [];
+  let teamMembers: {id: string; name: string}[] = [];
   let hasLoadError = false;
   try {
-    const records = await listWowproClients();
-    clients = records.map(({id, fields}) => toAdminClient(id, fields));
+    const [records, team, {data: companies}] = await Promise.all([
+      listWowproClients(),
+      listTeamMembers().catch(() => [] as SupportPerson[]),
+      createAdminClient().from('companies').select('airtable_record_id,account_manager_id'),
+    ]);
+    teamMembers = team.map((member) => ({id: member.id, name: member.name}));
+    const linked = new Map((companies || []).map((company) => [company.airtable_record_id, company.account_manager_id as string | null]));
+    clients = records.map(({id, fields}) => {
+      const client = toAdminClient(id, fields);
+      // Linked profile first, otherwise the team member whose name matches the CRM text.
+      const managerId = linked.get(id) || team.find((member) => member.name.trim().toLocaleLowerCase('it-IT') === client.accountManager.trim().toLocaleLowerCase('it-IT'))?.id || '';
+      return {...client, accountManagerId: managerId};
+    });
   } catch {
     hasLoadError = true;
   }
@@ -186,7 +210,7 @@ async function ClientsPage({archived}: {archived: boolean}) {
           <span className="eyebrow">COLLEGAMENTO NON DISPONIBILE</span>
           <h2>Impossibile caricare i clienti</h2>
           <p>Verifica le credenziali Airtable configurate nel servizio e riprova.</p>
-        </section> : <AdminClientDirectory archived={archived} initialClients={clients} />}
+        </section> : <AdminClientDirectory archived={archived} initialClients={clients} teamMembers={teamMembers} />}
       </main>
     </>
   );
@@ -201,6 +225,7 @@ function toAdminClient(recordId: string, fields: AirtableWowproClient): AdminCli
     plan: fields.piano || '',
     subscriptionStatus: fields.stato_abbonamento || '',
     accountManager: fields.account_manager_nome || '',
+    accountManagerId: '',
     shopifyCustomerId: fields.shopify_customer_id || '',
     includedCredits: Number(fields.crediti_inclusi_residui || 0),
     extraCredits: Number(fields.crediti_extra_residui || 0),
