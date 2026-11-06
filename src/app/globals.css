@@ -90,6 +90,10 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .app-main { min-width: 0; }
 .page-content > * { min-width: 0; }
 .mobile-bar, .sidebar-overlay, .inbox__back { display: none; }
+/* Mobile-only app chrome: hidden on desktop; tab wrappers are layout-transparent there. */
+.tabbar, .fab, .mobile-filters, .mobile-filters__empty, .mtabs__bar { display: none; }
+.mtabs, .mtab-panel { display: contents; }
+.mtab-panel > * { min-width: 0; }
 .page-header { height: 90px; padding: 0 44px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); background: rgba(248,250,251,.9); backdrop-filter: blur(12px); }
 .page-header span { color: #8b97a9; font-size: 12px; font-weight: 700; }
 .page-header h1 { margin: 2px 0 0; font-size: 25px; letter-spacing: -.04em; }
@@ -369,3 +373,106 @@ button, a { -webkit-tap-highlight-color: transparent; }
   .credit-shop__grid { grid-template-columns: repeat(2, 1fr); }
   .credit-shop__body .modal-actions .client-action { white-space: normal; }
 }
+
+/* ---------- Mobile app experience (≤ 760px) ---------- */
+@media (max-width: 760px) {
+  body { font-size: 15px; -webkit-tap-highlight-color: transparent; }
+  .mobile-bar { display: none; }
+  .app-main { min-height: 100dvh; padding-bottom: calc(66px + env(safe-area-inset-bottom)); }
+  .page-content { padding-bottom: 28px; }
+
+  /* Compact sticky app header. */
+  .page-header { position: sticky; z-index: 50; top: 0; min-height: calc(58px + env(safe-area-inset-top)); padding: calc(8px + env(safe-area-inset-top)) 16px 8px; flex-wrap: nowrap; align-items: center; background: rgba(248,250,251,.94); backdrop-filter: saturate(1.4) blur(14px); -webkit-backdrop-filter: saturate(1.4) blur(14px); }
+  .page-header > div:first-child { min-width: 0; flex: 1; }
+  .page-header > div:first-child > span { display: block; overflow: hidden; color: #7d899b; font-size: 10px; letter-spacing: .03em; text-overflow: ellipsis; white-space: nowrap; }
+  .page-header h1 { overflow: hidden; margin-top: 1px; font-size: 21px; line-height: 1.15; text-overflow: ellipsis; white-space: nowrap; }
+  .page-header .credit-chip { display: flex; flex: 0 0 auto; padding: 7px 11px; gap: 6px; border-radius: 999px; font-size: 0; box-shadow: none; }
+  .page-header .credit-chip strong { color: var(--ink); font-size: 13px; }
+  .page-header .credit-chip::after { content: 'crediti'; color: #7d899b; font-size: 11px; font-weight: 700; }
+  .page-header > :not(div:first-child) { flex: 0 0 auto; }
+
+  /* Bottom tab bar. */
+  .tabbar { position: fixed; z-index: 68; right: 0; bottom: 0; left: 0; display: flex; padding: 6px 6px calc(6px + env(safe-area-inset-bottom)); border-top: 1px solid rgba(255,255,255,.06); background: rgba(10,13,21,.97); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
+  .tabbar__item { flex: 1; min-width: 0; padding: 4px 2px; display: flex; flex-direction: column; align-items: center; gap: 3px; border: 0; background: none; color: #8d98aa; font: inherit; font-size: 10.5px; font-weight: 700; text-decoration: none; cursor: pointer; }
+  .tabbar__item > span { position: relative; width: 48px; height: 28px; display: grid; place-items: center; border-radius: 999px; transition: background .18s, color .18s; }
+  .tabbar__item.is-active { color: white; }
+  .tabbar__item.is-active > span { background: rgba(29,182,91,.2); color: #55de91; }
+  .tabbar__item b { position: absolute; top: -4px; right: 3px; min-width: 18px; height: 18px; padding: 0 5px; display: grid; place-items: center; border: 2px solid var(--nav); border-radius: 999px; background: var(--green); color: #04210f; font-size: 9px; }
+  .sidebar { padding-top: calc(20px + env(safe-area-inset-top)); padding-bottom: calc(20px + env(safe-area-inset-bottom)); }
+
+  /* Floating primary action above the tab bar. */
+  .fab { position: fixed; z-index: 65; right: 16px; bottom: calc(76px + env(safe-area-inset-bottom)); height: 52px; padding: 0 20px 0 16px; display: inline-flex; align-items: center; gap: 8px; border: 0; border-radius: 999px; background: linear-gradient(150deg, var(--green), #0f9a4a); color: #04210f; font: inherit; font-size: 15px; font-weight: 800; box-shadow: var(--glow-strong); cursor: pointer; }
+  .fab:active { transform: scale(.97); }
+  .client-requests-toolbar > .button, .feedback-hero__actions .button--primary { display: none; }
+  .client-requests-workspace, .feedback-portal { padding-bottom: 64px; }
+
+  /* Segmented tabs that split long pages. */
+  .mtabs { display: grid; gap: 16px; }
+  .mtabs__bar { padding: 4px; display: flex; gap: 4px; border-radius: 14px; background: #e9edf1; }
+  .mtabs > .mtabs__bar { position: sticky; z-index: 40; top: calc(58px + env(safe-area-inset-top)); box-shadow: 0 0 0 8px var(--canvas); }
+  .mtabs__bar button { flex: 1; min-width: 0; height: 38px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 0; border-radius: 10px; background: transparent; color: #5b6575; font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; transition: background .15s, color .15s; }
+  .mtabs__bar button.is-active { background: white; color: var(--ink); box-shadow: 0 1px 4px rgba(10,13,21,.12); }
+  .mtabs__bar b, .mtabs__bar small { min-width: 18px; height: 18px; padding: 0 5px; display: grid; place-items: center; border-radius: 999px; background: rgba(10,13,21,.08); color: #4f5d73; font-size: 10px; font-weight: 800; }
+  .mtabs__bar b { background: var(--green); color: #04210f; }
+  .mtab-panel { display: none; }
+  .mtab-panel.is-active { display: grid; gap: 18px; animation: login-fade .16s ease-out; }
+  .mtab-panel .support-chat { height: calc(100dvh - 210px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); min-height: 380px; border-radius: 18px; }
+  .mtab-panel .credits-section-title { margin-bottom: 12px; }
+
+  /* Credits: balances as two compact cards. */
+  .credits-hero { grid-template-columns: 1fr; gap: 12px; }
+  .credits-hero > article { min-height: 0; padding: 20px; }
+
+  /* Status filter pills for requests. */
+  .mobile-filters { margin: 0 -12px; padding: 2px 12px; display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; }
+  .mobile-filters::-webkit-scrollbar { display: none; }
+  .mobile-filters button { flex: 0 0 auto; height: 36px; padding: 0 14px; display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 999px; background: white; color: #4f5d73; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+  .mobile-filters button.is-active { border-color: var(--ink); background: var(--ink); color: white; }
+  .mobile-filters small { min-width: 18px; height: 18px; padding: 0 5px; display: grid; place-items: center; border-radius: 999px; background: var(--green-soft); color: var(--green-dark); font-size: 10px; font-weight: 800; }
+  .mobile-filters button.is-active small { background: var(--green); color: #04210f; }
+  .mobile-filters__empty { margin: 0; padding: 28px 16px; display: block; color: var(--muted); font-size: 14px; text-align: center; }
+  .client-requests-toolbar h2 { font-size: 19px; }
+  .client-requests-toolbar p { font-size: 13px; }
+
+  /* Request detail: tabs, compact header, composer pinned to the bottom. */
+  .rt { gap: 14px; padding-top: calc(18px + env(safe-area-inset-top)); }
+  .rt-head h2 { padding-right: 44px; }
+  .rt-tabs { display: flex; }
+  .rt:not(.rt--tab-details) .rt-meta, .rt:not(.rt--tab-details) .rt-steps,
+  .rt--tab-activity .rt-section--brief, .rt--tab-activity .rt-section--files,
+  .rt--tab-files .rt-section--brief, .rt--tab-files .rt-section--activity, .rt--tab-files .rt-composer,
+  .rt--tab-details .rt-section--files, .rt--tab-details .rt-section--activity, .rt--tab-details .rt-composer { display: none; }
+  .rt-section--activity > h3 { display: none; }
+  .rt-composer { margin: 0 -14px -24px; padding: 10px 14px calc(10px + env(safe-area-inset-bottom)); border-width: 1px 0 0; border-radius: 0; }
+  .rt-composer textarea { height: 48px; min-height: 48px; resize: none; }
+  .rt-composer textarea:focus { height: 96px; }
+  .rt-composer__bar small { display: none; }
+  .rt-composer__bar { justify-content: flex-end; }
+
+  /* Chat lives in the Supporto tab: no floating launcher on phones. */
+  .support-widget:not(.is-open) { display: none; }
+
+  /* Dashboard: short hero, swipeable benefits, no repeated call to action. */
+  .client-unified-dashboard { gap: 22px; }
+  .unified-hero { padding: 22px 18px; border-radius: 20px; }
+  .unified-hero h2 { margin: 12px 0 14px; font-size: 34px; }
+  .unified-hero__content > p { display: none; }
+  .unified-hero__actions { flex-direction: column; gap: 8px; margin-top: 4px; }
+  .unified-hero__actions .button { width: 100%; justify-content: center; }
+  .unified-benefits__heading { gap: 6px; }
+  .unified-benefits__heading > a { display: none; }
+  .unified-benefits__grid { margin: 0 -12px; padding: 4px 12px 10px; display: flex; gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding: 12px; scrollbar-width: none; }
+  .unified-benefits__grid::-webkit-scrollbar { display: none; }
+  .unified-benefits__grid > article { flex: 0 0 78%; scroll-snap-align: start; }
+  .unified-cta { display: none; }
+
+  /* Feedback: the hero shrinks to a title and a stats strip. */
+  .feedback-hero { gap: 16px; }
+  .feedback-hero > div:first-child > p, .feedback-hero__actions { display: none; }
+  .feedback-hero h2 { margin-bottom: 0; font-size: 24px; }
+  .feedback-hero__stats { grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .feedback-hero__stats div { padding: 10px 8px; border-radius: 12px; }
+  .feedback-hero__stats strong { font-size: 20px; }
+  .feedback-hero__stats small { display: block; font-size: 10px; line-height: 1.25; }
+}
+
