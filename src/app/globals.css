@@ -474,5 +474,48 @@ button, a { -webkit-tap-highlight-color: transparent; }
   .feedback-hero__stats div { padding: 10px 8px; border-radius: 12px; }
   .feedback-hero__stats strong { font-size: 20px; }
   .feedback-hero__stats small { display: block; font-size: 10px; line-height: 1.25; }
+  /* Back-office KPI cards: two compact columns instead of one tall card per row. */
+  .metric-grid, .administration-kpis, .request-overview, .credit-overview, .feedback-overview { grid-template-columns: 1fr 1fr !important; gap: 10px; }
+  .metric-card, .credit-overview__metric { min-height: 0; padding: 14px; border-radius: 16px; }
+  .metric-card .metric-icon, .credit-overview__metric .metric-icon { width: 32px; height: 32px; border-radius: 9px; }
+  .metric-card .metric-icon svg, .credit-overview__metric .metric-icon svg { width: 17px; height: 17px; }
+  .metric-card p, .credit-overview__metric p { margin: 10px 0 2px; font-size: 12px; }
+  .metric-card strong, .credit-overview__metric strong { font-size: 24px; }
+  .metric-card small, .credit-overview__metric small { display: block; font-size: 11px; line-height: 1.3; }
+  .admin-welcome { padding: 18px; }
+  .client-toolbar { flex-direction: column; align-items: stretch; gap: 12px; }
+  .client-toolbar__actions { flex-wrap: wrap; }
+  .client-toolbar__actions .client-search { flex: 1 1 100%; width: 100%; }
+  .client-toolbar__actions .button { flex: 1; justify-content: center; }
+
+  /* Back-office credits ledger: one card per movement. */
+  .credit-ledger { overflow: visible; }
+  .credit-ledger__head { display: none; }
+  .credit-ledger__row { min-width: 0; min-height: 0; padding: 12px 14px; grid-template-columns: 1fr auto; gap: 4px 12px; }
+  .credit-ledger__row > :nth-child(1) { grid-column: 1; grid-row: 1; color: var(--muted); font-size: 11px; }
+  .credit-ledger__row > :nth-child(1) strong, .credit-ledger__row > :nth-child(1) small { display: inline; margin-right: 6px; font-size: 11px; }
+  .credit-ledger__row > :nth-child(2) { grid-column: 1; grid-row: 2; }
+  .credit-ledger__row > :nth-child(3) { grid-column: 1 / -1; grid-row: 3; margin: 0; color: #5b6575; font-size: 13px; }
+  .credit-ledger__row > :nth-child(4) { grid-column: 2; grid-row: 2; justify-self: end; }
+  .credit-ledger__row > :nth-child(5) { grid-column: 1 / -1; grid-row: 4; color: var(--muted); font-size: 11px; }
+  .credit-ledger__row > :nth-child(6) { grid-column: 2; grid-row: 1; font-size: 16px; text-align: right; }
+  /* Search fields span the full width. */
+  .client-search { width: 100%; max-width: none; }
+  .request-board__filters { display: grid; gap: 10px; }
+
+  /* Back-office request rows: id above the title. */
+  .request-board__row > :nth-child(1) .admin-row__id { display: block; margin-bottom: 3px; }
+  .request-board__row > :nth-child(1) .request-row-open:not(.request-row-open--link) { display: block; padding: 0; font-size: 15px; text-align: left; }
+  .request-board__row > select { height: 44px; font-size: 15px !important; }
+
+  /* Team & roles: one card per operator. */
+  .team-directory { overflow: visible; }
+  .team-directory__head { display: none; }
+  .team-directory__row { min-width: 0; padding: 14px; grid-template-columns: 1fr auto; gap: 6px 10px; align-items: center; }
+  .team-directory__row > :nth-child(1) { grid-column: 1; grid-row: 1; }
+  .team-directory__row > :nth-child(2) { grid-column: 1 / -1; grid-row: 2; overflow: hidden; color: var(--muted); font-size: 13px; text-overflow: ellipsis; }
+  .team-directory__row > :nth-child(3) { grid-column: 1; grid-row: 3; justify-self: start; }
+  .team-directory__row > :nth-child(4) { grid-column: 2; grid-row: 1; justify-self: end; }
+  .team-directory__row > :nth-child(5) { grid-column: 2; grid-row: 3; justify-self: end; }
 }
 
