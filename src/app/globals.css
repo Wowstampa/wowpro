@@ -476,7 +476,8 @@ button, a { -webkit-tap-highlight-color: transparent; }
   .feedback-hero__stats small { display: block; font-size: 10px; line-height: 1.25; }
   /* Back-office KPI cards: two compact columns instead of one tall card per row. */
   .metric-grid, .administration-kpis, .request-overview, .credit-overview, .feedback-overview { grid-template-columns: 1fr 1fr !important; gap: 10px; }
-  .metric-card, .credit-overview__metric { min-height: 0; padding: 14px; border-radius: 16px; }
+  .metric-card, .administration-kpis .metric-card, .credit-overview__metric { min-height: 0; padding: 14px; border-radius: 16px; }
+  .credit-ledger__filters .client-search, .credit-ledger__filters label { width: 100%; }
   .metric-card .metric-icon, .credit-overview__metric .metric-icon { width: 32px; height: 32px; border-radius: 9px; }
   .metric-card .metric-icon svg, .credit-overview__metric .metric-icon svg { width: 17px; height: 17px; }
   .metric-card p, .credit-overview__metric p { margin: 10px 0 2px; font-size: 12px; }
