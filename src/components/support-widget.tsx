@@ -30,7 +30,7 @@ export function SupportWidget({initialUnread, managerName}: {initialUnread: numb
     return () => clearInterval(timer);
   }, [isOpen]);
 
-  return <div className="support-widget">
+  return <div className={isOpen ? 'support-widget is-open' : 'support-widget'}>
     {isOpen ? <section aria-label="Chat con il tuo account manager" className="support-widget__panel" role="dialog">
       <button aria-label="Chiudi chat" className="support-widget__close" onClick={() => setIsOpen(false)} type="button"><X size={18} /></button>
       <SupportChat emptyHint={`Scrivi a ${managerName || 'il tuo account manager'}: ti risponderà qui e riceverai un avviso via email.`} variant="popup" viewer="client" />

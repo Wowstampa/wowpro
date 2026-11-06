@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import {useState} from 'react';
+import {useEffect, useState} from 'react';
 import {usePathname, useRouter} from 'next/navigation';
 import {
   BadgeEuro,
@@ -11,10 +11,12 @@ import {
   Home,
   Lightbulb,
   LogOut,
+  Menu,
   MessageSquareText,
   MessagesSquare,
   PackageCheck,
   UsersRound,
+  X,
 } from 'lucide-react';
 import {createClient} from '@/lib/supabase/client';
 
@@ -66,6 +68,16 @@ export function AppShell({mode, children, notificationCounts = {requests: 0, fee
   const router = useRouter();
   const links = mode === 'admin' ? getAdminLinks(notificationCounts, isAdministrator) : mode === 'graphic' ? graphicLinks.map((link) => link.href === '/operatore/richieste' ? {...link, count: notificationCounts.requests || undefined} : link) : getClientLinks(notificationCounts);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const activeLink = links.find(({href, children}) => children?.some((child) => pathname.startsWith(child.href)) || href === pathname || (href !== '/admin' && href !== '/dashboard' && pathname.startsWith(href)));
+  const totalBadges = links.reduce((total, link) => total + (link.count || 0), 0);
+
+  // Mobile menu: lock page scroll while it is open.
+  useEffect(() => {
+    if (!menuOpen) return;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = ''; };
+  }, [menuOpen]);
 
   async function signOut() {
     setIsSigningOut(true);
@@ -77,7 +89,12 @@ export function AppShell({mode, children, notificationCounts = {requests: 0, fee
 
   return (
     <div className="app-frame">
-      <aside className="sidebar">
+      <header className="mobile-bar">
+        <Link className="mobile-bar__brand" href={links[0]?.href || '/'} onClick={() => setMenuOpen(false)}><span className="brand__mark">W</span><span><strong>WOWPRO</strong><small>{activeLink?.label || 'WowStampa'}</small></span></Link>
+        <button aria-expanded={menuOpen} aria-label={menuOpen ? 'Chiudi menu' : 'Apri menu'} className="mobile-bar__toggle" onClick={() => setMenuOpen((value) => !value)} type="button">{menuOpen ? <X size={22} /> : <Menu size={22} />}{!menuOpen && totalBadges ? <b>{totalBadges > 9 ? '9+' : totalBadges}</b> : null}</button>
+      </header>
+      {menuOpen ? <button aria-label="Chiudi menu" className="sidebar-overlay" onClick={() => setMenuOpen(false)} type="button" /> : null}
+      <aside className={menuOpen ? 'sidebar is-open' : 'sidebar'}>
         <div className="brand">
           <span className="brand__mark">W</span>
           <span><strong>WOWPRO</strong><small>{mode === 'admin' ? 'back-office · WowStampa' : mode === 'graphic' ? 'operatore grafico · WowStampa' : 'by WowStampa'}</small></span>
@@ -90,14 +107,14 @@ export function AppShell({mode, children, notificationCounts = {requests: 0, fee
             return (
               <div className={separated ? 'nav-group nav-group--separated' : 'nav-group'} key={href}>
                 {section ? <span className="nav-label nav-label--section">{section}</span> : null}
-                <Link href={href} className={active ? 'nav-link nav-link--active' : 'nav-link'}>
+                <Link href={href} className={active ? 'nav-link nav-link--active' : 'nav-link'} onClick={() => setMenuOpen(false)}>
                   <Icon size={18} />
                   <span>{label}</span>
                   {count ? <b>{count}</b> : null}
                 </Link>
                 {children ? <div className="nav-sublist">{children.map(({href: childHref, label: childLabel, icon: ChildIcon}) => {
                   const childActive = pathname === childHref || pathname.startsWith(`${childHref}/`);
-                  return <Link className={childActive ? 'nav-sublink nav-sublink--active' : 'nav-sublink'} href={childHref} key={childHref}><ChildIcon size={14} /><span>{childLabel}</span></Link>;
+                  return <Link className={childActive ? 'nav-sublink nav-sublink--active' : 'nav-sublink'} href={childHref} key={childHref} onClick={() => setMenuOpen(false)}><ChildIcon size={14} /><span>{childLabel}</span></Link>;
                 })}</div> : null}
               </div>
             );
