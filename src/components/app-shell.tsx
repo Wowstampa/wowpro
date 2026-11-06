@@ -10,6 +10,7 @@ import {
   Headphones,
   Home,
   Lightbulb,
+  LayoutGrid,
   LogOut,
   Menu,
   MessageSquareText,
@@ -61,6 +62,8 @@ function getAdminLinks(notificationCounts: AdminNotificationCounts, isAdministra
   return links;
 }
 
+const TAB_LABELS: Record<string, string> = {'/dashboard': 'Home', '/dashboard/richieste': 'Richieste', '/admin': 'Home', '/operatore': 'Home'};
+
 export type AdminNotificationCounts = {requests: number; feedback: number; support?: number};
 
 export function AppShell({mode, children, notificationCounts = {requests: 0, feedback: 0}, operatorName, isAdministrator = false, subscription}: {mode: ShellMode; children: React.ReactNode; notificationCounts?: AdminNotificationCounts; operatorName?: string; isAdministrator?: boolean; subscription?: {plan: string; monthlyCredits: number; renewalDate: string; status: string}}) {
@@ -71,6 +74,10 @@ export function AppShell({mode, children, notificationCounts = {requests: 0, fee
   const [menuOpen, setMenuOpen] = useState(false);
   const activeLink = links.find(({href, children}) => children?.some((child) => pathname.startsWith(child.href)) || href === pathname || (href !== '/admin' && href !== '/dashboard' && pathname.startsWith(href)));
   const totalBadges = links.reduce((total, link) => total + (link.count || 0), 0);
+  // Mobile bottom bar: the most used sections, everything else stays in the "Altro" drawer.
+  const tabHrefs = mode === 'admin' ? ['/admin', '/admin/richieste', '/admin/messaggi', '/admin/clienti'] : mode === 'graphic' ? ['/operatore', '/operatore/richieste'] : ['/dashboard', '/dashboard/richieste', '/dashboard/crediti', '/dashboard/supporto'];
+  const tabItems = tabHrefs.map((href) => links.find((link) => link.href === href)).filter((link): link is NavigationLink => Boolean(link)).map((link) => ({...link, label: TAB_LABELS[link.href] || link.label, icon: link.href === '/dashboard' ? Home : link.icon}));
+  const moreBadges = links.filter((link) => !tabHrefs.includes(link.href)).reduce((total, link) => total + (link.count || 0), 0);
 
   // Mobile menu: lock page scroll while it is open.
   useEffect(() => {
@@ -139,6 +146,13 @@ export function AppShell({mode, children, notificationCounts = {requests: 0, fee
         </div>
       </aside>
       <div className="app-main">{children}</div>
+      <nav aria-label="Navigazione principale" className="tabbar">
+        {tabItems.map(({href, label, icon: Icon, count}) => {
+          const active = !menuOpen && activeLink?.href === href;
+          return <Link aria-current={active ? 'page' : undefined} className={active ? 'tabbar__item is-active' : 'tabbar__item'} href={href} key={href} onClick={() => setMenuOpen(false)}><span><Icon size={21} />{count ? <b>{count > 9 ? '9+' : count}</b> : null}</span>{label}</Link>;
+        })}
+        <button aria-expanded={menuOpen} className={menuOpen || (activeLink && !tabItems.some((item) => item.href === activeLink.href)) ? 'tabbar__item is-active' : 'tabbar__item'} onClick={() => setMenuOpen((value) => !value)} type="button"><span><LayoutGrid size={21} />{moreBadges ? <b>{moreBadges > 9 ? '9+' : moreBadges}</b> : null}</span>Altro</button>
+      </nav>
     </div>
   );
 }

@@ -63,6 +63,7 @@ export function ClientFeedbackBoard({initialItems, now}: {initialItems: Feedback
   }
 
   return <section className="feedback-portal">
+    <button aria-label="Proponi una richiesta" className="fab" onClick={() => setIsProposing(true)} type="button"><Plus size={20} /> Proponi</button>
     <header className="feedback-hero">
       <div>
         <span className="feedback-hero__eyebrow"><i /> BACHECA CONDIVISA · CLIENTI WOWSTAMPA</span>

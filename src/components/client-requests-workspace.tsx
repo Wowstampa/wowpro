@@ -27,6 +27,9 @@ export function ClientRequestsWorkspace({extraCredits, includedCredits, requests
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [notice, setNotice] = useState('');
+  // Mobile-only status filter: the pills are hidden on desktop, where the filter always stays on "all".
+  const [filter, setFilter] = useState<keyof typeof FILTERS>('all');
+  const visible = filter === 'all' ? items : items.filter((item) => FILTERS[filter].statuses.includes(item.status));
   const closeDrawer = useCallback(() => { setSelectedId(null); if (window.location.search.includes('r=')) window.history.replaceState(null, '', window.location.pathname); }, []);
   useRequestFromUrl(useCallback((id: string) => setSelectedId(id), []));
 
@@ -40,10 +43,11 @@ export function ClientRequestsWorkspace({extraCredits, includedCredits, requests
         <Plus size={17} /> Nuova richiesta
       </button>
     </header>
+    {items.length ? <div aria-label="Filtra richieste" className="mobile-filters" role="tablist">{(Object.keys(FILTERS) as Array<keyof typeof FILTERS>).map((key) => { const count = key === 'all' ? items.length : items.filter((item) => FILTERS[key].statuses.includes(item.status)).length; return <button aria-selected={filter === key} className={filter === key ? 'is-active' : ''} key={key} onClick={() => setFilter(key)} role="tab" type="button">{FILTERS[key].label}{count ? <small>{count}</small> : null}</button>; })}</div> : null}
     {notice ? <p className="form-error request-notice">{notice}</p> : null}
     {!items.length ? <section className="empty-card empty-card--section"><span className="eyebrow">NESSUNA RICHIESTA</span><h2>Non hai richieste attive</h2><p>Inizia con una nuova richiesta per coinvolgere il tuo team grafico.</p></section> : <div className="client-requests-grid client-requests-grid--single">
       <div className="client-request-list client-request-list--workspace">
-        {items.map((request) => <button aria-pressed={selectedId === request.id} className={'client-request-row' + (selectedId === request.id ? ' client-request-row--selected' : '')} key={request.id} onClick={() => setSelectedId(request.id)} type="button">
+        {visible.map((request) => <button aria-pressed={selectedId === request.id} className={'client-request-row' + (selectedId === request.id ? ' client-request-row--selected' : '')} key={request.id} onClick={() => setSelectedId(request.id)} type="button">
           <span className="client-request-row__icon"><MessageSquareText size={17} /></span>
           <span className="client-request-row__copy">
             <small>{request.publicId}</small>
@@ -52,8 +56,10 @@ export function ClientRequestsWorkspace({extraCredits, includedCredits, requests
           </span>
           <span className="client-request-row__meta"><b className={'client-request-status client-request-status--' + statusClass(request.status)}>{status(request.status)}</b><small>{shortDate(request.createdAt)}</small></span>
         </button>)}
+        {!visible.length ? <p className="mobile-filters__empty">Nessuna richiesta in questa sezione.</p> : null}
       </div>
     </div>}
+    <button aria-label="Nuova richiesta" className="fab" onClick={() => setIsCreating(true)} type="button"><Plus size={20} /> Nuova richiesta</button>
     {selectedId ? <RequestDrawer onClose={closeDrawer}><RequestThread onStatusChange={(value) => setItems((current) => current.map((item) => item.id === selectedId ? {...item, status: value} : item))} requestId={selectedId} viewer="client" /></RequestDrawer> : null}
     {isCreating ? <CreateRequestModal extraCredits={balances.extra} includedCredits={balances.included} onClose={() => setIsCreating(false)} onCreated={(request, warning) => { setNotice(warning || ''); const usedIncluded = Math.min(balances.included, request.creditCost); setBalances({included: balances.included - usedIncluded, extra: balances.extra - (request.creditCost - usedIncluded)}); setItems((current) => [request, ...current]); setSelectedId(request.id); setIsCreating(false); router.refresh(); }} /> : null}
   </section>;
@@ -116,6 +122,13 @@ function CreateRequestModal({extraCredits, includedCredits, onClose, onCreated}:
     </form>
   </section></div>;
 }
+
+const FILTERS = {
+  all: {label: 'Tutte', statuses: ['new', 'in_progress', 'review', 'completed', 'rejected']},
+  open: {label: 'In corso', statuses: ['new', 'in_progress']},
+  review: {label: 'Da approvare', statuses: ['review']},
+  closed: {label: 'Chiuse', statuses: ['completed', 'rejected']},
+};
 
 function status(value: string) { return ({new: 'Nuova', in_progress: 'In lavorazione', review: 'Bozza da approvare', completed: 'Completata', rejected: 'Rifiutata'} as Record<string, string>)[value] || 'Aggiornata'; }
 function statusClass(value: string) { return value === 'in_progress' ? 'working' : value === 'review' ? 'review' : value === 'completed' ? 'completed' : value === 'rejected' ? 'rejected' : 'new'; }

@@ -28,6 +28,7 @@ export function RequestThread({requestId, viewer, canReject = false, onStatusCha
   const [isSending, setIsSending] = useState(false);
   const [isActing, setIsActing] = useState(false);
   const [changesOpen, setChangesOpen] = useState(false);
+  const [mobileTab, setMobileTab] = useState<'activity' | 'files' | 'details'>('activity');
   const timelineEnd = useRef<HTMLDivElement>(null);
   const lastLength = useRef(0);
 
@@ -97,7 +98,9 @@ export function RequestThread({requestId, viewer, canReject = false, onStatusCha
   const {request} = thread;
   const stepIndex = STEPS.indexOf(request.status);
 
-  return <div className="rt">
+  const mobileTabs = [{id: 'activity', label: 'Attività', count: thread.timeline.length}, {id: 'files', label: 'File', count: thread.files.length}, {id: 'details', label: 'Dettagli', count: 0}] as const;
+
+  return <div className={`rt rt--tab-${mobileTab}`}>
     <header className="rt-head">
       <div className="rt-head__top"><span className="rt-id">{request.publicId}</span><span className={`rt-status rt-status--${request.status}`}>{REQUEST_STATUS_LABELS[request.status]}</span></div>
       <h2>{request.title}</h2>
@@ -111,13 +114,15 @@ export function RequestThread({requestId, viewer, canReject = false, onStatusCha
       {request.status !== 'rejected' ? <ol className="rt-steps">{STEPS.map((step, index) => <li className={index < stepIndex ? 'is-done' : index === stepIndex ? 'is-current' : ''} key={step}><i>{index < stepIndex ? <CheckCircle2 size={14} /> : index + 1}</i>{REQUEST_STATUS_LABELS[step]}</li>)}</ol> : null}
     </header>
 
+    <div aria-label="Sezioni della richiesta" className="mtabs__bar rt-tabs" role="tablist">{mobileTabs.map((tab) => <button aria-selected={mobileTab === tab.id} className={mobileTab === tab.id ? 'is-active' : ''} key={tab.id} onClick={() => setMobileTab(tab.id)} role="tab" type="button">{tab.label}{tab.count ? <small>{tab.count}</small> : null}</button>)}</div>
+
     <ActionBar canReject={canReject} changesOpen={changesOpen} isActing={isActing} onAct={act} onToggleChanges={setChangesOpen} status={request.status} viewer={viewer} />
 
-    <section className="rt-section"><h3>Brief</h3><p className="rt-brief">{request.brief}</p></section>
+    <section className="rt-section rt-section--brief"><h3>Brief</h3><p className="rt-brief">{request.brief}</p></section>
 
-    <section className="rt-section"><h3>File <small>{thread.files.length}</small></h3>{thread.files.length ? <FileList files={thread.files} /> : <p className="rt-muted">Nessun file allegato.</p>}<AddFilesButton key={request.id} onUploaded={() => void load()} requestId={request.id} /></section>
+    <section className="rt-section rt-section--files"><h3>File <small>{thread.files.length}</small></h3>{thread.files.length ? <FileList files={thread.files} /> : <p className="rt-muted">Nessun file allegato.</p>}<AddFilesButton key={request.id} onUploaded={() => void load()} requestId={request.id} /></section>
 
-    <section className="rt-section">
+    <section className="rt-section rt-section--activity">
       <h3>Attività</h3>
       <ol className="rt-timeline">
         {thread.timeline.map((item) => <TimelineEntry item={item} key={`${item.kind}-${item.id}`} viewer={viewer} />)}
