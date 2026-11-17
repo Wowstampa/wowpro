@@ -7,6 +7,7 @@ import {
   BadgeEuro,
   ChartNoAxesCombined,
   CreditCard,
+  Crown,
   Headphones,
   Home,
   Lightbulb,
@@ -39,6 +40,7 @@ function getClientLinks(notificationCounts: AdminNotificationCounts): Navigation
   {href: '/dashboard/richieste', label: 'Richieste grafiche', icon: MessageSquareText, count: notificationCounts.requests || undefined, section: 'GESTIONE'},
   {href: '/dashboard/ordini', label: 'Ordini', icon: PackageCheck},
   {href: '/dashboard/crediti', label: 'Crediti', icon: CreditCard},
+  {href: '/dashboard/abbonamento', label: 'Abbonamento', icon: Crown},
   {href: '/dashboard/supporto', label: 'Supporto', icon: Headphones, count: notificationCounts.support || undefined, section: 'SUPPORTO'},
   {href: '/dashboard/feedback', label: 'Feedback & idee', icon: Lightbulb, section: 'COMMUNITY'},
   ];
