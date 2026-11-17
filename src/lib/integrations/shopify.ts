@@ -145,6 +145,7 @@ export type CustomerOrder = {
   statusPageUrl: string | null;
   items: Array<{title: string; variantTitle: string | null; quantity: number; imageUrl: string | null}>;
   creditsOnly: boolean;
+  subscriptionPlan: string | null;
   shipments: Array<{status: string | null; company: string | null; number: string | null; url: string | null}>;
 };
 
@@ -152,12 +153,12 @@ type OrdersQuery = {orders: {nodes: Array<{
   id: string; name: string; createdAt: string; cancelledAt: string | null;
   displayFinancialStatus: string | null; displayFulfillmentStatus: string | null; statusPageUrl: string | null;
   totalPriceSet: {shopMoney: {amount: string; currencyCode: string}};
-  lineItems: {nodes: Array<{title: string; variantTitle: string | null; quantity: number; image: {url: string} | null; product: {id: string} | null}>};
+  lineItems: {nodes: Array<{title: string; variantTitle: string | null; quantity: number; image: {url: string} | null; product: {id: string} | null; sellingPlan: {name: string} | null}>};
   fulfillments: Array<{displayStatus: string | null; trackingInfo: Array<{company: string | null; number: string | null; url: string | null}>}>;
 }>}};
 
-// Only orders belonging to this customer are ever requested: by Shopify customer ID when known, otherwise by email.
-export async function listCustomerOrders({customerId, email}: {customerId?: string | null; email?: string | null}) {
+// Shopify customer IDs for a client: the ID saved in the CRM plus any customer with the login email.
+async function resolveCustomerIds({customerId, email}: {customerId?: string | null; email?: string | null}) {
   const cleanEmail = (email || '').trim().toLowerCase().replace(/["\\]/g, '');
   const customerIds = new Set<string>();
   const numericId = (customerId || '').replace(/\D/g, '');
@@ -170,7 +171,13 @@ export async function listCustomerOrders({customerId, email}: {customerId?: stri
     );
     for (const customer of customers.customers.nodes) customerIds.add(customer.id.split('/').pop() || '');
   }
-  const filters = [...customerIds].filter(Boolean).map((id) => `customer_id:${id}`);
+  return {cleanEmail, customerIds: [...customerIds].filter(Boolean)};
+}
+
+// Only orders belonging to this customer are ever requested: by Shopify customer ID when known, otherwise by email.
+export async function listCustomerOrders({customerId, email}: {customerId?: string | null; email?: string | null}) {
+  const {cleanEmail, customerIds} = await resolveCustomerIds({customerId, email});
+  const filters = customerIds.map((id) => `customer_id:${id}`);
   if (cleanEmail) filters.push(`email:"${cleanEmail}"`);
   if (!filters.length) return [];
   const search = filters.join(' OR ');
@@ -180,7 +187,7 @@ export async function listCustomerOrders({customerId, email}: {customerId?: stri
         nodes {
           id name createdAt cancelledAt displayFinancialStatus displayFulfillmentStatus statusPageUrl
           totalPriceSet { shopMoney { amount currencyCode } }
-          lineItems(first: 30) { nodes { title variantTitle quantity product { id } image { url(transform: {maxWidth: 120, maxHeight: 120}) } } }
+          lineItems(first: 30) { nodes { title variantTitle quantity product { id } sellingPlan { name } image { url(transform: {maxWidth: 120, maxHeight: 120}) } } }
           fulfillments(first: 10) { displayStatus trackingInfo(first: 5) { company number url } }
         }
       }
@@ -200,8 +207,73 @@ export async function listCustomerOrders({customerId, email}: {customerId?: stri
     statusPageUrl: order.statusPageUrl,
     items: order.lineItems.nodes.map((item) => ({title: item.title, variantTitle: item.variantTitle, quantity: item.quantity, imageUrl: item.image?.url || null})),
     creditsOnly: order.lineItems.nodes.length > 0 && order.lineItems.nodes.every((item) => item.product?.id === creditsProduct),
+    subscriptionPlan: order.lineItems.nodes.find((item) => item.sellingPlan)?.sellingPlan?.name || null,
     shipments: order.fulfillments.flatMap((fulfillment) => fulfillment.trackingInfo.length
       ? fulfillment.trackingInfo.map((tracking) => ({status: fulfillment.displayStatus, ...tracking}))
       : [{status: fulfillment.displayStatus, company: null, number: null, url: null}]),
   }));
+}
+
+export type SubscriptionStatus = 'ACTIVE' | 'PAUSED' | 'CANCELLED' | 'EXPIRED' | 'FAILED';
+export type CustomerSubscription = {
+  status: SubscriptionStatus | null;
+  nextBillingDate: string | null;
+  plan: string | null;
+  price: string | null;
+  billing: {name: string | null; company: string | null; lines: string[]; extra: Array<{label: string; value: string}>} | null;
+};
+
+type MetafieldNode = {key: string; value: string};
+type AddressNode = {name: string | null; company: string | null; address1: string | null; address2: string | null; zip: string | null; city: string | null; province: string | null; countryCodeV2: string | null} | null;
+
+// Subscription status written on the Shopify customer by Shopify Flow (namespace "wowpro"), because a contract
+// created by the Shopify Subscriptions app can only be read by that app.
+export async function getCustomerSubscription({customerId, email}: {customerId?: string | null; email?: string | null}): Promise<CustomerSubscription> {
+  const {customerIds} = await resolveCustomerIds({customerId, email});
+  if (!customerIds.length) return {status: null, nextBillingDate: null, plan: null, price: null, billing: null};
+  const data = await shopifyAdminQuery<{nodes: Array<{id: string; metafields: {nodes: MetafieldNode[]}} | null>}>(
+    `query CustomerSubscription($ids: [ID!]!) { nodes(ids: $ids) { ... on Customer { id metafields(first: 20, namespace: "wowpro") { nodes { key value } } } } }`,
+    {ids: customerIds.map((id) => `gid://shopify/Customer/${id}`)},
+  );
+  // With more than one customer record, the one with a subscription status wins (an active one first).
+  const candidates = data.nodes.filter(Boolean).map((node) => Object.fromEntries(node!.metafields.nodes.map((field) => [field.key, field.value.trim()])) as Record<string, string>);
+  const fields = candidates.find((entry) => entry.subscription_status?.toUpperCase() === 'ACTIVE') || candidates.find((entry) => entry.subscription_status) || {};
+  const status = (fields.subscription_status || '').toUpperCase();
+  return {
+    status: ['ACTIVE', 'PAUSED', 'CANCELLED', 'EXPIRED', 'FAILED'].includes(status) ? status as SubscriptionStatus : null,
+    nextBillingDate: fields.subscription_next_billing || null,
+    plan: fields.subscription_plan || null,
+    price: fields.subscription_price || null,
+    billing: null,
+  };
+}
+
+const BILLING_ATTRIBUTE = /iva|vat|fiscal|sdi|pec|destinatario|tax/i;
+
+// Billing details on the client's latest order, used by the accounting team for the SDI invoice.
+// Address fields are protected customer data: if the app has no access, the page simply hides them.
+export async function getLatestBillingDetails(orderId: string): Promise<CustomerSubscription['billing']> {
+  const data = await shopifyAdminQuery<{order: {billingAddress: AddressNode; customAttributes: Array<{key: string; value: string | null}>} | null}>(
+    `query OrderBilling($id: ID!) { order(id: $id) { billingAddress { name company address1 address2 zip city province countryCodeV2 } customAttributes { key value } } }`,
+    {id: orderId},
+  );
+  const address = data.order?.billingAddress;
+  const extra = (data.order?.customAttributes || []).filter((attribute) => attribute.value && BILLING_ATTRIBUTE.test(attribute.key)).map((attribute) => ({label: attribute.key, value: attribute.value as string}));
+  if (!address && !extra.length) return null;
+  const cityLine = [address?.zip, address?.city, address?.province ? `(${address.province})` : null].filter(Boolean).join(' ');
+  return {
+    name: address?.name || null,
+    company: address?.company || null,
+    lines: [address?.address1, address?.address2, cityLine, address?.countryCodeV2 && address.countryCodeV2 !== 'IT' ? address.countryCodeV2 : null].filter((line): line is string => Boolean(line)),
+    extra,
+  };
+}
+
+export function getSubscriptionCheckoutUrl() {
+  return process.env.SHOPIFY_SUBSCRIPTION_URL || null;
+}
+
+export function getCustomerAccountUrl() {
+  const storefront = process.env.SHOPIFY_STOREFRONT_URL || `https://${getStoreDomain()}`;
+  return `${storefront.replace(/\/$/, '')}/account`;
 }
