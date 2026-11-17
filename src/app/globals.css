@@ -350,6 +350,37 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .subscription-billing footer p { margin: 0; max-width: 560px; color: #5b6575; font-size: 12px; line-height: 1.55; }
 .subscription-billing footer .client-action { flex: 0 0 auto; }
 
+/* ---------- Dashboard: program presentation ---------- */
+.program { scroll-margin-top: 110px; padding: 30px; border: 1px solid var(--line); border-radius: 24px; background: radial-gradient(600px 260px at 100% 0, rgba(29,182,91,.08), transparent 70%), white; box-shadow: var(--shadow); }
+.program__eyebrow { display: inline-flex; align-items: center; gap: 8px; color: var(--green-dark); font-size: 11px; font-weight: 900; letter-spacing: .1em; }
+.program__eyebrow i { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 4px rgba(29,182,91,.15); }
+.program__header h2 { margin: 10px 0 6px; font-size: 30px; letter-spacing: -.05em; }
+.program__header p { margin: 0; color: #5b6575; font-size: 14px; }
+.program__body { margin-top: 24px; display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 22px; align-items: start; }
+.program__tabs { display: grid; gap: 8px; }
+.program__tabs button { padding: 12px; display: flex; align-items: center; gap: 12px; border: 1px solid var(--line); border-radius: 16px; background: white; color: var(--ink); font: inherit; text-align: left; cursor: pointer; transition: border-color .15s, background .15s, box-shadow .15s; }
+.program__tabs button:hover { border-color: #cfd8e2; }
+.program__tabs button > span { width: 42px; height: 42px; flex: 0 0 auto; display: grid; place-items: center; border-radius: 12px; background: #f1f4f7; color: #5b6575; transition: inherit; }
+.program__tabs strong { display: grid; gap: 2px; font-size: 15px; letter-spacing: -.02em; }
+.program__tabs small { color: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: 0; }
+.program__tabs button.is-active { border-color: #0a0d15; background: #0a0d15; color: white; box-shadow: 0 14px 30px -18px rgba(10,13,21,.6); }
+.program__tabs button.is-active > span { background: rgba(29,182,91,.2); color: #55de91; }
+.program__tabs button.is-active small { color: #aeb5c1; }
+.program__panel { padding: 26px; border-radius: 20px; background: #f6f8fa; animation: login-fade .2s ease-out; }
+.program__panel h3 { margin: 0; font-size: 22px; letter-spacing: -.04em; }
+.program__intro { max-width: 640px; margin: 8px 0 20px; color: #5b6575; font-size: 14px; line-height: 1.6; }
+.program__features { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.program__features article { padding: 16px; display: grid; grid-template-columns: 40px 1fr; gap: 12px; align-items: start; border: 1px solid var(--line); border-radius: 16px; background: white; }
+.program__features article > span { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 12px; background: var(--green-soft); color: var(--green-dark); }
+.program__features h4 { margin: 2px 0 4px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 15px; letter-spacing: -.02em; }
+.program__features h4 small { padding: 3px 7px; border-radius: 999px; background: #eee9ff; color: var(--violet); font-size: 10px; font-weight: 900; letter-spacing: .03em; }
+.program__features p { margin: 0; color: #6b7686; font-size: 13px; line-height: 1.5; }
+.program__actions { margin-top: 20px; display: flex; flex-wrap: wrap; gap: 10px; }
+.program__actions .button { min-height: 46px; }
+.program__ghost { border: 1px solid #cfd8e2; background: white; color: var(--ink); }
+.sub-landing__discover { display: inline-block; margin-top: 14px; color: #6ee5a0; font-size: 13px; font-weight: 800; text-decoration: none; }
+@media (max-width: 1100px) { .program__body { grid-template-columns: 1fr; } .program__tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
 /* ---------- Subscription sales page ---------- */
 .sub-landing { display: grid; gap: 44px; }
 .sub-landing .fab { display: none; }
@@ -699,5 +730,20 @@ button, a { -webkit-tap-highlight-color: transparent; }
   .sub-landing__steps, .sub-landing__plans { grid-template-columns: 1fr; }
   .sub-landing__heading h3 { font-size: 21px; }
   .sub-landing .sub-landing__fab { display: inline-flex; left: 16px; right: 16px; justify-content: center; }
+  /* Dashboard program presentation. */
+  .program { padding: 20px 16px; border-radius: 20px; }
+  .program__header h2 { font-size: 24px; }
+  .program__body { margin-top: 18px; gap: 14px; }
+  .program__tabs { margin: 0 -16px; padding: 2px 16px 4px; display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; }
+  .program__tabs::-webkit-scrollbar { display: none; }
+  .program__tabs button { flex: 0 0 auto; padding: 8px 14px 8px 8px; scroll-snap-align: start; border-radius: 999px; }
+  .program__tabs button > span { width: 32px; height: 32px; border-radius: 50%; }
+  .program__tabs button > span svg { width: 16px; height: 16px; }
+  .program__tabs small { display: none; }
+  .program__tabs strong { font-size: 14px; }
+  .program__panel { margin: 0 -4px; padding: 18px 14px; }
+  .program__panel h3 { font-size: 19px; }
+  .program__features { grid-template-columns: 1fr; }
+  .program__actions .button { flex: 1 1 100%; justify-content: center; }
 }
 
