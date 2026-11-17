@@ -294,12 +294,30 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .subscription-actions .subscription-actions__ghost { border: 1px solid #3a414e; background: transparent; color: #d8dce3; box-shadow: none; }
 .subscription-actions .subscription-actions__ghost:hover { border-color: #f08a84; color: #ffb1ac; }
 .subscription-options { width: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.subscription-options a { padding: 16px; display: grid; gap: 4px; border: 1px solid #2b313c; border-radius: 14px; background: rgba(255,255,255,.04); color: white; text-decoration: none; transition: border-color .15s, background .15s; }
-.subscription-options a:hover { border-color: var(--green); background: rgba(29,182,91,.1); }
+.subscription-options a, .subscription-options button { padding: 16px; text-align: left; font: inherit; cursor: pointer; display: grid; gap: 4px; border: 1px solid #2b313c; border-radius: 14px; background: rgba(255,255,255,.04); color: white; text-decoration: none; transition: border-color .15s, background .15s; }
+.subscription-options a:hover, .subscription-options button:hover { border-color: var(--green); background: rgba(29,182,91,.1); }
 .subscription-options strong { font-size: 15px; }
 .subscription-options b { font-size: 20px; letter-spacing: -.03em; }
 .subscription-options small { color: #aeb5c1; font-size: 12px; }
 .subscription-options span { margin-top: 8px; display: inline-flex; align-items: center; gap: 5px; color: #6ee5a0; font-size: 13px; font-weight: 800; }
+.subscription-buy { width: min(680px, calc(100vw - 32px)); max-height: 92vh; overflow-y: auto; }
+.subscription-buy__form { display: grid; gap: 16px; }
+.subscription-buy fieldset { margin: 0; padding: 0; border: 0; min-width: 0; }
+.subscription-buy legend { margin-bottom: 10px; color: #1a2433; font-size: 13px; font-weight: 900; }
+.subscription-buy__plans { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.subscription-buy__plans label { position: relative; padding: 14px 16px; display: grid; gap: 3px; border: 1.5px solid var(--line); border-radius: 14px; cursor: pointer; transition: border-color .15s, background .15s; }
+.subscription-buy__plans label.is-selected { border-color: var(--green); background: var(--green-soft); }
+.subscription-buy__plans input { position: absolute; opacity: 0; pointer-events: none; }
+.subscription-buy__plans strong { font-size: 14px; }
+.subscription-buy__plans b { font-size: 18px; letter-spacing: -.03em; }
+.subscription-buy__plans small { color: var(--muted); font-size: 12px; }
+.subscription-buy__billing { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.subscription-buy__billing label { display: grid; gap: 6px; color: #1a2433; font-size: 12px; font-weight: 800; }
+.subscription-buy__billing label small { color: var(--muted); font-weight: 600; }
+.subscription-buy__billing label.is-wide { grid-column: 1 / -1; }
+.subscription-buy__billing input { height: 42px; padding: 0 12px; border: 1px solid #dce3eb; border-radius: 10px; outline: 0; font: inherit; font-size: 14px; font-weight: 500; }
+.subscription-buy__billing input:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(29,182,91,.12); }
+.subscription-buy__billing label.has-error input { border-color: var(--red); }
 .subscription-actions__sent { color: #8fe3b1; font-size: 13px; font-weight: 700; }
 .subscription-status { padding: 5px 10px; display: inline-flex; align-items: center; border-radius: 999px; font-size: 11px; font-weight: 800; white-space: nowrap; }
 .subscription-status--ok { background: var(--green-soft); color: var(--green-dark); }
@@ -581,5 +599,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
   .subscription-billing { padding: 16px; grid-template-columns: 1fr; }
   .subscription-billing footer { flex-direction: column; align-items: stretch; }
   .subscription-options { grid-template-columns: 1fr; }
+  .subscription-buy__plans, .subscription-buy__billing { grid-template-columns: 1fr; }
+  .subscription-buy { width: 100%; }
 }
 
