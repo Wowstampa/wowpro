@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import {BadgeCheck, CreditCard, Info, Mail, MessageSquareText, Palette, Pencil, Phone, Sparkles} from 'lucide-react';
+import {BadgeCheck, CreditCard, ExternalLink, Info, Mail, MessageSquareText, Palette, Pencil, Phone, Receipt, Sparkles} from 'lucide-react';
 
 import {PageHeader} from '@/components/app-shell';
 import {ClientRequestsWorkspace} from '@/components/client-requests-workspace';
@@ -13,17 +13,19 @@ import {getConversationCompany} from '@/lib/support';
 import {createAdminClient} from '@/lib/supabase/admin.server';
 import {requireProfile} from '@/lib/auth';
 import {getWowproClient} from '@/lib/integrations/airtable';
-import {listCustomerOrders, type CustomerOrder} from '@/lib/integrations/shopify';
+import {getCustomerAccountUrl, getCustomerSubscription, getLatestBillingDetails, getSubscriptionCheckoutUrl, listCustomerOrders, type CustomerOrder, type CustomerSubscription} from '@/lib/integrations/shopify';
+import {SubscriptionActions} from '@/components/subscription-actions';
 import {listRequestFiles} from '@/lib/request-files';
 import {createClient} from '@/lib/supabase/server';
 
-const titles: Record<string, string> = {crediti: 'Crediti', richieste: 'Richieste grafiche', ordini: 'Ordini', supporto: 'Supporto', feedback: 'Feedback & idee'};
+const titles: Record<string, string> = {crediti: 'Crediti', richieste: 'Richieste grafiche', ordini: 'Ordini', abbonamento: 'Abbonamento', supporto: 'Supporto', feedback: 'Feedback & idee'};
 
 export default async function ClientSectionPage({params}: {params: Promise<{section: string}>}) {
   const {section} = await params;
   if (section === 'crediti') return <CreditsPage />;
   if (section === 'richieste') return <RequestsPage />;
   if (section === 'ordini') return <OrdersPage />;
+  if (section === 'abbonamento') return <SubscriptionPage />;
   if (section === 'supporto') return <SupportPage />;
   if (section === 'feedback') return <FeedbackPage />;
   const title = titles[section] || 'WOWPRO';
@@ -44,6 +46,92 @@ async function CreditsPage() {
   return <><PageHeader eyebrow="WOWPRO · Area cliente" title="Crediti" action={<div className="credit-chip"><i /> <strong>{number(included + extra)}</strong> crediti disponibili</div>} /><main className="page-content credits-page"><MobileTabs tabs={[{id: 'saldo', label: 'Saldo', content: <section className="credits-hero"><article className="credits-hero__included"><span className="credits-hero__label"><i /> CREDITI INCLUSI</span><div><strong>{number(included)}</strong><b>{monthly ? ` / ${number(monthly)}` : ''}</b></div><p>{renewal ? `Rinnovo automatico il ${date(renewal)}` : 'Rinnovo mensile del piano'}</p><div className="credits-progress"><i style={{width: monthly ? `${Math.min(included / monthly, 1) * 100}%` : '0%'}} /></div><div className="credits-hero__summary"><span>Consumati: <b>{number(used)}</b></span><span>{monthly ? `${Math.round(included / monthly * 100)}% disponibile` : 'Piano da configurare'}</span></div><div className="credits-hero__note"><Info size={15} /><p>I crediti inclusi <b>si resettano ogni mese e non sono cumulabili</b>: vengono sempre consumati per primi.</p></div></article><article className="credits-hero__extra"><span className="credits-hero__label"><i /> CREDITI EXTRA</span><strong>{number(extra)}</strong><p>I crediti extra <b>non scadono e non si azzerano</b> al reset mensile. Vengono usati solo dopo aver esaurito quelli inclusi.</p><CreditPurchase /></article></section>}, {id: 'listino', label: 'Listino', content: <section><div className="credits-section-title"><h2>Listino servizi grafici</h2><p>Costo in crediti per ogni tipo di richiesta</p></div><div className="service-price-grid"><Service icon={<BadgeCheck size={18} />} title="Revisione" text="Controllo file e piccole correzioni su un progetto esistente." credits="1.000" /><Service icon={<Pencil size={18} />} title="Modifica" text="Interventi sostanziali su grafica, testi o impaginazione." credits="2.000" /><Service icon={<Sparkles size={18} />} title="Creazione" text="Progettazione di una grafica nuova partendo da zero." credits="3.000" /></div></section>}, {id: 'movimenti', label: 'Movimenti', content: <section><div className="credits-section-title"><h2>Storico movimenti</h2></div><div className="credits-ledger"><div className="credits-ledger__head"><span>Data</span><span>Descrizione</span><span>Tipo</span><span>Crediti</span><span>Saldo</span></div>{ledger.map((transaction) => <div className="credits-ledger__row" key={transaction.id}><strong>{date(transaction.created_at)}</strong><span>{transaction.description}</span><span><i className={transaction.bucket === 'extra' ? 'ledger-tag ledger-tag--extra' : 'ledger-tag'}>{transaction.bucket === 'extra' ? 'Extra' : 'Inclusi'}</i></span><b className={transaction.amount > 0 ? 'positive' : 'negative'}>{transaction.amount > 0 ? '+' : ''}{number(transaction.amount)}</b><strong>{number(transaction.balance)}</strong></div>)}{!ledger.length ? <div className="credits-ledger__empty"><CreditCard size={20} /><strong>Nessun movimento</strong><p>Gli accrediti registrati dal team compariranno qui.</p></div> : null}</div></section>}]} />
   </main></>;
 }
+
+const SUBSCRIPTION_STATUS: Record<string, {label: string; tone: string}> = {
+  ACTIVE: {label: 'Attivo', tone: 'ok'}, PAUSED: {label: 'In pausa', tone: 'warn'}, CANCELLED: {label: 'Disdetto', tone: 'off'},
+  EXPIRED: {label: 'Scaduto', tone: 'off'}, FAILED: {label: 'Pagamento non riuscito', tone: 'warn'},
+};
+
+async function SubscriptionPage() {
+  const profile = await requireProfile(['client']);
+  const supabase = await createClient();
+  const {data: company} = await supabase.from('companies').select('airtable_record_id,shopify_customer_id').eq('id', profile.company_id || '').maybeSingle();
+  let plan = ''; let crmStatus = ''; let crmRenewal = ''; let monthly = 0;
+  let customerId = company?.shopify_customer_id || '';
+  let email = profile.email;
+  if (company?.airtable_record_id) {
+    try {
+      const record = await getWowproClient(company.airtable_record_id);
+      plan = record.fields.piano ? `WOWPRO ${record.fields.piano}` : '';
+      crmStatus = record.fields.stato_abbonamento || '';
+      crmRenewal = record.fields.data_rinnovo_piano || '';
+      monthly = Number(record.fields.crediti_inclusi_mese || 0);
+      customerId = record.fields.shopify_customer_id || customerId;
+      email = record.fields.email_login || email;
+    } catch { /* The CRM is optional here: Shopify data is shown anyway. */ }
+  }
+  let subscription: CustomerSubscription = {status: null, nextBillingDate: null, plan: null, price: null, billing: null};
+  let payments: CustomerOrder[] = [];
+  let hasLoadError = false;
+  const [subscriptionResult, ordersResult, managerResult] = await Promise.allSettled([
+    getCustomerSubscription({customerId, email}),
+    listCustomerOrders({customerId, email}),
+    profile.company_id ? getConversationCompany(profile.company_id) : Promise.resolve(null),
+  ]);
+  if (subscriptionResult.status === 'fulfilled') subscription = subscriptionResult.value; else { hasLoadError = true; console.error('[Subscription]', subscriptionResult.reason); }
+  if (ordersResult.status === 'fulfilled') payments = ordersResult.value.filter((order) => order.subscriptionPlan); else { hasLoadError = true; console.error('[Subscription orders]', ordersResult.reason); }
+  const managerName = managerResult.status === 'fulfilled' ? managerResult.value?.manager?.name || null : null;
+  const latestOrder = ordersResult.status === 'fulfilled' ? payments[0] || ordersResult.value[0] : undefined;
+  let billing: CustomerSubscription['billing'] = null;
+  if (latestOrder) { try { billing = await getLatestBillingDetails(latestOrder.id); } catch (error) { console.error('[Subscription billing]', error); } }
+
+  // Shopify (via Flow) is the source of truth; the CRM fills in until the first sync.
+  const statusKey = subscription.status || (/attiv/i.test(crmStatus) ? 'ACTIVE' : /disd|cessat|annull/i.test(crmStatus) ? 'CANCELLED' : /paus|sospes/i.test(crmStatus) ? 'PAUSED' : '');
+  const status = SUBSCRIPTION_STATUS[statusKey] || {label: crmStatus || 'Non attivo', tone: 'off'};
+  const nextBilling = subscription.nextBillingDate || crmRenewal;
+  const planName = subscription.plan || plan || payments[0]?.subscriptionPlan || 'WOWPRO';
+  const isActive = statusKey === 'ACTIVE' || statusKey === 'FAILED';
+
+  const overview = <section className="subscription-hero">
+    <article className="subscription-hero__plan">
+      <span className="credits-hero__label"><i /> IL TUO ABBONAMENTO</span>
+      <div className="subscription-hero__title"><h2>{planName}</h2><b className={`subscription-status subscription-status--${status.tone}`}>{status.label}</b></div>
+      <dl className="subscription-hero__facts">
+        <div><dt>{statusKey === 'CANCELLED' || statusKey === 'EXPIRED' ? 'Termine' : 'Prossimo rinnovo'}</dt><dd>{nextBilling ? date(nextBilling) : '—'}</dd></div>
+        <div><dt>Importo</dt><dd>{subscription.price || (payments[0] ? money(payments[0].total, payments[0].currency) : '—')}</dd></div>
+        <div><dt>Crediti inclusi</dt><dd>{monthly ? `${number(monthly)} / mese` : '—'}</dd></div>
+      </dl>
+      {statusKey === 'FAILED' ? <p className="subscription-hero__alert">L’ultimo addebito non è andato a buon fine: aggiorna il metodo di pagamento per non perdere i vantaggi WOWPRO.</p> : null}
+      <SubscriptionActions accountUrl={getCustomerAccountUrl()} active={isActive} checkoutUrl={getSubscriptionCheckoutUrl()} managerName={managerName} />
+      <p className="subscription-hero__note"><Info size={14} /> Il rinnovo è automatico e viene addebitato sul metodo di pagamento salvato su WowStampa.</p>
+    </article>
+  </section>;
+
+  const paymentsList = <section>
+    <div className="credits-section-title"><h2>Pagamenti dell’abbonamento</h2><p>Ogni rinnovo genera un ordine su WowStampa</p></div>
+    {payments.length ? <div className="subscription-payments">{payments.map((order) => <article key={order.id}>
+      <div><strong>{order.name}</strong><small>{date(order.createdAt)} · {order.subscriptionPlan}</small></div>
+      <b>{money(order.total, order.currency)}</b>
+      <span className={order.cancelled ? 'subscription-status subscription-status--off' : order.financialStatus === 'PAID' ? 'subscription-status subscription-status--ok' : 'subscription-status subscription-status--warn'}>{order.cancelled ? 'Annullato' : order.financialStatus === 'PAID' ? 'Pagato' : order.financialStatus === 'REFUNDED' ? 'Rimborsato' : 'In attesa'}</span>
+      {order.statusPageUrl ? <a href={order.statusPageUrl} rel="noreferrer" target="_blank">Ricevuta <ExternalLink size={13} /></a> : <span />}
+    </article>)}</div> : <div className="credits-ledger__empty"><Receipt size={20} /><strong>{hasLoadError ? 'Pagamenti non disponibili' : 'Nessun pagamento'}</strong><p>{hasLoadError ? 'Riprova tra qualche istante.' : 'I pagamenti dell’abbonamento compariranno qui dopo il primo addebito.'}</p></div>}
+  </section>;
+
+  const billingCard = <section>
+    <div className="credits-section-title"><h2>Dati di fatturazione</h2><p>Usati per la fattura elettronica (SDI)</p></div>
+    <article className="subscription-billing">
+      {billing ? <><div><strong>{billing.company || billing.name || 'Intestatario'}</strong>{billing.company && billing.name ? <small>{billing.name}</small> : null}{billing.lines.map((line) => <span key={line}>{line}</span>)}</div>{billing.extra.length ? <dl>{billing.extra.map((item) => <div key={item.label}><dt>{item.label}</dt><dd>{item.value}</dd></div>)}</dl> : null}</>
+        : <p className="subscription-billing__empty">I dati di fatturazione compariranno qui dal tuo prossimo ordine su WowStampa.</p>}
+      <footer><p>Le fatture sono emesse da <b>Strategia Associati in Comunicazione S.r.l.</b> e inviate tramite SDI con i dati indicati nell’ordine. Per correggerli scrivi al tuo account manager.</p><OpenChatButton className="client-action">Scrivi all’account manager</OpenChatButton></footer>
+    </article>
+  </section>;
+
+  return <><PageHeader eyebrow="WOWPRO · Area cliente" title="Abbonamento" /><main className="page-content subscription-page">
+    <MobileTabs tabs={[{id: 'piano', label: 'Piano', content: overview}, {id: 'pagamenti', label: 'Pagamenti', content: paymentsList}, {id: 'fatturazione', label: 'Fatturazione', content: billingCard}]} />
+  </main></>;
+}
+
+function money(value: number, currency: string) { return new Intl.NumberFormat('it-IT', {style: 'currency', currency}).format(value); }
 
 async function OrdersPage() {
   const profile = await requireProfile(['client']);
