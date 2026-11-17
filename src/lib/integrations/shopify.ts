@@ -269,8 +269,29 @@ export async function getLatestBillingDetails(orderId: string): Promise<Customer
   };
 }
 
-export function getSubscriptionCheckoutUrl() {
-  return process.env.SHOPIFY_SUBSCRIPTION_URL || null;
+// Invitation-only subscription product: one variant per billing cycle, each with its own Shopify Subscriptions plan.
+const SUBSCRIPTION_OPTIONS = [
+  {id: 'monthly', label: 'Mensile', price: '129 € / mese', note: 'Rinnovo automatico ogni mese', variantEnv: 'SHOPIFY_SUBSCRIPTION_MONTHLY_VARIANT', planEnv: 'SHOPIFY_SUBSCRIPTION_MONTHLY_PLAN', variant: '59332069785931', plan: '724585808203'},
+  {id: 'annual', label: 'Annuale', price: '1.290 € / anno', note: '2 mesi gratis rispetto al mensile', variantEnv: 'SHOPIFY_SUBSCRIPTION_ANNUAL_VARIANT', planEnv: 'SHOPIFY_SUBSCRIPTION_ANNUAL_PLAN', variant: '59332069818699', plan: '724585873739'},
+] as const;
+
+export type SubscriptionOption = {id: string; label: string; price: string; note: string; url: string};
+
+export function getSubscriptionOptions(): SubscriptionOption[] {
+  const storefront = (process.env.SHOPIFY_STOREFRONT_URL || `https://${getStoreDomain()}`).replace(/\/$/, '');
+  return SUBSCRIPTION_OPTIONS.map((option) => {
+    const variant = process.env[option.variantEnv] || option.variant;
+    const plan = process.env[option.planEnv] || option.plan;
+    return {id: option.id, label: option.label, price: option.price, note: option.note, url: `${storefront}/cart/add?id=${variant}&quantity=1&selling_plan=${plan}&return_to=%2Fcheckout`};
+  });
+}
+
+// Plan label from the billing interval written by Flow (MONTH / YEAR) or from an order's selling plan name.
+export function subscriptionPlanLabel(value: string | null | undefined) {
+  if (!value) return null;
+  if (/year|anno|annual/i.test(value)) return 'WOWPRO annuale';
+  if (/month|mese|mensil/i.test(value)) return 'WOWPRO mensile';
+  return value;
 }
 
 export function getCustomerAccountUrl() {
