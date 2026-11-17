@@ -4,14 +4,14 @@ import {ExternalLink, Loader2, X} from 'lucide-react';
 import {useState} from 'react';
 
 // Actions on the subscription page: (re)activation through the invitation-only Shopify product and a cancellation request.
-export function SubscriptionActions({active, checkoutUrl, accountUrl, managerName}: {active: boolean; checkoutUrl: string | null; accountUrl: string; managerName: string | null}) {
+export function SubscriptionActions({active, options, accountUrl, managerName}: {active: boolean; options: Array<{id: string; label: string; price: string; note: string; url: string}>; accountUrl: string; managerName: string | null}) {
   const [isOpen, setIsOpen] = useState(false);
   const [sent, setSent] = useState(false);
 
   return <div className="subscription-actions">
     {active
-      ? <a className="button button--primary" href={accountUrl} rel="noreferrer" target="_blank">Gestisci pagamento <ExternalLink size={15} /></a>
-      : checkoutUrl ? <a className="button button--primary" href={checkoutUrl} rel="noreferrer" target="_blank">Attiva l’abbonamento <ExternalLink size={15} /></a> : null}
+      ? <a className="button button--primary" href={accountUrl} rel="noreferrer" target="_blank">Aggiorna metodo di pagamento <ExternalLink size={15} /></a>
+      : <div className="subscription-options">{options.map((option) => <a href={option.url} key={option.id} rel="noreferrer" target="_blank"><strong>{option.label}</strong><b>{option.price}</b><small>{option.note}</small><span>Attiva <ExternalLink size={13} /></span></a>)}</div>}
     {active ? sent ? <span className="subscription-actions__sent">Richiesta di disdetta inviata a {managerName || 'il tuo account manager'}</span> : <button className="button subscription-actions__ghost" onClick={() => setIsOpen(true)} type="button">Richiedi disdetta</button> : null}
     {isOpen ? <CancelModal managerName={managerName} onClose={() => setIsOpen(false)} onSent={() => { setSent(true); setIsOpen(false); }} /> : null}
   </div>;
