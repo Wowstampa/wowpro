@@ -1,6 +1,7 @@
 'use client';
 
-import {ArrowRight, BadgeCheck, BadgePercent, Box, CalendarCheck, Check, Gift, Headphones, Lock, MessageSquareText, Palette, Receipt, ScanSearch, Send, Sparkles} from 'lucide-react';
+import Link from 'next/link';
+import {ArrowRight, BadgeCheck, CalendarCheck, Check, Lock, Receipt, Send} from 'lucide-react';
 import {useState} from 'react';
 
 import {PurchaseModal, type BillingDraft, type SubscriptionPlanOption} from '@/components/subscription-actions';
@@ -10,16 +11,6 @@ const MONTHLY = 129;
 const ANNUAL = 1290;
 const CREDITS = 12_000;
 
-const BENEFITS = [
-  {icon: Palette, title: 'Reparto grafico dedicato', text: 'Revisioni, modifiche e creazioni grafiche con i tuoi crediti inclusi.'},
-  {icon: Headphones, title: 'Account manager dedicato', text: 'Una persona di riferimento in chat, email e telefono.'},
-  {icon: BadgePercent, title: 'Listino riservato', text: 'Prezzi WOWPRO su tutto il catalogo, applicati in automatico.'},
-  {icon: Sparkles, title: 'Produzione prioritaria', text: 'I tuoi ordini passano in testa alla coda di stampa.'},
-  {icon: Box, title: 'Spedizione white label', text: 'Pacco anonimo con il tuo nome come mittente.'},
-  {icon: ScanSearch, title: 'Preventivi rapidi', text: 'Quotazioni su misura in tempi brevi.'},
-  {icon: Gift, title: 'Promo in anteprima', text: 'Accesso per primo alle offerte riservate.'},
-  {icon: MessageSquareText, title: 'Tutto in un portale', text: 'Richieste, file, crediti e ordini in un unico posto.'},
-];
 
 const USES = [
   {count: 12, label: 'revisioni', cost: '1.000 crediti l’una'},
@@ -79,13 +70,10 @@ export function SubscriptionLanding({options, billing, payments, managerName}: {
         <p>che equivalgono, per esempio, a</p>
         <ul>{USES.map((use) => <li key={use.label}><b>{use.count}</b><span>{use.label}<small>{use.cost}</small></span></li>)}</ul>
         <p className="sub-landing__credits-foot">oppure combinali come preferisci.</p>
+        <Link className="sub-landing__discover" href="/dashboard#programma">Scopri cosa puoi fare con WOWPRO →</Link>
       </aside>
     </section>
 
-    <section className="sub-landing__block">
-      <div className="sub-landing__heading"><h3>Cosa include WOWPRO</h3><p>Un unico abbonamento, tutto quello che serve per comunicare e stampare meglio.</p></div>
-      <div className="sub-landing__benefits">{BENEFITS.map(({icon: Icon, title, text}) => <article key={title}><span><Icon size={20} /></span><h4>{title}</h4><p>{text}</p></article>)}</div>
-    </section>
 
     <section className="sub-landing__block">
       <div className="sub-landing__heading"><h3>Come funziona</h3></div>
