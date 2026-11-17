@@ -18,6 +18,15 @@ export type AirtableWowproClient = {
   account_manager_nome?: string;
   grafico_dedicato_nome?: string;
   archiviato?: boolean;
+  fatt_ragione_sociale?: string;
+  fatt_partita_iva?: string;
+  fatt_codice_fiscale?: string;
+  fatt_codice_sdi?: string;
+  fatt_pec?: string;
+  fatt_indirizzo?: string;
+  fatt_cap?: string;
+  fatt_citta?: string;
+  fatt_provincia?: string;
 };
 
 type AirtableResponse = {

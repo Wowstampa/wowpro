@@ -271,19 +271,41 @@ export async function getLatestBillingDetails(orderId: string): Promise<Customer
 
 // Invitation-only subscription product: one variant per billing cycle, each with its own Shopify Subscriptions plan.
 const SUBSCRIPTION_OPTIONS = [
-  {id: 'monthly', label: 'Mensile', price: '129 € / mese', note: 'Rinnovo automatico ogni mese', variantEnv: 'SHOPIFY_SUBSCRIPTION_MONTHLY_VARIANT', planEnv: 'SHOPIFY_SUBSCRIPTION_MONTHLY_PLAN', variant: '59332069785931', plan: '724585808203'},
-  {id: 'annual', label: 'Annuale', price: '1.290 € / anno', note: '2 mesi gratis rispetto al mensile', variantEnv: 'SHOPIFY_SUBSCRIPTION_ANNUAL_VARIANT', planEnv: 'SHOPIFY_SUBSCRIPTION_ANNUAL_PLAN', variant: '59332069818699', plan: '724585873739'},
+  {id: 'monthly', label: 'Mensile', price: '129 € + IVA / mese', note: 'Rinnovo automatico ogni mese', variantEnv: 'SHOPIFY_SUBSCRIPTION_MONTHLY_VARIANT', planEnv: 'SHOPIFY_SUBSCRIPTION_MONTHLY_PLAN', variant: '59332069785931', plan: '724585808203'},
+  {id: 'annual', label: 'Annuale', price: '1.290 € + IVA / anno', note: '2 mesi gratis rispetto al mensile', variantEnv: 'SHOPIFY_SUBSCRIPTION_ANNUAL_VARIANT', planEnv: 'SHOPIFY_SUBSCRIPTION_ANNUAL_PLAN', variant: '59332069818699', plan: '724585873739'},
 ] as const;
 
-export type SubscriptionOption = {id: string; label: string; price: string; note: string; url: string};
+export type SubscriptionOption = {id: 'monthly' | 'annual'; label: string; price: string; note: string};
 
 export function getSubscriptionOptions(): SubscriptionOption[] {
+  return SUBSCRIPTION_OPTIONS.map(({id, label, price, note}) => ({id, label, price, note}));
+}
+
+export function getSubscriptionProductId() {
+  return (process.env.SHOPIFY_SUBSCRIPTION_PRODUCT_ID || '16189778493771').replace(/\D/g, '');
+}
+
+export type BillingDetails = {company: string; vatNumber: string; taxCode: string; sdi: string; pec: string; address: string; zip: string; city: string; province: string};
+
+// Checkout for a subscription: an empty cart, then the plan line with the billing details as line properties
+// (they are shown on the order and copied to every renewal), then the Shopify checkout. Card details are
+// only ever entered on Shopify. A cart permalink cannot be used because it does not support selling plans.
+export function buildSubscriptionCheckoutUrl({optionId, email, clientRecordId, billing}: {optionId: SubscriptionOption['id']; email: string; clientRecordId: string; billing: BillingDetails}) {
+  const option = SUBSCRIPTION_OPTIONS.find((item) => item.id === optionId);
+  if (!option) throw new Error('Piano non valido.');
   const storefront = (process.env.SHOPIFY_STOREFRONT_URL || `https://${getStoreDomain()}`).replace(/\/$/, '');
-  return SUBSCRIPTION_OPTIONS.map((option) => {
-    const variant = process.env[option.variantEnv] || option.variant;
-    const plan = process.env[option.planEnv] || option.plan;
-    return {id: option.id, label: option.label, price: option.price, note: option.note, url: `${storefront}/cart/add?id=${variant}&quantity=1&selling_plan=${plan}&return_to=%2Fcheckout`};
-  });
+  const checkout = new URLSearchParams();
+  if (email) checkout.set('checkout[email]', email);
+  const add = new URLSearchParams({id: process.env[option.variantEnv] || option.variant, quantity: '1', selling_plan: process.env[option.planEnv] || option.plan});
+  const properties: Array<[string, string]> = [
+    ['Intestatario', billing.company], ['P.IVA', billing.vatNumber], ['Codice fiscale', billing.taxCode],
+    ['Codice SDI', billing.sdi], ['PEC', billing.pec],
+    ['Sede', [billing.address, [billing.zip, billing.city, billing.province ? `(${billing.province})` : ''].filter(Boolean).join(' ')].filter(Boolean).join(', ')],
+    ['_wowpro_client', clientRecordId],
+  ];
+  for (const [name, value] of properties) if (value) add.set(`properties[${name}]`, value);
+  add.set('return_to', `/checkout?${checkout.toString()}`);
+  return `${storefront}/cart/clear?return_to=${encodeURIComponent(`/cart/add?${add.toString()}`)}`;
 }
 
 // Plan label from the billing interval written by Flow (MONTH / YEAR) or from an order's selling plan name.
