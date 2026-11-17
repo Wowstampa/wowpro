@@ -1,0 +1,28 @@
+import {NextResponse} from 'next/server';
+import {z} from 'zod';
+
+import {billingSchema, billingToClient} from '@/lib/billing';
+import {getAppOrigin, getClientAccount} from '@/lib/client-account';
+import {getWowproClient, updateWowproClient} from '@/lib/integrations/airtable';
+import {buildSubscriptionCheckoutUrl, ensureOrdersPaidWebhook} from '@/lib/integrations/shopify';
+
+const schema = z.object({plan: z.enum(['monthly', 'annual']), billing: billingSchema});
+
+// Saves the billing details on the client record and returns the Shopify checkout for the chosen plan.
+export async function POST(request: Request) {
+  const account = await getClientAccount();
+  if (!account) return NextResponse.json({error: 'Accesso non autorizzato.'}, {status: 403});
+  const parsed = schema.safeParse(await request.json().catch(() => ({})));
+  if (!parsed.success) return NextResponse.json({error: parsed.error.issues[0]?.message || 'Dati non validi.', field: parsed.error.issues[0]?.path.at(-1)}, {status: 400});
+
+  try {
+    await ensureOrdersPaidWebhook(getAppOrigin(request));
+    await updateWowproClient(account.recordId, billingToClient(parsed.data.billing));
+    const client = await getWowproClient(account.recordId, {fresh: true});
+    const checkoutUrl = buildSubscriptionCheckoutUrl({optionId: parsed.data.plan, email: client.fields.email_login || account.profile.email, clientRecordId: account.recordId, billing: parsed.data.billing});
+    return NextResponse.json({checkoutUrl});
+  } catch (error) {
+    console.error('[Subscription checkout]', error);
+    return NextResponse.json({error: 'Impossibile avviare il pagamento. Riprova tra qualche istante.'}, {status: 502});
+  }
+}
