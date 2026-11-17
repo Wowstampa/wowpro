@@ -14,7 +14,9 @@ import {createAdminClient} from '@/lib/supabase/admin.server';
 import {requireProfile} from '@/lib/auth';
 import {getWowproClient} from '@/lib/integrations/airtable';
 import {getCustomerAccountUrl, getCustomerSubscription, getLatestBillingDetails, getSubscriptionOptions, listCustomerOrders, subscriptionPlanLabel, type CustomerOrder, type CustomerSubscription} from '@/lib/integrations/shopify';
-import {SubscriptionActions} from '@/components/subscription-actions';
+import {SubscriptionActions, type BillingDraft} from '@/components/subscription-actions';
+import {billingFromClient} from '@/lib/billing';
+import {countSubscriptionPayments} from '@/lib/subscription';
 import {listRequestFiles} from '@/lib/request-files';
 import {createClient} from '@/lib/supabase/server';
 
@@ -57,6 +59,7 @@ async function SubscriptionPage() {
   const supabase = await createClient();
   const {data: company} = await supabase.from('companies').select('airtable_record_id,shopify_customer_id').eq('id', profile.company_id || '').maybeSingle();
   let plan = ''; let crmStatus = ''; let crmRenewal = ''; let monthly = 0;
+  let billingDraft: BillingDraft = {company: '', vatNumber: '', taxCode: '', sdi: '', pec: '', address: '', zip: '', city: '', province: ''};
   let customerId = company?.shopify_customer_id || '';
   let email = profile.email;
   if (company?.airtable_record_id) {
@@ -64,6 +67,7 @@ async function SubscriptionPage() {
       const record = await getWowproClient(company.airtable_record_id);
       plan = record.fields.piano ? `WOWPRO ${record.fields.piano}` : '';
       crmStatus = record.fields.stato_abbonamento || '';
+      billingDraft = billingFromClient(record.fields);
       crmRenewal = record.fields.data_rinnovo_piano || '';
       monthly = Number(record.fields.crediti_inclusi_mese || 0);
       customerId = record.fields.shopify_customer_id || customerId;
@@ -82,13 +86,16 @@ async function SubscriptionPage() {
   if (ordersResult.status === 'fulfilled') payments = ordersResult.value.filter((order) => order.subscriptionPlan); else { hasLoadError = true; console.error('[Subscription orders]', ordersResult.reason); }
   const managerName = managerResult.status === 'fulfilled' ? managerResult.value?.manager?.name || null : null;
   const latestOrder = ordersResult.status === 'fulfilled' ? payments[0] || ordersResult.value[0] : undefined;
-  let billing: CustomerSubscription['billing'] = null;
-  if (latestOrder) { try { billing = await getLatestBillingDetails(latestOrder.id); } catch (error) { console.error('[Subscription billing]', error); } }
+  const paidCount = company?.airtable_record_id ? await countSubscriptionPayments(company.airtable_record_id).catch(() => 0) : 0;
+  // Billing details saved in the portal come first; otherwise those on the latest order.
+  let billing: CustomerSubscription['billing'] = billingDraft.vatNumber ? {name: null, company: billingDraft.company, lines: [billingDraft.address, [billingDraft.zip, billingDraft.city, billingDraft.province ? `(${billingDraft.province})` : ''].filter(Boolean).join(' ')].filter(Boolean), extra: [{label: 'Partita IVA', value: billingDraft.vatNumber}, ...(billingDraft.taxCode ? [{label: 'Codice fiscale', value: billingDraft.taxCode}] : []), ...(billingDraft.sdi ? [{label: 'Codice SDI', value: billingDraft.sdi}] : []), ...(billingDraft.pec ? [{label: 'PEC', value: billingDraft.pec}] : [])]} : null;
+  if (!billing && latestOrder) { try { billing = await getLatestBillingDetails(latestOrder.id); } catch (error) { console.error('[Subscription billing]', error); } }
 
   // Shopify (via Flow) is the source of truth; the CRM fills in until the first sync.
-  const statusKey = subscription.status || (/attiv/i.test(crmStatus) ? 'ACTIVE' : /disd|cessat|annull/i.test(crmStatus) ? 'CANCELLED' : /paus|sospes/i.test(crmStatus) ? 'PAUSED' : '');
-  const status = SUBSCRIPTION_STATUS[statusKey] || {label: crmStatus || 'Non attivo', tone: 'off'};
-  const nextBilling = subscription.nextBillingDate || crmRenewal;
+  // A subscription counts as active only when paid through Shopify; the CRM status fills in until Flow syncs.
+  const statusKey = subscription.status || (paidCount ? (/attiv/i.test(crmStatus) ? 'ACTIVE' : /disd|cessat|annull/i.test(crmStatus) ? 'CANCELLED' : /paus|sospes/i.test(crmStatus) ? 'PAUSED' : '') : '');
+  const status = SUBSCRIPTION_STATUS[statusKey] || {label: 'Non attivo', tone: 'off'};
+  const nextBilling = statusKey ? subscription.nextBillingDate || crmRenewal : '';
   const planName = subscriptionPlanLabel(subscription.plan) || subscriptionPlanLabel(payments[0]?.subscriptionPlan) || plan || 'WOWPRO';
   const isActive = statusKey === 'ACTIVE' || statusKey === 'FAILED';
 
@@ -102,8 +109,8 @@ async function SubscriptionPage() {
         <div><dt>Crediti inclusi</dt><dd>{monthly ? `${number(monthly)} / mese` : '—'}</dd></div>
       </dl>
       {statusKey === 'FAILED' ? <p className="subscription-hero__alert">L’ultimo addebito non è andato a buon fine: aggiorna il metodo di pagamento per non perdere i vantaggi WOWPRO.</p> : null}
-      <SubscriptionActions accountUrl={getCustomerAccountUrl()} active={isActive} options={getSubscriptionOptions()} managerName={managerName} />
-      <p className="subscription-hero__note"><Info size={14} /> Il rinnovo è automatico e viene addebitato sul metodo di pagamento salvato su WowStampa.</p>
+      <SubscriptionActions accountUrl={getCustomerAccountUrl()} active={isActive} billing={billingDraft} managerName={managerName} options={getSubscriptionOptions()} payments={paidCount} />
+      <p className="subscription-hero__note"><Info size={14} /> Pagamento con carta sul checkout sicuro di WowStampa. Il rinnovo è automatico e puoi richiedere la disdetta in qualsiasi momento.</p>
     </article>
   </section>;
 
