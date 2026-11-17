@@ -1,7 +1,8 @@
 import {NextResponse} from 'next/server';
 
 import {getWowproClient, listWowproClients, updateWowproClient} from '@/lib/integrations/airtable';
-import {creditsFromTitle, getCreditsProductId, verifyShopifyWebhook} from '@/lib/integrations/shopify';
+import {creditsFromTitle, getCreditsProductId, getSubscriptionProductId, verifyShopifyWebhook} from '@/lib/integrations/shopify';
+import {recordSubscriptionPayment} from '@/lib/subscription';
 import {createAdminClient} from '@/lib/supabase/admin.server';
 
 type ShopifyOrder = {
@@ -9,9 +10,10 @@ type ShopifyOrder = {
   name: string;
   email?: string | null;
   contact_email?: string | null;
-  customer?: {email?: string | null} | null;
+  customer?: {id?: number | null; email?: string | null} | null;
+  created_at?: string;
   note_attributes?: Array<{name: string; value: string}>;
-  line_items: Array<{product_id: number | null; variant_title?: string | null; title?: string | null; quantity: number}>;
+  line_items: Array<{product_id: number | null; variant_title?: string | null; title?: string | null; quantity: number; properties?: Array<{name: string; value: string}> | null}>;
 };
 
 export async function POST(request: Request) {
@@ -21,6 +23,23 @@ export async function POST(request: Request) {
   }
 
   const order = JSON.parse(rawBody) as ShopifyOrder;
+
+  // WOWPRO subscription (first purchase and every renewal).
+  const subscriptionLine = order.line_items.find((item) => String(item.product_id) === getSubscriptionProductId());
+  if (subscriptionLine) {
+    try {
+      const fromLine = subscriptionLine.properties?.find((property) => property.name === '_wowpro_client')?.value?.trim();
+      const recordId = fromLine && /^rec[A-Za-z0-9]+$/.test(fromLine) ? fromLine : await findClientRecordId(order);
+      if (!recordId) {
+        console.error('[Subscription webhook] Cliente WOWPRO non trovato per ordine', order.name);
+      } else {
+        await recordSubscriptionPayment({recordId, orderId: order.id, orderName: order.name, annual: /annual/i.test(subscriptionLine.variant_title || subscriptionLine.title || ''), shopifyCustomerId: order.customer?.id ? String(order.customer.id) : null, paidAt: order.created_at || new Date().toISOString()});
+      }
+    } catch (error) {
+      console.error('[Subscription webhook]', error);
+      return NextResponse.json({error: 'Attivazione abbonamento non riuscita.'}, {status: 500});
+    }
+  }
   const productId = getCreditsProductId();
   const credits = order.line_items
     .filter((item) => String(item.product_id) === productId)
