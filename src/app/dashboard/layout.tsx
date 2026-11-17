@@ -4,6 +4,7 @@ import {getWowproClient} from '@/lib/integrations/airtable';
 import {createClient} from '@/lib/supabase/server';
 import {SupportWidget} from '@/components/support-widget';
 import {countUnread, getConversationCompany} from '@/lib/support';
+import {countSubscriptionPayments} from '@/lib/subscription';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,7 +25,8 @@ export default async function DashboardLayout({children}: {children: React.React
         plan: client.fields.piano ? `WOWPRO ${client.fields.piano}` : 'WOWPRO',
         monthlyCredits: Number(client.fields.crediti_inclusi_mese || 0),
         renewalDate: client.fields.data_rinnovo_piano || '',
-        status: client.fields.stato_abbonamento || 'Attivo',
+        // Only a subscription paid through Shopify counts as active.
+        status: (await countSubscriptionPayments(company.airtable_record_id).catch(() => 0)) ? client.fields.stato_abbonamento || 'Attivo' : 'non attivo',
       };
     } catch { /* The portal remains available if the Airtable subscription cannot be read. */ }
   }
