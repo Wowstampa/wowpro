@@ -278,6 +278,49 @@ button, a { -webkit-tap-highlight-color: transparent; }
   .client-toolbar { display: grid; align-items: stretch; }.client-search { width: 100%; }.client-toolbar__actions { display: grid; }.client-toolbar__actions .button { width: fit-content; }.client-list { overflow-x: auto; }.client-list__head, .client-table-row { min-width: 980px; }.client-form { grid-template-columns: 1fr; }.credit-choice { grid-template-columns: 1fr; }.client-modal { max-height: calc(100vh - 36px); overflow-y: auto; }
 }
 
+/* ---------- Subscription page ---------- */
+.subscription-page { gap: 30px; }
+.subscription-hero__plan { padding: 28px; border-radius: 22px; background: radial-gradient(420px 260px at 92% 0, #0a3e2b, transparent 66%), #0a0d15; color: white; }
+.subscription-hero__title { margin-top: 14px; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.subscription-hero__title h2 { margin: 0; font-size: 34px; letter-spacing: -.05em; }
+.subscription-hero__facts { margin: 22px 0 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.subscription-hero__facts > div { padding: 14px 16px; border: 1px solid #262c38; border-radius: 14px; background: rgba(255,255,255,.035); }
+.subscription-hero__facts dt { color: #9aa3b0; font-size: 11px; font-weight: 700; }
+.subscription-hero__facts dd { margin: 5px 0 0; font-size: 18px; font-weight: 800; letter-spacing: -.03em; }
+.subscription-hero__alert { margin: 16px 0 0; padding: 12px 14px; border-radius: 12px; background: rgba(243,167,18,.14); color: #ffd58a; font-size: 13px; line-height: 1.5; }
+.subscription-hero__note { margin: 18px 0 0; padding-top: 14px; display: flex; align-items: center; gap: 8px; border-top: 1px solid #2b313c; color: #aeb5c1; font-size: 12px; }
+.subscription-actions { margin-top: 22px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.subscription-actions .button { min-height: 44px; }
+.subscription-actions .subscription-actions__ghost { border: 1px solid #3a414e; background: transparent; color: #d8dce3; box-shadow: none; }
+.subscription-actions .subscription-actions__ghost:hover { border-color: #f08a84; color: #ffb1ac; }
+.subscription-actions__sent { color: #8fe3b1; font-size: 13px; font-weight: 700; }
+.subscription-status { padding: 5px 10px; display: inline-flex; align-items: center; border-radius: 999px; font-size: 11px; font-weight: 800; white-space: nowrap; }
+.subscription-status--ok { background: var(--green-soft); color: var(--green-dark); }
+.subscription-status--warn { background: #fff2d9; color: #a86a04; }
+.subscription-status--off { background: #eef1f4; color: #6b7686; }
+.subscription-hero .subscription-status--ok { background: rgba(29,182,91,.18); color: #6ee5a0; }
+.subscription-hero .subscription-status--warn { background: rgba(243,167,18,.18); color: #ffd58a; }
+.subscription-hero .subscription-status--off { background: rgba(255,255,255,.08); color: #c4c8d2; }
+.subscription-payments { overflow: hidden; border: 1px solid var(--line); border-radius: 18px; background: white; box-shadow: var(--shadow); }
+.subscription-payments > article { padding: 14px 20px; display: grid; grid-template-columns: minmax(0, 1fr) 110px 120px 90px; gap: 16px; align-items: center; }
+.subscription-payments > article + article { border-top: 1px solid var(--line); }
+.subscription-payments strong { display: block; font-size: 14px; }
+.subscription-payments small { display: block; margin-top: 3px; color: var(--muted); font-size: 12px; }
+.subscription-payments b { font-size: 15px; text-align: right; }
+.subscription-payments .subscription-status { justify-self: end; }
+.subscription-payments a { display: inline-flex; align-items: center; justify-content: flex-end; gap: 5px; color: var(--green-dark); font-size: 12px; font-weight: 800; text-decoration: none; }
+.subscription-billing { padding: 22px; display: grid; grid-template-columns: 1fr 1fr; gap: 18px 28px; border: 1px solid var(--line); border-radius: 18px; background: white; box-shadow: var(--shadow); }
+.subscription-billing > div { display: grid; gap: 4px; color: #4f5d73; font-size: 13px; }
+.subscription-billing > div strong { color: var(--ink); font-size: 15px; }
+.subscription-billing > div small { color: var(--muted); font-size: 12px; }
+.subscription-billing dl { margin: 0; display: grid; gap: 8px; }
+.subscription-billing dl dt { color: var(--muted); font-size: 11px; font-weight: 700; }
+.subscription-billing dl dd { margin: 2px 0 0; color: var(--ink); font-size: 13px; font-weight: 700; }
+.subscription-billing__empty { margin: 0; color: var(--muted); font-size: 13px; }
+.subscription-billing footer { grid-column: 1 / -1; padding-top: 16px; display: flex; align-items: center; justify-content: space-between; gap: 16px; border-top: 1px solid var(--line); }
+.subscription-billing footer p { margin: 0; max-width: 560px; color: #5b6575; font-size: 12px; line-height: 1.55; }
+.subscription-billing footer .client-action { flex: 0 0 auto; }
+
 /* ---------- Mobile (≤ 760px) ---------- */
 @media (max-width: 760px) {
   .app-frame { display: block; }
@@ -518,5 +561,17 @@ button, a { -webkit-tap-highlight-color: transparent; }
   .team-directory__row > :nth-child(3) { grid-column: 1; grid-row: 3; justify-self: start; }
   .team-directory__row > :nth-child(4) { grid-column: 2; grid-row: 1; justify-self: end; }
   .team-directory__row > :nth-child(5) { grid-column: 2; grid-row: 3; justify-self: end; }
+  /* Subscription page. */
+  .subscription-hero__plan { padding: 20px; }
+  .subscription-hero__title h2 { font-size: 26px; }
+  .subscription-hero__facts { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .subscription-hero__facts > div:first-child { grid-column: 1 / -1; }
+  .subscription-hero__facts dd { font-size: 16px; }
+  .subscription-actions { flex-direction: column; align-items: stretch; }
+  .subscription-actions .button { justify-content: center; }
+  .subscription-payments > article { padding: 12px 14px; grid-template-columns: 1fr auto; gap: 6px 12px; }
+  .subscription-payments > article > :nth-child(3) { justify-self: start; }
+  .subscription-billing { padding: 16px; grid-template-columns: 1fr; }
+  .subscription-billing footer { flex-direction: column; align-items: stretch; }
 }
 
