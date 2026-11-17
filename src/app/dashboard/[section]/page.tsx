@@ -13,7 +13,7 @@ import {getConversationCompany} from '@/lib/support';
 import {createAdminClient} from '@/lib/supabase/admin.server';
 import {requireProfile} from '@/lib/auth';
 import {getWowproClient} from '@/lib/integrations/airtable';
-import {getCustomerAccountUrl, getCustomerSubscription, getLatestBillingDetails, getSubscriptionCheckoutUrl, listCustomerOrders, type CustomerOrder, type CustomerSubscription} from '@/lib/integrations/shopify';
+import {getCustomerAccountUrl, getCustomerSubscription, getLatestBillingDetails, getSubscriptionOptions, listCustomerOrders, subscriptionPlanLabel, type CustomerOrder, type CustomerSubscription} from '@/lib/integrations/shopify';
 import {SubscriptionActions} from '@/components/subscription-actions';
 import {listRequestFiles} from '@/lib/request-files';
 import {createClient} from '@/lib/supabase/server';
@@ -89,7 +89,7 @@ async function SubscriptionPage() {
   const statusKey = subscription.status || (/attiv/i.test(crmStatus) ? 'ACTIVE' : /disd|cessat|annull/i.test(crmStatus) ? 'CANCELLED' : /paus|sospes/i.test(crmStatus) ? 'PAUSED' : '');
   const status = SUBSCRIPTION_STATUS[statusKey] || {label: crmStatus || 'Non attivo', tone: 'off'};
   const nextBilling = subscription.nextBillingDate || crmRenewal;
-  const planName = subscription.plan || plan || payments[0]?.subscriptionPlan || 'WOWPRO';
+  const planName = subscriptionPlanLabel(subscription.plan) || subscriptionPlanLabel(payments[0]?.subscriptionPlan) || plan || 'WOWPRO';
   const isActive = statusKey === 'ACTIVE' || statusKey === 'FAILED';
 
   const overview = <section className="subscription-hero">
@@ -102,7 +102,7 @@ async function SubscriptionPage() {
         <div><dt>Crediti inclusi</dt><dd>{monthly ? `${number(monthly)} / mese` : '—'}</dd></div>
       </dl>
       {statusKey === 'FAILED' ? <p className="subscription-hero__alert">L’ultimo addebito non è andato a buon fine: aggiorna il metodo di pagamento per non perdere i vantaggi WOWPRO.</p> : null}
-      <SubscriptionActions accountUrl={getCustomerAccountUrl()} active={isActive} checkoutUrl={getSubscriptionCheckoutUrl()} managerName={managerName} />
+      <SubscriptionActions accountUrl={getCustomerAccountUrl()} active={isActive} options={getSubscriptionOptions()} managerName={managerName} />
       <p className="subscription-hero__note"><Info size={14} /> Il rinnovo è automatico e viene addebitato sul metodo di pagamento salvato su WowStampa.</p>
     </article>
   </section>;
@@ -110,7 +110,7 @@ async function SubscriptionPage() {
   const paymentsList = <section>
     <div className="credits-section-title"><h2>Pagamenti dell’abbonamento</h2><p>Ogni rinnovo genera un ordine su WowStampa</p></div>
     {payments.length ? <div className="subscription-payments">{payments.map((order) => <article key={order.id}>
-      <div><strong>{order.name}</strong><small>{date(order.createdAt)} · {order.subscriptionPlan}</small></div>
+      <div><strong>{order.name}</strong><small>{date(order.createdAt)} · {subscriptionPlanLabel(order.subscriptionPlan)}</small></div>
       <b>{money(order.total, order.currency)}</b>
       <span className={order.cancelled ? 'subscription-status subscription-status--off' : order.financialStatus === 'PAID' ? 'subscription-status subscription-status--ok' : 'subscription-status subscription-status--warn'}>{order.cancelled ? 'Annullato' : order.financialStatus === 'PAID' ? 'Pagato' : order.financialStatus === 'REFUNDED' ? 'Rimborsato' : 'In attesa'}</span>
       {order.statusPageUrl ? <a href={order.statusPageUrl} rel="noreferrer" target="_blank">Ricevuta <ExternalLink size={13} /></a> : <span />}
