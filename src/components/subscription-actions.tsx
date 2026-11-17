@@ -4,6 +4,7 @@ import {CheckCircle2, CreditCard, ExternalLink, Loader2, Lock, X} from 'lucide-r
 import {useRouter} from 'next/navigation';
 import {FormEvent, useEffect, useRef, useState} from 'react';
 
+export type SubscriptionPlanOption = Option;
 type Option = {id: 'monthly' | 'annual'; label: string; price: string; note: string};
 export type BillingDraft = {company: string; vatNumber: string; taxCode: string; sdi: string; pec: string; address: string; zip: string; city: string; province: string};
 
@@ -41,9 +42,9 @@ const FIELDS: Array<{name: keyof BillingDraft; label: string; placeholder?: stri
   {name: 'province', label: 'Provincia', placeholder: 'es. RM', maxLength: 2},
 ];
 
-function PurchaseModal({billing, options, payments, onClose}: {billing: BillingDraft; options: Option[]; payments: number; onClose: () => void}) {
+export function PurchaseModal({billing, options, payments, onClose, initialPlan}: {billing: BillingDraft; options: Option[]; payments: number; onClose: () => void; initialPlan?: Option['id']}) {
   const router = useRouter();
-  const [plan, setPlan] = useState<Option['id']>(options[0]?.id || 'monthly');
+  const [plan, setPlan] = useState<Option['id']>(initialPlan || options[0]?.id || 'monthly');
   const [form, setForm] = useState(billing);
   const [phase, setPhase] = useState<'form' | 'waiting' | 'done'>('form');
   const [error, setError] = useState('');
