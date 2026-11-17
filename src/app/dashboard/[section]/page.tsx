@@ -15,6 +15,7 @@ import {requireProfile} from '@/lib/auth';
 import {getWowproClient} from '@/lib/integrations/airtable';
 import {getCustomerAccountUrl, getCustomerSubscription, getLatestBillingDetails, getSubscriptionOptions, listCustomerOrders, subscriptionPlanLabel, type CustomerOrder, type CustomerSubscription} from '@/lib/integrations/shopify';
 import {SubscriptionActions, type BillingDraft} from '@/components/subscription-actions';
+import {SubscriptionLanding} from '@/components/subscription-landing';
 import {billingFromClient} from '@/lib/billing';
 import {countSubscriptionPayments} from '@/lib/subscription';
 import {listRequestFiles} from '@/lib/request-files';
@@ -132,6 +133,11 @@ async function SubscriptionPage() {
       <footer><p>Le fatture sono emesse da <b>Strategia Associati in Comunicazione S.r.l.</b> e inviate tramite SDI con i dati indicati nell’ordine. Per correggerli scrivi al tuo account manager.</p><OpenChatButton className="client-action">Scrivi all’account manager</OpenChatButton></footer>
     </article>
   </section>;
+
+  // Never subscribed: a sales page instead of an empty account summary.
+  if (!paidCount && !subscription.status) {
+    return <><PageHeader eyebrow="WOWPRO · Area cliente" title="Abbonamento" /><main className="page-content subscription-page"><SubscriptionLanding billing={billingDraft} managerName={managerName} options={getSubscriptionOptions()} payments={paidCount} /></main></>;
+  }
 
   return <><PageHeader eyebrow="WOWPRO · Area cliente" title="Abbonamento" /><main className="page-content subscription-page">
     <MobileTabs tabs={[{id: 'piano', label: 'Piano', content: overview}, {id: 'pagamenti', label: 'Pagamenti', content: paymentsList}, {id: 'fatturazione', label: 'Fatturazione', content: billingCard}]} />
