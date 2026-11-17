@@ -40,7 +40,7 @@ const FAQ = [
   {q: 'Come avviene il pagamento?', a: 'Con carta sul checkout sicuro di WowStampa. Il rinnovo è automatico sulla stessa carta, che puoi aggiornare quando vuoi.'},
 ];
 
-const euro = (value: number, digits = 0) => new Intl.NumberFormat('it-IT', {style: 'currency', currency: 'EUR', minimumFractionDigits: digits, maximumFractionDigits: digits}).format(value);
+const euro = (value: number, digits = 0) => new Intl.NumberFormat('it-IT', {style: 'currency', currency: 'EUR', minimumFractionDigits: digits, maximumFractionDigits: digits, useGrouping: 'always'}).format(value);
 
 // Sales page shown to invited clients who have never subscribed.
 export function SubscriptionLanding({options, billing, payments, managerName}: {options: SubscriptionPlanOption[]; billing: BillingDraft; payments: number; managerName: string | null}) {
