@@ -362,7 +362,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .sub-landing__toggle { margin: 24px 0 18px; padding: 4px; display: inline-flex; gap: 4px; border: 1px solid #2a303b; border-radius: 999px; background: rgba(255,255,255,.04); }
 .sub-landing__toggle button { height: 38px; padding: 0 16px; display: inline-flex; align-items: center; gap: 8px; border: 0; border-radius: 999px; background: transparent; color: #c3c9d3; font: inherit; font-size: 14px; font-weight: 800; cursor: pointer; }
 .sub-landing__toggle button.is-active { background: white; color: var(--ink); }
-.sub-landing__toggle b { padding: 3px 8px; border-radius: 999px; background: var(--green); color: #04210f; font-size: 10px; }
+.sub-landing__toggle b { padding: 3px 8px; white-space: nowrap; border-radius: 999px; background: var(--green); color: #04210f; font-size: 10px; }
 .sub-landing__price { display: flex; align-items: flex-end; gap: 10px; }
 .sub-landing__price strong { font-size: 56px; line-height: .9; letter-spacing: -.06em; }
 .sub-landing__price span { padding-bottom: 4px; color: #aeb5c1; font-size: 13px; font-weight: 700; line-height: 1.25; }
@@ -686,7 +686,8 @@ button, a { -webkit-tap-highlight-color: transparent; }
   .sub-landing__hero h2 { font-size: 34px; }
   .sub-landing__intro > p { font-size: 14px; }
   .sub-landing__toggle { width: 100%; }
-  .sub-landing__toggle button { flex: 1; justify-content: center; padding: 0 8px; font-size: 13px; }
+  .sub-landing__toggle button { flex: 1; justify-content: center; gap: 6px; padding: 0 6px; font-size: 13px; }
+  .sub-landing__toggle b { padding: 3px 6px; font-size: 9px; }
   .sub-landing__price strong { font-size: 46px; }
   .sub-landing__actions .button { flex: 1 1 100%; }
   .sub-landing__credits { padding: 20px; }
