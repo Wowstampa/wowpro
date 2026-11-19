@@ -320,3 +320,51 @@ export function getCustomerAccountUrl() {
   const storefront = process.env.SHOPIFY_STOREFRONT_URL || `https://${getStoreDomain()}`;
   return `${storefront.replace(/\/$/, '')}/account`;
 }
+
+/* ---------- Catalog and quotes (draft orders) ---------- */
+
+export type CatalogProduct = {id: string; title: string; imageUrl: string | null; url: string | null; variants: Array<{id: string; title: string; price: number}>};
+
+// Active products of the online store for the quote request picker (WOWPRO credits and subscription excluded).
+export async function searchCatalog(term: string) {
+  const clean = term.replace(/["\\]/g, ' ').trim().slice(0, 80);
+  const query = ['status:active', 'published_status:published', clean ? `title:*${clean}*` : ''].filter(Boolean).join(' ');
+  const data = await shopifyAdminQuery<{products: {nodes: Array<{id: string; title: string; onlineStoreUrl: string | null; featuredMedia: {preview: {image: {url: string} | null} | null} | null; variants: {nodes: Array<{id: string; title: string; price: string}>}}>}}>(
+    `query Catalog($query: String!) { products(first: 20, query: $query, sortKey: RELEVANCE) { nodes { id title onlineStoreUrl featuredMedia { preview { image { url(transform: {maxWidth: 160, maxHeight: 160}) } } } variants(first: 60) { nodes { id title price } } } } }`,
+    {query},
+  );
+  const excluded = new Set([`gid://shopify/Product/${getCreditsProductId()}`, `gid://shopify/Product/${getSubscriptionProductId()}`]);
+  return data.products.nodes.filter((product) => !excluded.has(product.id)).map((product): CatalogProduct => ({
+    id: product.id, title: product.title, url: product.onlineStoreUrl, imageUrl: product.featuredMedia?.preview?.image?.url || null,
+    variants: product.variants.nodes.map((variant) => ({id: variant.id, title: variant.title === 'Default Title' ? '' : variant.title, price: Number(variant.price)})),
+  }));
+}
+
+export type QuoteOfferLine = {variantId: string; quantity: number; unitPrice: number};
+
+// Creates the draft order for an accepted quote: the client pays it through its invoice URL.
+export async function createQuoteDraftOrder({quoteId, publicId, email, customerId, lines, shipping, note}: {quoteId: string; publicId: string; email: string; customerId?: string | null; lines: QuoteOfferLine[]; shipping: number; note: string}) {
+  const input: Record<string, unknown> = {
+    email,
+    note: `Preventivo WOWPRO ${publicId}${note ? `\n${note}` : ''}`,
+    tags: ['WOWPRO', 'preventivo'],
+    customAttributes: [{key: 'wowpro_quote', value: quoteId}, {key: 'wowpro_quote_code', value: publicId}],
+    lineItems: lines.map((line) => ({variantId: line.variantId, quantity: line.quantity, priceOverride: {amount: line.unitPrice.toFixed(2), currencyCode: 'EUR'}})),
+    ...(shipping > 0 ? {shippingLine: {title: 'Spedizione', priceWithCurrency: {amount: shipping.toFixed(2), currencyCode: 'EUR'}}} : {}),
+  };
+  const numericCustomer = (customerId || '').replace(/\D/g, '');
+  if (numericCustomer) input.purchasingEntity = {customerId: `gid://shopify/Customer/${numericCustomer}`};
+  const data = await shopifyAdminQuery<{draftOrderCreate: {draftOrder: {id: string; invoiceUrl: string | null; totalPriceSet: {shopMoney: {amount: string; currencyCode: string}}} | null; userErrors: Array<{message: string}>}}>(
+    `mutation QuoteDraft($input: DraftOrderInput!) { draftOrderCreate(input: $input) { draftOrder { id invoiceUrl totalPriceSet { shopMoney { amount currencyCode } } } userErrors { message } } }`,
+    {input},
+  );
+  const result = data.draftOrderCreate;
+  if (!result.draftOrder || result.userErrors.length) throw new Error(result.userErrors.map((error) => error.message).join(' · ') || 'Ordine bozza non creato.');
+  return {id: result.draftOrder.id, invoiceUrl: result.draftOrder.invoiceUrl, total: Number(result.draftOrder.totalPriceSet.shopMoney.amount), currency: result.draftOrder.totalPriceSet.shopMoney.currencyCode};
+}
+
+export async function deleteDraftOrder(id: string) {
+  try {
+    await shopifyAdminQuery(`mutation DeleteDraft($input: DraftOrderDeleteInput!) { draftOrderDelete(input: $input) { deletedId userErrors { message } } }`, {input: {id}});
+  } catch (error) { console.error('[Draft order delete]', error); }
+}
