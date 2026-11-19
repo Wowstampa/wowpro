@@ -1,4 +1,6 @@
 import {PageHeader} from '@/components/app-shell';
+import {QuotesWorkspace} from '@/components/quotes';
+import {listQuotes} from '@/lib/quotes';
 import {listWowproClients, type AirtableWowproClient} from '@/lib/integrations/airtable';
 import {AdminClientDirectory, type AdminClient} from '@/components/admin-client-directory';
 import {AdminCreditLedger, type CreditLedgerEntry} from '@/components/admin-credit-ledger';
@@ -14,6 +16,7 @@ import {AdminInbox} from '@/components/admin-inbox';
 import {listConversations, listTeamMembers, type SupportPerson} from '@/lib/support';
 
 const titles: Record<string, string> = {
+  preventivi: 'Preventivi',
   clienti: 'Clienti',
   'archivio-clienti': 'Archivio clienti',
   richieste: 'Richieste',
@@ -30,6 +33,7 @@ export default async function AdminSectionPage({params, searchParams}: {params: 
   if (section === 'archivio-clienti') return <ClientsPage archived />;
   if (section === 'crediti') return <CreditsPage />;
   if (section === 'richieste') return <RequestsPage />;
+  if (section === 'preventivi') return <QuotesAdminPage />;
   if (section === 'feedback') return <FeedbackPage />;
   if (section === 'team-ruoli') return <TeamRolesPage />;
   if (section === 'messaggi') return <MessagesPage companyId={(await searchParams).c} />;
@@ -249,3 +253,9 @@ function toAdminClient(recordId: string, fields: AirtableWowproClient): AdminCli
 
 function asRecord(value: unknown) { return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}; }
 function stringValue(value: unknown, fallback: string) { return typeof value === 'string' && value.trim() ? value : fallback; }
+
+async function QuotesAdminPage() {
+  const profile = await requireProfile(['staff', 'admin']);
+  const quotes = await listQuotes(profile).catch((error) => { console.error('[Quotes admin]', error); return []; });
+  return <><PageHeader eyebrow="WowStampa · Programma WOWPRO" title="Preventivi" /><main className="page-content"><QuotesWorkspace initialQuotes={quotes} viewer="team" /></main></>;
+}
