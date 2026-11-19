@@ -350,6 +350,29 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .subscription-billing footer p { margin: 0; max-width: 560px; color: #5b6575; font-size: 12px; line-height: 1.55; }
 .subscription-billing footer .client-action { flex: 0 0 auto; }
 
+/* ---------- Dashboard: presentation video ---------- */
+.video-intro { padding: 24px; display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(300px, 1fr); gap: 28px; align-items: center; border-radius: 24px; background: radial-gradient(500px 300px at 100% 0, rgba(29,182,91,.22), transparent 65%), #0a0d15; color: white; }
+.video-intro__player { position: relative; overflow: hidden; aspect-ratio: 16 / 9; border-radius: 18px; background: #000; box-shadow: 0 24px 50px -24px rgba(0,0,0,.8); }
+.video-intro__player video { width: 100%; height: 100%; display: block; object-fit: cover; }
+.video-intro__play { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 12px; border: 0; background: linear-gradient(180deg, rgba(10,13,21,0) 40%, rgba(10,13,21,.55)); color: white; font: inherit; cursor: pointer; }
+.video-intro__play span { width: 76px; height: 76px; display: grid; place-items: center; padding-left: 5px; border-radius: 50%; background: var(--green); color: #04210f; box-shadow: 0 0 0 10px rgba(29,182,91,.25), 0 18px 40px -10px rgba(29,182,91,.9); transition: transform .18s; }
+.video-intro__play:hover span { transform: scale(1.06); }
+.video-intro__play small { padding: 6px 12px; border-radius: 999px; background: rgba(10,13,21,.7); font-size: 12px; font-weight: 800; }
+.video-intro__eyebrow { display: inline-flex; align-items: center; gap: 8px; color: #b9c0cc; font-size: 11px; font-weight: 900; letter-spacing: .1em; }
+.video-intro__eyebrow i { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 4px rgba(29,182,91,.2); }
+.video-intro__copy h2 { margin: 10px 0 8px; font-size: 32px; line-height: 1.02; letter-spacing: -.05em; }
+.video-intro__copy h2 em { color: #55de91; font-style: normal; }
+.video-intro__copy > p { margin: 0 0 16px; color: #c3c9d3; font-size: 14px; line-height: 1.55; }
+.video-intro__chapters { margin: 0; padding: 0; display: grid; gap: 6px; list-style: none; }
+.video-intro__chapters button { width: 100%; padding: 9px 12px 9px 9px; display: grid; grid-template-columns: 34px 1fr auto; gap: 11px; align-items: center; border: 1px solid transparent; border-radius: 14px; background: rgba(255,255,255,.04); color: white; font: inherit; text-align: left; cursor: pointer; transition: background .15s, border-color .15s; }
+.video-intro__chapters button:hover { background: rgba(255,255,255,.08); }
+.video-intro__chapters button.is-current { border-color: rgba(29,182,91,.6); background: rgba(29,182,91,.14); }
+.video-intro__chapters button > span { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 10px; background: rgba(29,182,91,.18); color: #55de91; }
+.video-intro__chapters strong { display: grid; gap: 1px; font-size: 14px; letter-spacing: -.01em; }
+.video-intro__chapters small { color: #9aa3b0; font-size: 12px; font-weight: 500; }
+.video-intro__chapters time { color: #8d98aa; font-size: 12px; font-weight: 800; font-variant-numeric: tabular-nums; }
+@media (max-width: 1100px) { .video-intro { grid-template-columns: 1fr; } }
+
 /* ---------- Dashboard: program presentation ---------- */
 .program { scroll-margin-top: 110px; padding: 30px; border: 1px solid var(--line); border-radius: 24px; background: radial-gradient(600px 260px at 100% 0, rgba(29,182,91,.08), transparent 70%), white; box-shadow: var(--shadow); }
 .program__eyebrow { display: inline-flex; align-items: center; gap: 8px; color: var(--green-dark); font-size: 11px; font-weight: 900; letter-spacing: .1em; }
@@ -745,5 +768,12 @@ button, a { -webkit-tap-highlight-color: transparent; }
   .program__panel h3 { font-size: 19px; }
   .program__features { grid-template-columns: 1fr; }
   .program__actions .button { flex: 1 1 100%; justify-content: center; }
+  /* Dashboard presentation video. */
+  .video-intro { padding: 12px 12px 18px; gap: 16px; border-radius: 20px; }
+  .video-intro__player { border-radius: 14px; }
+  .video-intro__play span { width: 60px; height: 60px; }
+  .video-intro__copy { padding: 0 4px; }
+  .video-intro__copy h2 { font-size: 26px; }
+  .video-intro__chapters small { display: none; }
 }
 
