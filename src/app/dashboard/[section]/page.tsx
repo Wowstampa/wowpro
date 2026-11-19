@@ -16,12 +16,14 @@ import {getWowproClient} from '@/lib/integrations/airtable';
 import {getCustomerAccountUrl, getCustomerSubscription, getLatestBillingDetails, getSubscriptionOptions, listCustomerOrders, subscriptionPlanLabel, type CustomerOrder, type CustomerSubscription} from '@/lib/integrations/shopify';
 import {SubscriptionActions, type BillingDraft} from '@/components/subscription-actions';
 import {SubscriptionLanding} from '@/components/subscription-landing';
+import {QuotesWorkspace} from '@/components/quotes';
+import {listQuotes} from '@/lib/quotes';
 import {billingFromClient} from '@/lib/billing';
 import {countSubscriptionPayments} from '@/lib/subscription';
 import {listRequestFiles} from '@/lib/request-files';
 import {createClient} from '@/lib/supabase/server';
 
-const titles: Record<string, string> = {crediti: 'Crediti', richieste: 'Richieste grafiche', ordini: 'Ordini', abbonamento: 'Abbonamento', supporto: 'Supporto', feedback: 'Feedback & idee'};
+const titles: Record<string, string> = {crediti: 'Crediti', richieste: 'Richieste grafiche', ordini: 'Ordini', abbonamento: 'Abbonamento', preventivi: 'Preventivi', supporto: 'Supporto', feedback: 'Feedback & idee'};
 
 export default async function ClientSectionPage({params}: {params: Promise<{section: string}>}) {
   const {section} = await params;
@@ -29,6 +31,7 @@ export default async function ClientSectionPage({params}: {params: Promise<{sect
   if (section === 'richieste') return <RequestsPage />;
   if (section === 'ordini') return <OrdersPage />;
   if (section === 'abbonamento') return <SubscriptionPage />;
+  if (section === 'preventivi') return <QuotesPage />;
   if (section === 'supporto') return <SupportPage />;
   if (section === 'feedback') return <FeedbackPage />;
   const title = titles[section] || 'WOWPRO';
@@ -145,6 +148,12 @@ async function SubscriptionPage() {
 }
 
 function money(value: number, currency: string) { return new Intl.NumberFormat('it-IT', {style: 'currency', currency}).format(value); }
+
+async function QuotesPage() {
+  const profile = await requireProfile(['client']);
+  const quotes = await listQuotes(profile).catch((error) => { console.error('[Quotes]', error); return []; });
+  return <><PageHeader eyebrow="WOWPRO · Area cliente" title="Preventivi" /><main className="page-content"><QuotesWorkspace initialQuotes={quotes} viewer="client" /></main></>;
+}
 
 async function OrdersPage() {
   const profile = await requireProfile(['client']);
