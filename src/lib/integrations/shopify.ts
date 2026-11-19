@@ -340,6 +340,22 @@ export async function searchCatalog(term: string) {
   }));
 }
 
+async function findExistingCustomer(customerId?: string | null, email?: string | null) {
+  const numeric = (customerId || '').replace(/\D/g, '');
+  if (numeric) {
+    try {
+      const data = await shopifyAdminQuery<{customer: {id: string} | null}>(`query QuoteCustomer($id: ID!) { customer(id: $id) { id } }`, {id: `gid://shopify/Customer/${numeric}`});
+      if (data.customer) return data.customer.id;
+    } catch { /* Fall back to the email lookup. */ }
+  }
+  const cleanEmail = (email || '').trim().toLowerCase().replace(/["\\]/g, '');
+  if (!cleanEmail) return null;
+  try {
+    const data = await shopifyAdminQuery<{customers: {nodes: Array<{id: string}>}}>(`query QuoteCustomerByEmail($search: String!) { customers(first: 1, query: $search) { nodes { id } } }`, {search: `email:"${cleanEmail}"`});
+    return data.customers.nodes[0]?.id || null;
+  } catch { return null; }
+}
+
 export type QuoteOfferLine = {variantId: string; title?: string; quantity: number; unitPrice: number; properties?: Array<{name: string; value: string}>};
 
 // Creates the draft order for an accepted quote: the client pays it through its invoice URL.
@@ -356,14 +372,15 @@ export async function createQuoteDraftOrder({quoteId, publicId, email, customerI
     })),
     ...(shipping > 0 ? {shippingLine: {title: 'Spedizione', priceWithCurrency: {amount: shipping.toFixed(2), currencyCode: 'EUR'}}} : {}),
   };
-  const numericCustomer = (customerId || '').replace(/\D/g, '');
-  if (numericCustomer) input.purchasingEntity = {customerId: `gid://shopify/Customer/${numericCustomer}`};
-  const data = await shopifyAdminQuery<{draftOrderCreate: {draftOrder: {id: string; invoiceUrl: string | null; totalPriceSet: {shopMoney: {amount: string; currencyCode: string}}} | null; userErrors: Array<{message: string}>}}>(
-    `mutation QuoteDraft($input: DraftOrderInput!) { draftOrderCreate(input: $input) { draftOrder { id invoiceUrl totalPriceSet { shopMoney { amount currencyCode } } } userErrors { message } } }`,
+  // Only a customer that really exists in Shopify is linked: a stale CRM id makes Shopify reject the draft ("Record is invalid").
+  const verifiedCustomer = await findExistingCustomer(customerId, email);
+  if (verifiedCustomer) input.purchasingEntity = {customerId: verifiedCustomer};
+  const data = await shopifyAdminQuery<{draftOrderCreate: {draftOrder: {id: string; invoiceUrl: string | null; totalPriceSet: {shopMoney: {amount: string; currencyCode: string}}} | null; userErrors: Array<{message: string; field: string[] | null}>}}>(
+    `mutation QuoteDraft($input: DraftOrderInput!) { draftOrderCreate(input: $input) { draftOrder { id invoiceUrl totalPriceSet { shopMoney { amount currencyCode } } } userErrors { field message } } }`,
     {input},
   );
   const result = data.draftOrderCreate;
-  if (!result.draftOrder || result.userErrors.length) throw new Error(result.userErrors.map((error) => error.message).join(' · ') || 'Ordine bozza non creato.');
+  if (!result.draftOrder || result.userErrors.length) throw new Error(result.userErrors.map((error) => `${error.field?.length ? `${error.field.join('.')}: ` : ''}${error.message}`).join(' · ') || 'Ordine bozza non creato.');
   return {id: result.draftOrder.id, invoiceUrl: result.draftOrder.invoiceUrl, total: Number(result.draftOrder.totalPriceSet.shopMoney.amount), currency: result.draftOrder.totalPriceSet.shopMoney.currencyCode};
 }
 
