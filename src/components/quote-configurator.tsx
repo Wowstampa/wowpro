@@ -92,10 +92,12 @@ export function QuoteConfigurator({product, onBack, onAdd}: {product: CatalogPic
       if ((config.dimensions.maxWidth && base > config.dimensions.maxWidth) || (config.dimensions.maxHeight && tall > config.dimensions.maxHeight)) { setError(`Misura massima ${config.dimensions.maxWidth || '–'} × ${config.dimensions.maxHeight || '–'} cm.`); return; }
       options.push({name: 'Misure', value: `${base} × ${tall} cm`});
     }
-    onAdd({productId: product.id, variantId: chosen.id, productTitle: config.title, variantTitle: chosen.title, imageUrl: swatchImage || chosen.imageUrl || product.imageUrl, quantity: hasQuantityOption ? 1 : quantity, note: note.trim(), listPrice: chosen.price, options});
+    onAdd({productId: product.id, variantId: chosen.id, productTitle: config.title, variantTitle: chosen.title, imageUrl: swatchImage || chosen.imageUrl || product.imageUrl, quantity: hasQuantityOption ? 1 : quantity, note: note.trim(), listPrice: adminPrice(chosen.id) ?? chosen.price, options});
   }
 
-  const fromPrice = variant?.price ?? (product.variants.length ? Math.min(...product.variants.map((item) => item.price)) : null);
+  // Admin prices (the ones used in the draft order) win over the storefront ones.
+  const adminPrice = (id?: string) => product.variants.find((item) => item.id === id)?.price;
+  const fromPrice = adminPrice(variant?.id) ?? variant?.price ?? (product.variants.length ? Math.min(...product.variants.map((item) => item.price)) : null);
   let step = 0;
   const stepLabel = () => String(++step).padStart(2, '0');
 
