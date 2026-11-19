@@ -326,6 +326,7 @@ function OfferEditor({quote, onSaved}: {quote: QuoteView; onSaved: (quote: Quote
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
   const subtotal = lines.reduce((total, line) => total + toNumber(line.unitPrice) * (Number(line.quantity) || 0), 0) + toNumber(shipping);
+  const requests = quote.items.filter((item) => !item.variantId);
   const update = (key: string, patch: Partial<DraftLine>) => setLines((current) => current.map((line) => line.key === key ? {...line, ...patch} : line));
 
   async function save() {
@@ -341,6 +342,11 @@ function OfferEditor({quote, onSaved}: {quote: QuoteView; onSaved: (quote: Quote
   return <section className="quote-editor">
     <h3>{quote.offer ? 'Aggiorna il preventivo' : 'Prepara il preventivo'}</h3>
     <p>Prezzi unitari IVA esclusa. Scrivi le righe come devono comparire nell’ordine: all’invio viene creato l’ordine bozza in Shopify e il cliente riceve il link per pagare.</p>
+    {requests.length ? <div className="quote-request">
+      <h4>Richiesta del cliente</h4>
+      {requests.map((item, index) => <div key={index}><strong>{item.productTitle}</strong>{(item.options || []).length ? <small>{(item.options || []).map((option) => `${option.name}: ${option.value}`).join(' · ')}</small> : null}{item.note ? <p>{item.note}</p> : null}</div>)}
+      {quote.notes ? <p className="quote-request__notes"><b>Note:</b> {quote.notes}</p> : null}
+    </div> : null}
     <div className="quote-editor__lines">{lines.map((line) => {
       const custom = !line.variantId;
       return <div className={custom ? 'quote-line quote-line--custom' : 'quote-line'} key={line.key}>
@@ -348,7 +354,6 @@ function OfferEditor({quote, onSaved}: {quote: QuoteView; onSaved: (quote: Quote
           <span className="quote-line__tag">{custom ? <><PenLine size={12} /> Riga personalizzata</> : <><Package size={12} /> Prodotto a catalogo</>}</span>
           <button aria-label="Rimuovi riga" onClick={() => setLines((current) => current.filter((item) => item.key !== line.key))} type="button"><Trash2 size={14} /></button>
         </header>
-        {line.request ? <details className="quote-line__request"><summary>Cosa ha scritto il cliente</summary><p>{line.request}</p></details> : null}
         {custom ? <label className="quote-line__field"><span>Nome prodotto nell’ordine</span><input maxLength={250} onChange={(event) => update(line.key, {title: event.target.value})} placeholder="Es. Adesivi PVC prespaziati sagomati 60×50 cm" value={line.title} /></label> : <strong className="quote-line__title">{line.title}</strong>}
         <label className="quote-line__field"><span>{custom ? 'Descrizione e specifiche' : 'Specifiche'} <small>una per riga, es. “Materiale: PVC 510g”</small></span><textarea maxLength={3000} onChange={(event) => update(line.key, {details: event.target.value})} placeholder={'Materiale: Vinile polimerico\nFinitura: Laminazione opaca\nLavorazione: Taglio sagomato'} rows={custom ? 4 : Math.min(6, Math.max(2, line.details.split('\n').length))} value={line.details} /></label>
         <div className="quote-line__numbers">
