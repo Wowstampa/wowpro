@@ -45,8 +45,6 @@ export function PurchaseModal({billing, options, payments, onClose, initialPlan}
   const router = useRouter();
   const [plan, setPlan] = useState<Option['id']>(initialPlan || options[0]?.id || 'monthly');
   const [form, setForm] = useState(billing);
-  const selected = options.find((option) => option.id === plan);
-  const other = options.find((option) => option.id !== plan);
   const [phase, setPhase] = useState<'form' | 'waiting' | 'done'>('form');
   const [error, setError] = useState('');
   const [errorField, setErrorField] = useState('');
@@ -102,31 +100,63 @@ export function PurchaseModal({billing, options, payments, onClose, initialPlan}
     onClose();
   }
 
-  return <div aria-modal="true" className="modal-backdrop" role="dialog"><section className="client-modal subscription-buy">
-    <header><div><h2>{phase === 'done' ? 'Abbonamento attivo' : 'Attiva WOWPRO'}</h2><p>{phase === 'done' ? 'Benvenuto in WOWPRO: i crediti inclusi sono già disponibili.' : 'Inserisci i dati di fatturazione, poi paghi con carta sul checkout sicuro di WowStampa.'}</p></div><button aria-label="Chiudi" className="modal-close" onClick={close} type="button"><X size={19} /></button></header>
+  const field = (name: keyof BillingDraft) => {
+    const config = FIELDS.find((item) => item.name === name)!;
+    return <label className={`buy-field${config.wide ? ' is-wide' : ''}${errorField === name ? ' has-error' : ''}`} key={name}>
+      <span>{config.label}{config.optional ? <small>facoltativo</small> : null}</span>
+      <input autoComplete="off" maxLength={config.maxLength} onChange={(event) => setForm((current) => ({...current, [name]: event.target.value}))} placeholder={config.placeholder} required={!config.optional && name !== 'sdi'} value={form[name]} />
+    </label>;
+  };
+  const isAnnual = plan === 'annual';
 
-    {phase === 'form' ? <form className="client-form subscription-buy__form" onSubmit={start}>
-      {selected ? <div className="subscription-buy__summary"><div><small>Piano scelto</small><strong>WOWPRO {selected.label.toLowerCase()} · {selected.price}</strong><span>{selected.note}</span></div>{other ? <button onClick={() => setPlan(other.id)} type="button">Passa al {other.label.toLowerCase()}</button> : null}</div> : null}
-      <fieldset className="subscription-buy__billing"><legend>Dati di fatturazione</legend>
-        {FIELDS.map((field) => <label className={`${field.wide ? 'is-wide' : ''}${errorField === field.name ? ' has-error' : ''}`} key={field.name}>{field.label}{field.optional ? <small> (facoltativo)</small> : null}<input autoComplete="off" maxLength={field.maxLength} onChange={(event) => setForm((current) => ({...current, [field.name]: event.target.value}))} placeholder={field.placeholder} required={!field.optional && field.name !== 'sdi'} value={form[field.name]} /></label>)}
-      </fieldset>
-      <p className="form-hint">Indica il codice SDI oppure la PEC. Le fatture sono emesse da Strategia Associati in Comunicazione S.r.l. con questi dati.</p>
-      {error ? <p className="form-error">{error}</p> : null}
-      <footer className="modal-actions"><button className="client-action" onClick={close} type="button">Annulla</button><button className="client-action client-action--primary" disabled={isStarting} type="submit">{isStarting ? <Loader2 className="spin" size={15} /> : <Lock size={15} />}Paga con carta</button></footer>
+  return <div aria-modal="true" className="modal-backdrop" role="dialog"><section className={`subscription-buy is-${phase}`}>
+    <button aria-label="Chiudi" className="subscription-buy__close" onClick={close} type="button"><X size={18} /></button>
+
+    {phase === 'form' ? <form className="subscription-buy__layout" onSubmit={start}>
+      <aside className="buy-summary">
+        <span className="buy-summary__brand"><b>W</b> WOWPRO</span>
+        <h2>Attiva il tuo<br /><em>reparto grafico.</em></h2>
+        <div aria-label="Frequenza di pagamento" className="buy-summary__toggle" role="radiogroup">
+          {options.map((option) => <button aria-checked={plan === option.id} className={plan === option.id ? 'is-active' : ''} key={option.id} onClick={() => setPlan(option.id)} role="radio" type="button">{option.label}{option.id === 'annual' ? <small>-2 mesi</small> : null}</button>)}
+        </div>
+        <div className="buy-summary__price"><strong>{isAnnual ? '1.290 €' : '129 €'}</strong><span>+ IVA<br />{isAnnual ? 'all’anno' : 'al mese'}</span></div>
+        <p className="buy-summary__note">{isAnnual ? 'Pari a 107,50 € al mese · risparmi 258 €' : 'Rinnovo mensile, disdici quando vuoi'}</p>
+        <ul className="buy-summary__list">
+          <li><CheckCircle2 size={16} /> 12.000 crediti grafici ogni mese</li>
+          <li><CheckCircle2 size={16} /> Grafico e account manager dedicati</li>
+          <li><CheckCircle2 size={16} /> Listino riservato e produzione prioritaria</li>
+          <li><CheckCircle2 size={16} /> Nessun vincolo di durata</li>
+        </ul>
+        <p className="buy-summary__secure"><Lock size={13} /> Pagamento con carta sul checkout sicuro di WowStampa</p>
+      </aside>
+
+      <div className="buy-form">
+        <header className="buy-form__head"><span className="buy-form__step">Passo 1 di 2</span><h3>Dati di fatturazione</h3><p>Li usiamo per la fattura elettronica. Poi paghi con carta.</p></header>
+        <fieldset className="buy-group"><legend>Azienda</legend>{field('company')}{field('vatNumber')}{field('taxCode')}</fieldset>
+        <fieldset className="buy-group"><legend>Fatturazione elettronica <small>codice SDI oppure PEC</small></legend>{field('sdi')}{field('pec')}</fieldset>
+        <fieldset className="buy-group buy-group--address"><legend>Sede legale</legend>{field('address')}{field('zip')}{field('city')}{field('province')}</fieldset>
+        {error ? <p className="form-error">{error}</p> : null}
+        <footer className="buy-form__foot">
+          <div><small>Totale di oggi</small><strong>{isAnnual ? '1.290 €' : '129 €'} <span>+ IVA</span></strong></div>
+          <button className="buy-form__pay" disabled={isStarting} type="submit">{isStarting ? <Loader2 className="spin" size={17} /> : <CreditCard size={17} />}Continua al pagamento</button>
+        </footer>
+        <p className="buy-form__legal">Fatture emesse da Strategia Associati in Comunicazione S.r.l. · Rinnovo automatico, disdetta in qualsiasi momento.</p>
+      </div>
     </form> : null}
 
-    {phase === 'waiting' ? <div className="credit-shop__body credit-shop__status">
-      <Loader2 className="spin" size={30} />
-      <h3>In attesa del pagamento</h3>
+    {phase === 'waiting' ? <div className="buy-status">
+      <span className="buy-status__icon"><Loader2 className="spin" size={30} /></span>
+      <span className="buy-form__step">Passo 2 di 2</span>
+      <h3>Completa il pagamento</h3>
       <p>Inserisci i dati della carta nella finestra del checkout WowStampa. Questa pagina si aggiornerà da sola appena il pagamento sarà confermato.</p>
       {checkoutUrl ? <a className="credit-shop__reopen" href={checkoutUrl} onClick={(event) => { event.preventDefault(); popupRef.current = window.open(checkoutUrl, 'wowpro-subscription'); }}>Non vedi il checkout? Riaprilo</a> : null}
     </div> : null}
 
-    {phase === 'done' ? <div className="credit-shop__body credit-shop__status">
-      <CheckCircle2 className="credit-shop__ok" size={36} />
-      <h3>Pagamento confermato</h3>
-      <p>Riceverai la conferma dell’ordine via email. Il rinnovo è automatico sulla carta che hai usato.</p>
-      <footer className="modal-actions"><button className="client-action client-action--primary" onClick={close} type="button">Vai al portale</button></footer>
+    {phase === 'done' ? <div className="buy-status buy-status--done">
+      <span className="buy-status__icon"><CheckCircle2 size={34} /></span>
+      <h3>Benvenuto in WOWPRO!</h3>
+      <p>Il pagamento è confermato e i tuoi crediti sono già disponibili. Riceverai la conferma dell’ordine via email.</p>
+      <button className="buy-form__pay" onClick={close} type="button">Inizia a usare WOWPRO</button>
     </div> : null}
   </section></div>;
 }
