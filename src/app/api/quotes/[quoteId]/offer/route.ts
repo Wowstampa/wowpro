@@ -45,7 +45,7 @@ export async function POST(request: Request, {params}: {params: Promise<{quoteId
     return NextResponse.json({quote: toSummary(updated as never)});
   } catch (error) {
     console.error('[Quote offer]', error);
-    const message = error instanceof Error && /access|scope|permission/i.test(error.message) ? 'L’app Shopify non ha ancora il permesso di creare ordini bozza.' : 'Impossibile creare il preventivo su Shopify. Riprova.';
+    const message = error instanceof Error && /access|scope|permission/i.test(error.message) ? 'L’app Shopify non ha ancora il permesso di creare ordini bozza.' : `Impossibile creare il preventivo su Shopify${error instanceof Error && error.message ? ` (${error.message.slice(0, 200)})` : ''}. Riprova.`;
     return NextResponse.json({error: message}, {status: 502});
   }
 }
