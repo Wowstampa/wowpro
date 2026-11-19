@@ -14,13 +14,12 @@ const MAX_WAIT = 30 * 60_000;
 // Subscription actions: purchase (plan → billing details → card on the Shopify checkout) or a cancellation request.
 export function SubscriptionActions({active, options, accountUrl, managerName, billing, payments}: {active: boolean; options: Option[]; accountUrl: string; managerName: string | null; billing: BillingDraft; payments: number}) {
   const [isCancelOpen, setIsCancelOpen] = useState(false);
-  const [isBuyOpen, setIsBuyOpen] = useState(false);
+  const [buyPlan, setBuyPlan] = useState<Option['id'] | null>(null);
   const [sent, setSent] = useState(false);
 
   if (!active) return <div className="subscription-actions">
-    <div className="subscription-options">{options.map((option) => <button key={option.id} onClick={() => setIsBuyOpen(true)} type="button"><strong>{option.label}</strong><b>{option.price}</b><small>{option.note}</small></button>)}</div>
-    <button className="button button--primary" onClick={() => setIsBuyOpen(true)} type="button"><CreditCard size={17} /> Attiva l’abbonamento</button>
-    {isBuyOpen ? <PurchaseModal billing={billing} onClose={() => setIsBuyOpen(false)} options={options} payments={payments} /> : null}
+    <div className="subscription-options">{options.map((option) => <button key={option.id} onClick={() => setBuyPlan(option.id)} type="button"><strong>{option.label}</strong><b>{option.price}</b><small>{option.note}</small><span><CreditCard size={13} /> Riattiva</span></button>)}</div>
+    {buyPlan ? <PurchaseModal billing={billing} initialPlan={buyPlan} onClose={() => setBuyPlan(null)} options={options} payments={payments} /> : null}
   </div>;
 
   return <div className="subscription-actions">
@@ -46,6 +45,8 @@ export function PurchaseModal({billing, options, payments, onClose, initialPlan}
   const router = useRouter();
   const [plan, setPlan] = useState<Option['id']>(initialPlan || options[0]?.id || 'monthly');
   const [form, setForm] = useState(billing);
+  const selected = options.find((option) => option.id === plan);
+  const other = options.find((option) => option.id !== plan);
   const [phase, setPhase] = useState<'form' | 'waiting' | 'done'>('form');
   const [error, setError] = useState('');
   const [errorField, setErrorField] = useState('');
@@ -102,10 +103,10 @@ export function PurchaseModal({billing, options, payments, onClose, initialPlan}
   }
 
   return <div aria-modal="true" className="modal-backdrop" role="dialog"><section className="client-modal subscription-buy">
-    <header><div><h2>{phase === 'done' ? 'Abbonamento attivo' : 'Attiva WOWPRO'}</h2><p>{phase === 'done' ? 'Benvenuto in WOWPRO: i crediti inclusi sono già disponibili.' : 'Scegli il piano, controlla i dati di fatturazione e paga con carta sul checkout sicuro di WowStampa.'}</p></div><button aria-label="Chiudi" className="modal-close" onClick={close} type="button"><X size={19} /></button></header>
+    <header><div><h2>{phase === 'done' ? 'Abbonamento attivo' : 'Attiva WOWPRO'}</h2><p>{phase === 'done' ? 'Benvenuto in WOWPRO: i crediti inclusi sono già disponibili.' : 'Inserisci i dati di fatturazione, poi paghi con carta sul checkout sicuro di WowStampa.'}</p></div><button aria-label="Chiudi" className="modal-close" onClick={close} type="button"><X size={19} /></button></header>
 
     {phase === 'form' ? <form className="client-form subscription-buy__form" onSubmit={start}>
-      <fieldset className="subscription-buy__plans"><legend>Piano</legend>{options.map((option) => <label className={plan === option.id ? 'is-selected' : ''} key={option.id}><input checked={plan === option.id} name="plan" onChange={() => setPlan(option.id)} type="radio" value={option.id} /><strong>{option.label}</strong><b>{option.price}</b><small>{option.note}</small></label>)}</fieldset>
+      {selected ? <div className="subscription-buy__summary"><div><small>Piano scelto</small><strong>WOWPRO {selected.label.toLowerCase()} · {selected.price}</strong><span>{selected.note}</span></div>{other ? <button onClick={() => setPlan(other.id)} type="button">Passa al {other.label.toLowerCase()}</button> : null}</div> : null}
       <fieldset className="subscription-buy__billing"><legend>Dati di fatturazione</legend>
         {FIELDS.map((field) => <label className={`${field.wide ? 'is-wide' : ''}${errorField === field.name ? ' has-error' : ''}`} key={field.name}>{field.label}{field.optional ? <small> (facoltativo)</small> : null}<input autoComplete="off" maxLength={field.maxLength} onChange={(event) => setForm((current) => ({...current, [field.name]: event.target.value}))} placeholder={field.placeholder} required={!field.optional && field.name !== 'sdi'} value={form[field.name]} /></label>)}
       </fieldset>

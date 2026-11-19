@@ -51,7 +51,7 @@ export function SubscriptionLanding({options, billing, payments, managerName}: {
       <div className="sub-landing__intro">
         <span className="sub-landing__eyebrow"><i /> PROGRAMMA WOWPRO · SU INVITO</span>
         <h2>Il tuo reparto grafico,<br /><em>a canone fisso.</em></h2>
-        <p>Grafiche pronte per la stampa senza assumere nessuno: ogni mese hai {CREDITS.toLocaleString('it-IT')} crediti da usare con il tuo grafico dedicato, più tutti i vantaggi riservati ai clienti WOWPRO.</p>
+        <p>Un grafico dedicato, prezzi riservati e ordini in corsia preferenziale: tutto con un canone fisso, senza assumere nessuno.</p>
         {toggle}
         <div className="sub-landing__price">
           <strong>{euro(perMonth, annual ? 2 : 0)}</strong><span>/ mese<br />+ IVA</span>
@@ -78,23 +78,6 @@ export function SubscriptionLanding({options, billing, payments, managerName}: {
     <section className="sub-landing__block">
       <div className="sub-landing__heading"><h3>Come funziona</h3></div>
       <ol className="sub-landing__steps">{STEPS.map(({icon: Icon, title, text}, index) => <li key={title}><span><Icon size={20} /><i>{index + 1}</i></span><h4>{title}</h4><p>{text}</p></li>)}</ol>
-    </section>
-
-    <section className="sub-landing__block">
-      <div className="sub-landing__heading"><h3>Scegli come pagare</h3><p>Stessi vantaggi e stessi crediti, cambia solo la frequenza di pagamento.</p></div>
-      <div className="sub-landing__plans">
-        {options.map((option) => {
-          const isAnnual = option.id === 'annual';
-          return <article className={isAnnual ? 'is-featured' : ''} key={option.id}>
-            {isAnnual ? <span className="sub-landing__badge">PIÙ CONVENIENTE</span> : null}
-            <h4>{option.label}</h4>
-            <div className="sub-landing__plan-price"><strong>{euro(isAnnual ? ANNUAL : MONTHLY)}</strong><span>+ IVA / {isAnnual ? 'anno' : 'mese'}</span></div>
-            <p>{isAnnual ? <>Pari a {euro(ANNUAL / 12, 2)} al mese · <b>risparmi {euro(saving)}</b></> : 'Massima flessibilità, rinnovo ogni mese'}</p>
-            <ul><li><Check size={15} /> {CREDITS.toLocaleString('it-IT')} crediti ogni mese</li><li><Check size={15} /> Tutti i vantaggi WOWPRO</li><li><Check size={15} /> Disdetta in qualsiasi momento</li></ul>
-            <button className={isAnnual ? 'button button--primary' : 'button sub-landing__outline'} onClick={() => setBuyPlan(option.id)} type="button">Scegli {option.label.toLowerCase()}</button>
-          </article>;
-        })}
-      </div>
     </section>
 
     <section className="sub-landing__block">
