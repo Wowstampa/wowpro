@@ -8,7 +8,7 @@ import {QUOTE_COLUMNS, addQuoteEvent, getAccessibleQuote, isQuoteTeam, notifyQuo
 import {createAdminClient} from '@/lib/supabase/admin.server';
 
 const schema = z.object({
-  lines: z.array(z.object({variantId: z.string().regex(/^gid:\/\/shopify\/ProductVariant\/\d+$/), title: z.string().trim().min(1).max(300), quantity: z.number().int().min(1).max(100_000), unitPrice: z.number().min(0).max(1_000_000), properties: z.array(z.object({name: z.string().trim().min(1).max(120), value: z.string().trim().min(1).max(400)})).max(40).optional()})).min(1).max(30),
+  lines: z.array(z.object({variantId: z.union([z.string().regex(/^gid:\/\/shopify\/ProductVariant\/\d+$/), z.literal('')]).default(''), title: z.string().trim().min(1).max(300), quantity: z.number().int().min(1).max(100_000), unitPrice: z.number().min(0).max(1_000_000), properties: z.array(z.object({name: z.string().trim().min(1).max(120), value: z.string().trim().min(1).max(3000)})).max(40).optional()})).min(1).max(30),
   shipping: z.number().min(0).max(100_000).default(0),
   note: z.string().trim().max(2000).default(''),
 });
