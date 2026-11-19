@@ -1,7 +1,7 @@
 'use client';
 /* eslint-disable @next/next/no-img-element -- Shopify CDN thumbnails are already resized. */
 
-import {CheckCircle2, CreditCard, ExternalLink, FileText, Loader2, Package, Paperclip, Plus, Search, Send, ShoppingBag, Trash2, X} from 'lucide-react';
+import {ArrowRight, CheckCircle2, CreditCard, LayoutGrid, PenLine, ExternalLink, FileText, Loader2, Package, Paperclip, Plus, Search, Send, ShoppingBag, Trash2, X} from 'lucide-react';
 import {FormEvent, useCallback, useEffect, useMemo, useRef, useState} from 'react';
 
 import {ACCEPTED_FILES, formatBytes, putWithProgress, validateFiles} from '@/components/request-files';
@@ -14,7 +14,7 @@ type OfferLine = {variantId: string; title: string; quantity: number; unitPrice:
 export type QuoteView = {id: string; publicId: string; kind: 'quote' | 'order'; status: Status; companyName: string; requesterName: string; items: Item[]; notes: string; neededBy: string | null; offer: {lines: OfferLine[]; shipping: number; note: string} | null; invoiceUrl: string | null; total: number | null; currency: string; createdAt: string; quotedAt: string | null; paidAt: string | null; orderName: string | null};
 type Message = {id: string; kind: 'comment' | 'event'; body: string; createdAt: string; authorName: string; fromClient: boolean; mine: boolean; file: {name: string; size: number} | null};
 type Product = CatalogPick;
-const itemDetails = (item: Item) => [item.variantTitle, ...(item.options || []).filter((option) => !item.variantTitle.includes(option.value)).map((option) => `${option.name}: ${option.value}`), (item.options || []).some((option) => /quantit/i.test(option.name)) ? '' : `${item.quantity} pz`].filter(Boolean);
+const itemDetails = (item: Item) => [item.variantTitle, ...(item.options || []).filter((option) => !item.variantTitle.includes(option.value)).map((option) => `${option.name}: ${option.value}`), (item.options || []).some((option) => /quantit/i.test(option.name)) || item.productId === 'custom' ? '' : `${item.quantity} pz`].filter(Boolean);
 
 const STATUS: Record<Status, {label: string; tone: string}> = {
   new: {label: 'Inviata', tone: 'new'}, in_review: {label: 'In valutazione', tone: 'review'}, quoted: {label: 'Preventivo pronto', tone: 'quoted'}, paid: {label: 'Pagato', tone: 'paid'}, cancelled: {label: 'Annullata', tone: 'cancelled'},
@@ -80,6 +80,7 @@ function NewQuoteModal({onClose, onCreated}: {onClose: () => void; onCreated: (q
   const [products, setProducts] = useState<Product[] | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const [picked, setPicked] = useState<Product | null>(null);
+  const [mode, setMode] = useState<'choose' | 'catalog' | 'custom'>('choose');
   const [items, setItems] = useState<Item[]>([]);
   const [notes, setNotes] = useState('');
   const [neededBy, setNeededBy] = useState('');
@@ -121,13 +122,23 @@ function NewQuoteModal({onClose, onCreated}: {onClose: () => void; onCreated: (q
     <button aria-label="Chiudi" className="subscription-buy__close" onClick={onClose} type="button"><X size={18} /></button>
     <form className="quote-new__layout" onSubmit={submit}>
       <div className="quote-new__catalog">
-        <header><span className="buy-form__step">Catalogo WowStampa</span><h3>Scegli i prodotti</h3></header>
+        {mode === 'choose' ? <>
+          <header><span className="buy-form__step">Nuova richiesta</span><h3>Come vuoi procedere?</h3></header>
+          <div className="quote-new__modes">
+            <button onClick={() => setMode('catalog')} type="button"><span><LayoutGrid size={22} /></span><strong>Scegli dal catalogo</strong><small>Prodotti WowStampa con le stesse opzioni del sito: misure, materiali, finiture, colori e taglie.</small><em>Sfoglia il catalogo <ArrowRight size={14} /></em></button>
+            <button onClick={() => setMode('custom')} type="button"><span><PenLine size={22} /></span><strong>Richiesta personalizzata</strong><small>Non trovi quello che cerchi o hai un progetto particolare? Descrivilo con parole tue, ti rispondiamo noi.</small><em>Scrivi la richiesta <ArrowRight size={14} /></em></button>
+          </div>
+        </> : null}
+        {mode === 'custom' ? <CustomRequest onAdd={(item) => { setItems((current) => [...current, item]); setMode('choose'); }} onSwitch={() => setMode('catalog')} /> : null}
+        {mode === 'catalog' ? <>
+        <header className="quote-new__head"><div><span className="buy-form__step">Catalogo WowStampa</span><h3>Scegli i prodotti</h3></div><button className="quote-new__switch" onClick={() => { setPicked(null); setMode('custom'); }} type="button"><PenLine size={14} /> Richiesta personalizzata</button></header>
         <label className="quote-new__search"><Search size={17} /><input autoFocus onChange={(event) => setTerm(event.target.value)} placeholder="Cerca: roll-up, banner, adesivi, t-shirt…" value={term} />{isSearching ? <Loader2 className="spin" size={16} /> : null}</label>
         {picked ? <QuoteConfigurator onAdd={(item) => { setItems((current) => [...current, item]); setPicked(null); }} onBack={() => setPicked(null)} product={picked} />
           : <div className="quote-new__results">
           {products?.map((product) => <button key={product.id} onClick={() => pick(product)} type="button">{product.imageUrl ? <img alt="" src={product.imageUrl} /> : <i><Package size={20} /></i>}<strong>{product.title}</strong><small>{product.variants.length ? `da ${euro(Math.min(...product.variants.map((item) => item.price)))}` : ''}</small></button>)}
-          {products && !products.length ? <p className="quotes__none">Nessun prodotto trovato. Prova un’altra parola, oppure descrivi cosa ti serve nelle note.</p> : null}
+          {products && !products.length ? <p className="quotes__none">Nessun prodotto trovato. <button className="quote-new__inline" onClick={() => setMode('custom')} type="button">Fai una richiesta personalizzata</button></p> : null}
         </div>}
+        </> : null}
       </div>
 
       <div className="quote-new__cart">
@@ -138,8 +149,8 @@ function NewQuoteModal({onClose, onCreated}: {onClose: () => void; onCreated: (q
         <p className="quote-new__hint">{kind === 'quote' ? 'Ricevi i prezzi WOWPRO e decidi poi se ordinare.' : 'Sai già cosa ti serve: ti mandiamo l’ordine con i prezzi WOWPRO da pagare.'}</p>
         <h4>La tua richiesta <small>{items.length} {items.length === 1 ? 'prodotto' : 'prodotti'}</small></h4>
         <ul className="quote-new__items">
-          {items.map((item, index) => <li key={`${item.variantId}-${index}`}>{item.imageUrl ? <img alt="" src={item.imageUrl} /> : <i><Package size={16} /></i>}<div><strong>{item.productTitle}</strong><small>{[...itemDetails(item), item.note].filter(Boolean).join(' · ')}</small></div><button aria-label="Rimuovi" onClick={() => setItems((current) => current.filter((_, position) => position !== index))} type="button"><Trash2 size={15} /></button></li>)}
-          {!items.length ? <li className="quote-new__placeholder">Cerca un prodotto a sinistra e aggiungilo qui.</li> : null}
+          {items.map((item, index) => <li key={`${item.variantId}-${index}`}>{item.imageUrl ? <img alt="" src={item.imageUrl} /> : <i>{item.productId === 'custom' ? <PenLine size={16} /> : <Package size={16} />}</i>}<div><strong>{item.productTitle}</strong><small>{[...itemDetails(item), item.note].filter(Boolean).join(' · ')}</small></div><button aria-label="Rimuovi" onClick={() => setItems((current) => current.filter((_, position) => position !== index))} type="button"><Trash2 size={15} /></button></li>)}
+          {!items.length ? <li className="quote-new__placeholder">Scegli un prodotto dal catalogo o descrivi una richiesta personalizzata.</li> : null}
         </ul>
         <label className="buy-field is-wide"><span>Note per l’account manager <small>facoltativo</small></span><textarea maxLength={4000} onChange={(event) => setNotes(event.target.value)} placeholder="Tempi, indirizzo di consegna, richieste particolari…" rows={3} value={notes} /></label>
         <label className="buy-field is-wide"><span>Ti serve entro <small>facoltativo</small></span><input onChange={(event) => setNeededBy(event.target.value)} type="date" value={neededBy} /></label>
@@ -149,6 +160,36 @@ function NewQuoteModal({onClose, onCreated}: {onClose: () => void; onCreated: (q
       </div>
     </form>
   </section></div>;
+}
+
+// Free-text request for anything that is not (or not exactly) in the catalog.
+function CustomRequest({onAdd, onSwitch}: {onAdd: (item: Item) => void; onSwitch: () => void}) {
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [quantity, setQuantity] = useState('');
+  const [size, setSize] = useState('');
+  const [error, setError] = useState('');
+
+  function add() {
+    if (title.trim().length < 3) { setError('Dai un nome alla richiesta, ad esempio “Adesivi sagomati per vetrina”.'); return; }
+    if (description.trim().length < 10) { setError('Descrivi cosa ti serve: materiale, uso, finiture, quantità…'); return; }
+    const options = [size.trim() ? {name: 'Misure', value: size.trim()} : null, quantity.trim() ? {name: 'Quantità indicativa', value: quantity.trim()} : null].filter(Boolean) as Array<{name: string; value: string}>;
+    onAdd({productId: 'custom', variantId: '', productTitle: title.trim(), variantTitle: '', imageUrl: null, quantity: Math.max(1, Number(quantity.replace(/\D/g, '')) || 1), note: description.trim(), listPrice: null, options});
+  }
+
+  return <div className="quote-custom">
+    <header className="quote-new__head"><div><span className="buy-form__step">Richiesta personalizzata</span><h3>Raccontaci cosa ti serve</h3></div><button className="quote-new__switch" onClick={onSwitch} type="button"><LayoutGrid size={14} /> Scegli dal catalogo</button></header>
+    <p className="quote-custom__intro">Scrivi con parole tue: il tuo account manager valuta la richiesta, ti propone la soluzione migliore e ti manda il preventivo.</p>
+    <label className="buy-field is-wide"><span>Cosa ti serve</span><input maxLength={120} onChange={(event) => setTitle(event.target.value)} placeholder="Es. Adesivi sagomati per la vetrina del negozio" value={title} /></label>
+    <label className="buy-field is-wide"><span>Descrizione</span><textarea maxLength={3000} onChange={(event) => setDescription(event.target.value)} placeholder={'Materiale, utilizzo (interno/esterno), finiture, colori, dove va applicato, idee o riferimenti…'} rows={6} value={description} /><small className="quote-custom__count">{description.length}/3000</small></label>
+    <div className="quote-custom__row">
+      <label className="buy-field"><span>Quantità <small>indicativa</small></span><input maxLength={60} onChange={(event) => setQuantity(event.target.value)} placeholder="Es. 50 pezzi" value={quantity} /></label>
+      <label className="buy-field"><span>Misure <small>facoltativo</small></span><input maxLength={120} onChange={(event) => setSize(event.target.value)} placeholder="Es. 60 × 40 cm" value={size} /></label>
+    </div>
+    <p className="quote-custom__tip">Hai un file, uno schizzo o una foto di esempio? Allegali a destra con “Allega file grafici”.</p>
+    {error ? <p className="form-error">{error}</p> : null}
+    <button className="button button--primary" onClick={add} type="button"><Plus size={16} /> Aggiungi alla richiesta</button>
+  </div>;
 }
 
 function QuoteDetail({quoteId, viewer, onChange}: {quoteId: string; viewer: 'client' | 'team'; onChange: (quote: QuoteView) => void}) {
