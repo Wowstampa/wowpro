@@ -323,24 +323,24 @@ export function getCustomerAccountUrl() {
 
 /* ---------- Catalog and quotes (draft orders) ---------- */
 
-export type CatalogProduct = {id: string; title: string; imageUrl: string | null; url: string | null; variants: Array<{id: string; title: string; price: number}>};
+export type CatalogProduct = {id: string; handle: string; title: string; imageUrl: string | null; url: string | null; variants: Array<{id: string; title: string; price: number}>};
 
 // Active products of the online store for the quote request picker (WOWPRO credits and subscription excluded).
 export async function searchCatalog(term: string) {
   const clean = term.replace(/["\\]/g, ' ').trim().slice(0, 80);
   const query = ['status:active', 'published_status:published', clean ? `title:*${clean}*` : ''].filter(Boolean).join(' ');
-  const data = await shopifyAdminQuery<{products: {nodes: Array<{id: string; title: string; onlineStoreUrl: string | null; featuredMedia: {preview: {image: {url: string} | null} | null} | null; variants: {nodes: Array<{id: string; title: string; price: string}>}}>}}>(
-    `query Catalog($query: String!) { products(first: 20, query: $query, sortKey: RELEVANCE) { nodes { id title onlineStoreUrl featuredMedia { preview { image { url(transform: {maxWidth: 160, maxHeight: 160}) } } } variants(first: 60) { nodes { id title price } } } } }`,
+  const data = await shopifyAdminQuery<{products: {nodes: Array<{id: string; handle: string; title: string; onlineStoreUrl: string | null; featuredMedia: {preview: {image: {url: string} | null} | null} | null; variants: {nodes: Array<{id: string; title: string; price: string}>}}>}}>(
+    `query Catalog($query: String!) { products(first: 20, query: $query, sortKey: RELEVANCE) { nodes { id handle title onlineStoreUrl featuredMedia { preview { image { url(transform: {maxWidth: 160, maxHeight: 160}) } } } variants(first: 60) { nodes { id title price } } } } }`,
     {query},
   );
   const excluded = new Set([`gid://shopify/Product/${getCreditsProductId()}`, `gid://shopify/Product/${getSubscriptionProductId()}`]);
   return data.products.nodes.filter((product) => !excluded.has(product.id)).map((product): CatalogProduct => ({
-    id: product.id, title: product.title, url: product.onlineStoreUrl, imageUrl: product.featuredMedia?.preview?.image?.url || null,
+    id: product.id, handle: product.handle, title: product.title, url: product.onlineStoreUrl, imageUrl: product.featuredMedia?.preview?.image?.url || null,
     variants: product.variants.nodes.map((variant) => ({id: variant.id, title: variant.title === 'Default Title' ? '' : variant.title, price: Number(variant.price)})),
   }));
 }
 
-export type QuoteOfferLine = {variantId: string; quantity: number; unitPrice: number};
+export type QuoteOfferLine = {variantId: string; quantity: number; unitPrice: number; properties?: Array<{name: string; value: string}>};
 
 // Creates the draft order for an accepted quote: the client pays it through its invoice URL.
 export async function createQuoteDraftOrder({quoteId, publicId, email, customerId, lines, shipping, note}: {quoteId: string; publicId: string; email: string; customerId?: string | null; lines: QuoteOfferLine[]; shipping: number; note: string}) {
@@ -349,7 +349,7 @@ export async function createQuoteDraftOrder({quoteId, publicId, email, customerI
     note: `Preventivo WOWPRO ${publicId}${note ? `\n${note}` : ''}`,
     tags: ['WOWPRO', 'preventivo'],
     customAttributes: [{key: 'wowpro_quote', value: quoteId}, {key: 'wowpro_quote_code', value: publicId}],
-    lineItems: lines.map((line) => ({variantId: line.variantId, quantity: line.quantity, priceOverride: {amount: line.unitPrice.toFixed(2), currencyCode: 'EUR'}})),
+    lineItems: lines.map((line) => ({variantId: line.variantId, quantity: line.quantity, priceOverride: {amount: line.unitPrice.toFixed(2), currencyCode: 'EUR'}, ...(line.properties?.length ? {customAttributes: line.properties.map((property) => ({key: property.name, value: property.value}))} : {})})),
     ...(shipping > 0 ? {shippingLine: {title: 'Spedizione', priceWithCurrency: {amount: shipping.toFixed(2), currencyCode: 'EUR'}}} : {}),
   };
   const numericCustomer = (customerId || '').replace(/\D/g, '');
