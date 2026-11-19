@@ -12,8 +12,8 @@ export async function GET() {
 }
 
 const itemSchema = z.object({
-  productId: z.string().min(1).max(80), variantId: z.string().min(1).max(80), productTitle: z.string().trim().min(1).max(200), variantTitle: z.string().trim().max(200).default(''),
-  imageUrl: z.string().url().max(600).nullable().default(null), quantity: z.number().int().min(1).max(100_000), note: z.string().trim().max(500).default(''), listPrice: z.number().nonnegative().nullable().default(null),
+  productId: z.string().min(1).max(80), variantId: z.string().max(80).default(''), productTitle: z.string().trim().min(1).max(200), variantTitle: z.string().trim().max(200).default(''),
+  imageUrl: z.string().url().max(600).nullable().default(null), quantity: z.number().int().min(1).max(100_000), note: z.string().trim().max(3000).default(''), listPrice: z.number().nonnegative().nullable().default(null),
   options: z.array(z.object({name: z.string().trim().min(1).max(120), value: z.string().trim().min(1).max(400)})).max(40).default([]),
 });
 const createSchema = z.object({
