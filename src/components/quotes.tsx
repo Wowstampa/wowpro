@@ -263,7 +263,7 @@ function QuoteDetail({quoteId, viewer, onChange}: {quoteId: string; viewer: 'cli
 
     {quote.offer && quote.status !== 'cancelled' ? <section className="quote-offer">
       <h3>{quote.status === 'paid' ? 'Riepilogo ordine' : 'Il tuo preventivo'}</h3>
-      <ul>{quote.offer.lines.map((line, index) => <li key={index}><span>{line.quantity} × {line.title}</span><b>{euro(line.unitPrice * line.quantity)}</b></li>)}{quote.offer.shipping ? <li><span>Spedizione</span><b>{euro(quote.offer.shipping)}</b></li> : null}</ul>
+      <ul>{quote.offer.lines.map((line, index) => <li key={index}><span>{line.quantity} × {line.title}{line.properties?.length ? <small className="quote-offer__specs">{line.properties.map((property) => property.name === 'Descrizione' ? property.value : `${property.name}: ${property.value}`).join(' · ')}</small> : null}</span><b>{euro(line.unitPrice * line.quantity)}</b></li>)}{quote.offer.shipping ? <li><span>Spedizione</span><b>{euro(quote.offer.shipping)}</b></li> : null}</ul>
       {quote.offer.note ? <p className="quote-offer__note">{quote.offer.note}</p> : null}
       <div className="quote-offer__total"><span>Totale IVA inclusa</span><strong>{quote.total !== null ? euro(quote.total, quote.currency) : '—'}</strong></div>
       {viewer === 'client' && quote.status === 'quoted' && quote.invoiceUrl ? <><button className="buy-form__pay" onClick={pay} type="button"><CreditCard size={17} /> Accetta e paga con carta</button>{paying ? <p className="quote-offer__wait"><Loader2 className="spin" size={14} /> In attesa della conferma del pagamento… <a href={quote.invoiceUrl} rel="noreferrer" target="_blank">Riapri il checkout <ExternalLink size={12} /></a></p> : <p className="quote-offer__wait">Pagamento sicuro sul checkout WowStampa. Hai domande? Scrivi qui sotto.</p>}</> : null}
@@ -297,24 +297,69 @@ function QuoteDetail({quoteId, viewer, onChange}: {quoteId: string; viewer: 'cli
   </div>;
 }
 
+type DraftLine = {key: string; variantId: string; title: string; quantity: string; unitPrice: string; details: string; request: string};
+const detailsToProperties = (details: string) => details.split('\n').map((row) => row.trim()).filter(Boolean).slice(0, 40).map((row) => {
+  const at = row.indexOf(':');
+  return at > 0 && at < 60 ? {name: row.slice(0, at).trim(), value: row.slice(at + 1).trim() || '-'} : {name: 'Descrizione', value: row};
+});
+const propertiesToDetails = (properties?: Array<{name: string; value: string}>) => (properties || []).map((property) => property.name === 'Descrizione' ? property.value : `${property.name}: ${property.value}`).join('\n');
+const toNumber = (value: string) => Number(value.replace(/\s/g, '').replace(',', '.')) || 0;
+
+// The account manager writes the offer: catalog lines keep the Shopify product, custom lines get the operator's own wording.
 function OfferEditor({quote, onSaved}: {quote: QuoteView; onSaved: (quote: QuoteView) => void}) {
-  const initial = useMemo<OfferLine[]>(() => quote.offer?.lines || quote.items.map((item) => ({variantId: item.variantId, title: [item.productTitle, item.variantTitle].filter(Boolean).join(' – '), quantity: item.quantity, unitPrice: item.listPrice || 0, properties: [...(item.options || []).filter((option) => !item.variantTitle.includes(option.value)), ...(item.note ? [{name: 'Dettagli', value: item.note}] : [])].slice(0, 40)})), [quote]);
+  const initial = useMemo<DraftLine[]>(() => {
+    if (quote.offer?.lines.length) return quote.offer.lines.map((line, index) => ({key: `o${index}`, variantId: line.variantId, title: line.title, quantity: String(line.quantity), unitPrice: String(line.unitPrice).replace('.', ','), details: propertiesToDetails(line.properties), request: ''}));
+    return quote.items.map((item, index) => {
+      const custom = !item.variantId;
+      const options = (item.options || []).filter((option) => !item.variantTitle.includes(option.value));
+      return {
+        key: `i${index}`, variantId: item.variantId, title: custom ? item.productTitle : [item.productTitle, item.variantTitle].filter(Boolean).join(' – '),
+        quantity: String(item.quantity), unitPrice: item.listPrice ? String(item.listPrice).replace('.', ',') : '',
+        details: custom ? '' : [...options.map((option) => `${option.name}: ${option.value}`), ...(item.note ? [`Note: ${item.note}`] : [])].join('\n'),
+        request: custom ? [item.productTitle, ...options.map((option) => `${option.name}: ${option.value}`), item.note].filter(Boolean).join('\n') : '',
+      };
+    });
+  }, [quote]);
   const [lines, setLines] = useState(initial);
   const [shipping, setShipping] = useState(String(quote.offer?.shipping || 0));
   const [note, setNote] = useState(quote.offer?.note || '');
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
-  const subtotal = lines.reduce((total, line) => total + line.unitPrice * line.quantity, 0) + (Number(shipping.replace(',', '.')) || 0);
+  const subtotal = lines.reduce((total, line) => total + toNumber(line.unitPrice) * (Number(line.quantity) || 0), 0) + toNumber(shipping);
+  const update = (key: string, patch: Partial<DraftLine>) => setLines((current) => current.map((line) => line.key === key ? {...line, ...patch} : line));
 
   async function save() {
-    setIsSaving(true); setError('');
-    try { const result = await api<{quote: QuoteView}>(`/api/quotes/${quote.id}/offer`, {method: 'POST', body: JSON.stringify({lines, shipping: Number(shipping.replace(',', '.')) || 0, note})}); onSaved(result.quote); } catch (caught) { setError(caught instanceof Error ? caught.message : 'Preventivo non inviato.'); } finally { setIsSaving(false); }
+    setError('');
+    if (!lines.length) { setError('Aggiungi almeno una riga.'); return; }
+    const missing = lines.find((line) => !line.title.trim());
+    if (missing) { setError('Ogni riga personalizzata deve avere un nome prodotto.'); return; }
+    const payload = lines.map((line) => ({variantId: line.variantId, title: line.title.trim(), quantity: Math.max(1, Number(line.quantity) || 1), unitPrice: toNumber(line.unitPrice), properties: detailsToProperties(line.details)}));
+    setIsSaving(true);
+    try { const result = await api<{quote: QuoteView}>(`/api/quotes/${quote.id}/offer`, {method: 'POST', body: JSON.stringify({lines: payload, shipping: toNumber(shipping), note})}); onSaved(result.quote); } catch (caught) { setError(caught instanceof Error ? caught.message : 'Preventivo non inviato.'); } finally { setIsSaving(false); }
   }
 
   return <section className="quote-editor">
     <h3>{quote.offer ? 'Aggiorna il preventivo' : 'Prepara il preventivo'}</h3>
-    <p>Prezzi unitari IVA esclusa. All’invio viene creato l’ordine bozza in Shopify e il cliente riceve il link per pagare.</p>
-    <div className="quote-editor__lines">{lines.map((line, index) => <div key={`${line.variantId}-${index}`}><span>{line.title}{line.properties?.length ? <small>{line.properties.map((property) => `${property.name}: ${property.value}`).join(' · ')}</small> : null}</span><label>Q.tà<input inputMode="numeric" onChange={(event) => setLines((current) => current.map((item, position) => position === index ? {...item, quantity: Math.max(1, Number(event.target.value.replace(/\D/g, '')) || 1)} : item))} value={line.quantity} /></label><label>€ cad.<input inputMode="decimal" onChange={(event) => setLines((current) => current.map((item, position) => position === index ? {...item, unitPrice: Math.max(0, Number(event.target.value.replace(',', '.')) || 0)} : item))} value={line.unitPrice} /></label></div>)}</div>
+    <p>Prezzi unitari IVA esclusa. Scrivi le righe come devono comparire nell’ordine: all’invio viene creato l’ordine bozza in Shopify e il cliente riceve il link per pagare.</p>
+    <div className="quote-editor__lines">{lines.map((line) => {
+      const custom = !line.variantId;
+      return <div className={custom ? 'quote-line quote-line--custom' : 'quote-line'} key={line.key}>
+        <header>
+          <span className="quote-line__tag">{custom ? <><PenLine size={12} /> Riga personalizzata</> : <><Package size={12} /> Prodotto a catalogo</>}</span>
+          <button aria-label="Rimuovi riga" onClick={() => setLines((current) => current.filter((item) => item.key !== line.key))} type="button"><Trash2 size={14} /></button>
+        </header>
+        {line.request ? <details className="quote-line__request"><summary>Cosa ha scritto il cliente</summary><p>{line.request}</p></details> : null}
+        {custom ? <label className="quote-line__field"><span>Nome prodotto nell’ordine</span><input maxLength={250} onChange={(event) => update(line.key, {title: event.target.value})} placeholder="Es. Adesivi PVC prespaziati sagomati 60×50 cm" value={line.title} /></label> : <strong className="quote-line__title">{line.title}</strong>}
+        <label className="quote-line__field"><span>{custom ? 'Descrizione e specifiche' : 'Specifiche'} <small>una per riga, es. “Materiale: PVC 510g”</small></span><textarea maxLength={3000} onChange={(event) => update(line.key, {details: event.target.value})} placeholder={'Materiale: Vinile polimerico\nFinitura: Laminazione opaca\nLavorazione: Taglio sagomato'} rows={custom ? 4 : Math.min(6, Math.max(2, line.details.split('\n').length))} value={line.details} /></label>
+        <div className="quote-line__numbers">
+          <label>Q.tà<input inputMode="numeric" onChange={(event) => update(line.key, {quantity: event.target.value.replace(/\D/g, '').slice(0, 6)})} value={line.quantity} /></label>
+          <label>€ cad. IVA escl.<input inputMode="decimal" onChange={(event) => update(line.key, {unitPrice: event.target.value.replace(/[^\d,.]/g, '').slice(0, 12)})} placeholder="0,00" value={line.unitPrice} /></label>
+          <span>{euro(toNumber(line.unitPrice) * (Number(line.quantity) || 0))}</span>
+        </div>
+      </div>;
+    })}
+      <button className="quote-editor__add" onClick={() => setLines((current) => [...current, {key: `n${Date.now()}`, variantId: '', title: '', quantity: '1', unitPrice: '', details: '', request: ''}])} type="button"><Plus size={15} /> Aggiungi riga personalizzata</button>
+    </div>
     <div className="quote-editor__extra"><label className="buy-field"><span>Spedizione €</span><input inputMode="decimal" onChange={(event) => setShipping(event.target.value)} value={shipping} /></label><label className="buy-field is-wide"><span>Nota per il cliente <small>facoltativo</small></span><input maxLength={2000} onChange={(event) => setNote(event.target.value)} placeholder="Tempi di produzione, validità dell’offerta…" value={note} /></label></div>
     <footer><span>Imponibile <b>{euro(subtotal)}</b> + IVA</span><button className="client-action client-action--primary" disabled={isSaving} onClick={() => void save()} type="button">{isSaving ? <Loader2 className="spin" size={15} /> : <Send size={15} />}{quote.offer ? 'Aggiorna e reinvia' : 'Invia preventivo'}</button></footer>
     {error ? <p className="form-error">{error}</p> : null}
