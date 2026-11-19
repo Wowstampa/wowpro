@@ -315,6 +315,12 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .subscription-buy__plans strong { font-size: 14px; }
 .subscription-buy__plans b { font-size: 18px; letter-spacing: -.03em; }
 .subscription-buy__plans small { color: var(--muted); font-size: 12px; }
+.subscription-buy__summary { padding: 14px 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border: 1.5px solid var(--green); border-radius: 14px; background: var(--green-soft); }
+.subscription-buy__summary div { display: grid; gap: 2px; }
+.subscription-buy__summary small { color: var(--green-dark); font-size: 11px; font-weight: 900; letter-spacing: .06em; text-transform: uppercase; }
+.subscription-buy__summary strong { font-size: 16px; letter-spacing: -.02em; }
+.subscription-buy__summary span { color: #5b6575; font-size: 12px; }
+.subscription-buy__summary button { flex: 0 0 auto; padding: 0; border: 0; background: none; color: var(--green-dark); font: inherit; font-size: 13px; font-weight: 800; text-decoration: underline; cursor: pointer; }
 .subscription-buy__billing { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .subscription-buy__billing label { display: grid; gap: 6px; color: #1a2433; font-size: 12px; font-weight: 800; }
 .subscription-buy__billing label small { color: var(--muted); font-weight: 600; }
