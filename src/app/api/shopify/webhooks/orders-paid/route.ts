@@ -3,6 +3,7 @@ import {NextResponse} from 'next/server';
 import {getWowproClient, listWowproClients, updateWowproClient} from '@/lib/integrations/airtable';
 import {creditsFromTitle, getCreditsProductId, getSubscriptionProductId, verifyShopifyWebhook} from '@/lib/integrations/shopify';
 import {recordSubscriptionPayment} from '@/lib/subscription';
+import {addQuoteEvent} from '@/lib/quotes';
 import {createAdminClient} from '@/lib/supabase/admin.server';
 
 type ShopifyOrder = {
@@ -23,6 +24,22 @@ export async function POST(request: Request) {
   }
 
   const order = JSON.parse(rawBody) as ShopifyOrder;
+
+  // Paid quote (draft order created from the portal).
+  const quoteId = order.note_attributes?.find((item) => item.name === 'wowpro_quote')?.value?.trim();
+  if (quoteId && /^[0-9a-f-]{36}$/i.test(quoteId)) {
+    try {
+      const admin = createAdminClient();
+      const {data: quote} = await admin.from('quote_requests').select('id,status').eq('id', quoteId).maybeSingle();
+      if (quote && quote.status !== 'paid') {
+        await admin.from('quote_requests').update({status: 'paid', paid_at: new Date().toISOString(), order_name: order.name, updated_at: new Date().toISOString()}).eq('id', quote.id);
+        await addQuoteEvent(quote.id, null, `Pagamento ricevuto · ordine ${order.name}. Il tuo ordine è in lavorazione.`);
+      }
+    } catch (error) {
+      console.error('[Quote webhook]', error);
+      return NextResponse.json({error: 'Aggiornamento preventivo non riuscito.'}, {status: 500});
+    }
+  }
 
   // WOWPRO subscription (first purchase and every renewal).
   const subscriptionLine = order.line_items.find((item) => String(item.product_id) === getSubscriptionProductId());
