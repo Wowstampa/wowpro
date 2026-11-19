@@ -305,7 +305,8 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .subscription-options small { color: #aeb5c1; font-size: 12px; }
 .subscription-options span { margin-top: 8px; display: inline-flex; align-items: center; gap: 5px; color: #6ee5a0; font-size: 13px; font-weight: 800; }
 .subscription-buy { width: min(680px, calc(100vw - 32px)); max-height: 92vh; overflow-y: auto; }
-.subscription-buy__form { display: grid; gap: 16px; }
+.subscription-buy__form { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+.subscription-buy__form > * { grid-column: 1 / -1; }
 .subscription-buy fieldset { margin: 0; padding: 0; border: 0; min-width: 0; }
 .subscription-buy legend { margin-bottom: 10px; color: #1a2433; font-size: 13px; font-weight: 900; }
 .subscription-buy__plans { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
