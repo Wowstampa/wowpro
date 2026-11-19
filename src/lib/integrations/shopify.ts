@@ -340,7 +340,7 @@ export async function searchCatalog(term: string) {
   }));
 }
 
-export type QuoteOfferLine = {variantId: string; quantity: number; unitPrice: number; properties?: Array<{name: string; value: string}>};
+export type QuoteOfferLine = {variantId: string; title?: string; quantity: number; unitPrice: number; properties?: Array<{name: string; value: string}>};
 
 // Creates the draft order for an accepted quote: the client pays it through its invoice URL.
 export async function createQuoteDraftOrder({quoteId, publicId, email, customerId, lines, shipping, note}: {quoteId: string; publicId: string; email: string; customerId?: string | null; lines: QuoteOfferLine[]; shipping: number; note: string}) {
@@ -349,7 +349,11 @@ export async function createQuoteDraftOrder({quoteId, publicId, email, customerI
     note: `Preventivo WOWPRO ${publicId}${note ? `\n${note}` : ''}`,
     tags: ['WOWPRO', 'preventivo'],
     customAttributes: [{key: 'wowpro_quote', value: quoteId}, {key: 'wowpro_quote_code', value: publicId}],
-    lineItems: lines.map((line) => ({variantId: line.variantId, quantity: line.quantity, priceOverride: {amount: line.unitPrice.toFixed(2), currencyCode: 'EUR'}, ...(line.properties?.length ? {customAttributes: line.properties.map((property) => ({key: property.name, value: property.value}))} : {})})),
+    lineItems: lines.map((line) => ({
+      ...(line.variantId ? {variantId: line.variantId, priceOverride: {amount: line.unitPrice.toFixed(2), currencyCode: 'EUR'}} : {title: (line.title || 'Prodotto personalizzato').slice(0, 255), originalUnitPriceWithCurrency: {amount: line.unitPrice.toFixed(2), currencyCode: 'EUR'}, requiresShipping: true, taxable: true}),
+      quantity: line.quantity,
+      ...(line.properties?.length ? {customAttributes: line.properties.map((property) => ({key: property.name, value: property.value}))} : {}),
+    })),
     ...(shipping > 0 ? {shippingLine: {title: 'Spedizione', priceWithCurrency: {amount: shipping.toFixed(2), currencyCode: 'EUR'}}} : {}),
   };
   const numericCustomer = (customerId || '').replace(/\D/g, '');
