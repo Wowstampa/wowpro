@@ -1,18 +1,20 @@
 'use client';
 /* eslint-disable @next/next/no-img-element -- Shopify CDN thumbnails are already resized. */
 
-import {CheckCircle2, CreditCard, ExternalLink, FileText, Loader2, Minus, Package, Paperclip, Plus, Search, Send, ShoppingBag, Trash2, X} from 'lucide-react';
+import {CheckCircle2, CreditCard, ExternalLink, FileText, Loader2, Package, Paperclip, Plus, Search, Send, ShoppingBag, Trash2, X} from 'lucide-react';
 import {FormEvent, useCallback, useEffect, useMemo, useRef, useState} from 'react';
 
 import {ACCEPTED_FILES, formatBytes, putWithProgress, validateFiles} from '@/components/request-files';
+import {QuoteConfigurator, type CatalogPick} from '@/components/quote-configurator';
 import {RequestDrawer} from '@/components/request-thread';
 
 type Status = 'new' | 'in_review' | 'quoted' | 'paid' | 'cancelled';
-type Item = {productId: string; variantId: string; productTitle: string; variantTitle: string; imageUrl: string | null; quantity: number; note: string; listPrice: number | null};
-type OfferLine = {variantId: string; title: string; quantity: number; unitPrice: number};
+type Item = {productId: string; variantId: string; productTitle: string; variantTitle: string; imageUrl: string | null; quantity: number; note: string; listPrice: number | null; options?: Array<{name: string; value: string}>};
+type OfferLine = {variantId: string; title: string; quantity: number; unitPrice: number; properties?: Array<{name: string; value: string}>};
 export type QuoteView = {id: string; publicId: string; kind: 'quote' | 'order'; status: Status; companyName: string; requesterName: string; items: Item[]; notes: string; neededBy: string | null; offer: {lines: OfferLine[]; shipping: number; note: string} | null; invoiceUrl: string | null; total: number | null; currency: string; createdAt: string; quotedAt: string | null; paidAt: string | null; orderName: string | null};
 type Message = {id: string; kind: 'comment' | 'event'; body: string; createdAt: string; authorName: string; fromClient: boolean; mine: boolean; file: {name: string; size: number} | null};
-type Product = {id: string; title: string; imageUrl: string | null; url: string | null; variants: Array<{id: string; title: string; price: number}>};
+type Product = CatalogPick;
+const itemDetails = (item: Item) => [item.variantTitle, ...(item.options || []).filter((option) => !item.variantTitle.includes(option.value)).map((option) => `${option.name}: ${option.value}`), (item.options || []).some((option) => /quantit/i.test(option.name)) ? '' : `${item.quantity} pz`].filter(Boolean);
 
 const STATUS: Record<Status, {label: string; tone: string}> = {
   new: {label: 'Inviata', tone: 'new'}, in_review: {label: 'In valutazione', tone: 'review'}, quoted: {label: 'Preventivo pronto', tone: 'quoted'}, paid: {label: 'Pagato', tone: 'paid'}, cancelled: {label: 'Annullata', tone: 'cancelled'},
@@ -60,7 +62,7 @@ export function QuotesWorkspace({viewer, initialQuotes}: {viewer: 'client' | 'te
       : <div className="quotes__list">
         {visible.map((quote) => <button className="quote-card" key={quote.id} onClick={() => setOpenId(quote.id)} type="button">
           <span className="quote-card__thumbs">{quote.items.slice(0, 3).map((item, index) => item.imageUrl ? <img alt="" key={index} src={item.imageUrl} /> : <i key={index}><Package size={16} /></i>)}</span>
-          <span className="quote-card__main"><small>{quote.publicId} · {quote.kind === 'order' ? 'Ordine' : 'Preventivo'}{viewer === 'team' ? ` · ${quote.companyName}` : ''}</small><strong>{quote.items.map((item) => item.productTitle).join(', ')}</strong><em>{quote.items.reduce((total, item) => total + item.quantity, 0)} pezzi · {shortDate(quote.createdAt)}</em></span>
+          <span className="quote-card__main"><small>{quote.publicId} · {quote.kind === 'order' ? 'Ordine' : 'Preventivo'}{viewer === 'team' ? ` · ${quote.companyName}` : ''}</small><strong>{quote.items.map((item) => item.productTitle).join(', ')}</strong><em>{quote.items.length} {quote.items.length === 1 ? 'prodotto' : 'prodotti'} · {shortDate(quote.createdAt)}</em></span>
           <span className="quote-card__side"><b className={`quote-status quote-status--${STATUS[quote.status].tone}`}>{STATUS[quote.status].label}</b>{quote.total !== null && quote.status !== 'cancelled' ? <strong>{euro(quote.total, quote.currency)}</strong> : null}</span>
         </button>)}
         {!visible.length ? <p className="quotes__none">Nessuna richiesta in questa sezione.</p> : null}
@@ -78,9 +80,6 @@ function NewQuoteModal({onClose, onCreated}: {onClose: () => void; onCreated: (q
   const [products, setProducts] = useState<Product[] | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const [picked, setPicked] = useState<Product | null>(null);
-  const [variantId, setVariantId] = useState('');
-  const [quantity, setQuantity] = useState(1);
-  const [lineNote, setLineNote] = useState('');
   const [items, setItems] = useState<Item[]>([]);
   const [notes, setNotes] = useState('');
   const [neededBy, setNeededBy] = useState('');
@@ -98,13 +97,7 @@ function NewQuoteModal({onClose, onCreated}: {onClose: () => void; onCreated: (q
     return () => clearTimeout(timer);
   }, [term]);
 
-  function pick(product: Product) { setPicked(product); setVariantId(product.variants[0]?.id || ''); setQuantity(1); setLineNote(''); }
-  function addItem() {
-    if (!picked) return;
-    const variant = picked.variants.find((item) => item.id === variantId) || picked.variants[0];
-    setItems((current) => [...current, {productId: picked.id, variantId: variant.id, productTitle: picked.title, variantTitle: variant.title, imageUrl: picked.imageUrl, quantity, note: lineNote.trim(), listPrice: variant.price}]);
-    setPicked(null);
-  }
+  function pick(product: Product) { setPicked(product); setError(''); }
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -124,22 +117,14 @@ function NewQuoteModal({onClose, onCreated}: {onClose: () => void; onCreated: (q
     } catch (caught) { setError(caught instanceof Error ? caught.message : 'Richiesta non inviata.'); } finally { setIsSaving(false); setProgress(''); }
   }
 
-  const variant = picked?.variants.find((item) => item.id === variantId);
-
   return <div aria-modal="true" className="modal-backdrop" role="dialog"><section className="quote-new">
     <button aria-label="Chiudi" className="subscription-buy__close" onClick={onClose} type="button"><X size={18} /></button>
     <form className="quote-new__layout" onSubmit={submit}>
       <div className="quote-new__catalog">
         <header><span className="buy-form__step">Catalogo WowStampa</span><h3>Scegli i prodotti</h3></header>
         <label className="quote-new__search"><Search size={17} /><input autoFocus onChange={(event) => setTerm(event.target.value)} placeholder="Cerca: roll-up, banner, adesivi, t-shirt…" value={term} />{isSearching ? <Loader2 className="spin" size={16} /> : null}</label>
-        {picked ? <div className="quote-new__picker">
-          <button className="quote-new__back" onClick={() => setPicked(null)} type="button">← Torna ai risultati</button>
-          <div className="quote-new__picked">{picked.imageUrl ? <img alt="" src={picked.imageUrl} /> : <i><Package size={22} /></i>}<div><strong>{picked.title}</strong>{variant ? <small>Prezzo di listino {euro(variant.price)} · il prezzo WOWPRO è nel preventivo</small> : null}</div></div>
-          {picked.variants.length > 1 ? <label className="buy-field is-wide"><span>Variante</span><select onChange={(event) => setVariantId(event.target.value)} value={variantId}>{picked.variants.map((item) => <option key={item.id} value={item.id}>{item.title || 'Standard'}</option>)}</select></label> : null}
-          <div className="quote-new__qty"><span>Quantità</span><div><button aria-label="Diminuisci" onClick={() => setQuantity((value) => Math.max(1, value - 1))} type="button"><Minus size={15} /></button><input inputMode="numeric" min={1} onChange={(event) => setQuantity(Math.max(1, Number(event.target.value.replace(/\D/g, '')) || 1))} value={quantity} /><button aria-label="Aumenta" onClick={() => setQuantity((value) => value + 1)} type="button"><Plus size={15} /></button></div></div>
-          <label className="buy-field is-wide"><span>Dettagli <small>facoltativo</small></span><input maxLength={500} onChange={(event) => setLineNote(event.target.value)} placeholder="Misure, materiale, finiture, colori…" value={lineNote} /></label>
-          <button className="button button--primary" onClick={addItem} type="button"><Plus size={16} /> Aggiungi alla richiesta</button>
-        </div> : <div className="quote-new__results">
+        {picked ? <QuoteConfigurator onAdd={(item) => { setItems((current) => [...current, item]); setPicked(null); }} onBack={() => setPicked(null)} product={picked} />
+          : <div className="quote-new__results">
           {products?.map((product) => <button key={product.id} onClick={() => pick(product)} type="button">{product.imageUrl ? <img alt="" src={product.imageUrl} /> : <i><Package size={20} /></i>}<strong>{product.title}</strong><small>{product.variants.length ? `da ${euro(Math.min(...product.variants.map((item) => item.price)))}` : ''}</small></button>)}
           {products && !products.length ? <p className="quotes__none">Nessun prodotto trovato. Prova un’altra parola, oppure descrivi cosa ti serve nelle note.</p> : null}
         </div>}
@@ -153,7 +138,7 @@ function NewQuoteModal({onClose, onCreated}: {onClose: () => void; onCreated: (q
         <p className="quote-new__hint">{kind === 'quote' ? 'Ricevi i prezzi WOWPRO e decidi poi se ordinare.' : 'Sai già cosa ti serve: ti mandiamo l’ordine con i prezzi WOWPRO da pagare.'}</p>
         <h4>La tua richiesta <small>{items.length} {items.length === 1 ? 'prodotto' : 'prodotti'}</small></h4>
         <ul className="quote-new__items">
-          {items.map((item, index) => <li key={`${item.variantId}-${index}`}>{item.imageUrl ? <img alt="" src={item.imageUrl} /> : <i><Package size={16} /></i>}<div><strong>{item.productTitle}</strong><small>{[item.variantTitle, `${item.quantity} pz`, item.note].filter(Boolean).join(' · ')}</small></div><button aria-label="Rimuovi" onClick={() => setItems((current) => current.filter((_, position) => position !== index))} type="button"><Trash2 size={15} /></button></li>)}
+          {items.map((item, index) => <li key={`${item.variantId}-${index}`}>{item.imageUrl ? <img alt="" src={item.imageUrl} /> : <i><Package size={16} /></i>}<div><strong>{item.productTitle}</strong><small>{[...itemDetails(item), item.note].filter(Boolean).join(' · ')}</small></div><button aria-label="Rimuovi" onClick={() => setItems((current) => current.filter((_, position) => position !== index))} type="button"><Trash2 size={15} /></button></li>)}
           {!items.length ? <li className="quote-new__placeholder">Cerca un prodotto a sinistra e aggiungilo qui.</li> : null}
         </ul>
         <label className="buy-field is-wide"><span>Note per l’account manager <small>facoltativo</small></span><textarea maxLength={4000} onChange={(event) => setNotes(event.target.value)} placeholder="Tempi, indirizzo di consegna, richieste particolari…" rows={3} value={notes} /></label>
@@ -246,7 +231,7 @@ function QuoteDetail({quoteId, viewer, onChange}: {quoteId: string; viewer: 'cli
     {viewer === 'team' && !closed ? <OfferEditor onSaved={(next) => { onChange(next); void load(); }} quote={quote} /> : null}
 
     <section className="rt-section"><h3>Prodotti richiesti</h3>
-      <ul className="quote-items">{quote.items.map((item, index) => <li key={index}>{item.imageUrl ? <img alt="" src={item.imageUrl} /> : <i><Package size={16} /></i>}<div><strong>{item.productTitle}</strong><small>{[item.variantTitle, `${item.quantity} pz`].filter(Boolean).join(' · ')}</small>{item.note ? <p>{item.note}</p> : null}</div></li>)}</ul>
+      <ul className="quote-items">{quote.items.map((item, index) => <li key={index}>{item.imageUrl ? <img alt="" src={item.imageUrl} /> : <i><Package size={16} /></i>}<div><strong>{item.productTitle}</strong><small>{itemDetails(item).join(' · ')}</small>{item.note ? <p>{item.note}</p> : null}</div></li>)}</ul>
       {quote.notes ? <p className="rt-brief">{quote.notes}</p> : null}
     </section>
 
@@ -272,7 +257,7 @@ function QuoteDetail({quoteId, viewer, onChange}: {quoteId: string; viewer: 'cli
 }
 
 function OfferEditor({quote, onSaved}: {quote: QuoteView; onSaved: (quote: QuoteView) => void}) {
-  const initial = useMemo<OfferLine[]>(() => quote.offer?.lines || quote.items.map((item) => ({variantId: item.variantId, title: [item.productTitle, item.variantTitle].filter(Boolean).join(' – '), quantity: item.quantity, unitPrice: item.listPrice || 0})), [quote]);
+  const initial = useMemo<OfferLine[]>(() => quote.offer?.lines || quote.items.map((item) => ({variantId: item.variantId, title: [item.productTitle, item.variantTitle].filter(Boolean).join(' – '), quantity: item.quantity, unitPrice: item.listPrice || 0, properties: [...(item.options || []).filter((option) => !item.variantTitle.includes(option.value)), ...(item.note ? [{name: 'Dettagli', value: item.note}] : [])].slice(0, 40)})), [quote]);
   const [lines, setLines] = useState(initial);
   const [shipping, setShipping] = useState(String(quote.offer?.shipping || 0));
   const [note, setNote] = useState(quote.offer?.note || '');
@@ -288,7 +273,7 @@ function OfferEditor({quote, onSaved}: {quote: QuoteView; onSaved: (quote: Quote
   return <section className="quote-editor">
     <h3>{quote.offer ? 'Aggiorna il preventivo' : 'Prepara il preventivo'}</h3>
     <p>Prezzi unitari IVA esclusa. All’invio viene creato l’ordine bozza in Shopify e il cliente riceve il link per pagare.</p>
-    <div className="quote-editor__lines">{lines.map((line, index) => <div key={`${line.variantId}-${index}`}><span>{line.title}</span><label>Q.tà<input inputMode="numeric" onChange={(event) => setLines((current) => current.map((item, position) => position === index ? {...item, quantity: Math.max(1, Number(event.target.value.replace(/\D/g, '')) || 1)} : item))} value={line.quantity} /></label><label>€ cad.<input inputMode="decimal" onChange={(event) => setLines((current) => current.map((item, position) => position === index ? {...item, unitPrice: Math.max(0, Number(event.target.value.replace(',', '.')) || 0)} : item))} value={line.unitPrice} /></label></div>)}</div>
+    <div className="quote-editor__lines">{lines.map((line, index) => <div key={`${line.variantId}-${index}`}><span>{line.title}{line.properties?.length ? <small>{line.properties.map((property) => `${property.name}: ${property.value}`).join(' · ')}</small> : null}</span><label>Q.tà<input inputMode="numeric" onChange={(event) => setLines((current) => current.map((item, position) => position === index ? {...item, quantity: Math.max(1, Number(event.target.value.replace(/\D/g, '')) || 1)} : item))} value={line.quantity} /></label><label>€ cad.<input inputMode="decimal" onChange={(event) => setLines((current) => current.map((item, position) => position === index ? {...item, unitPrice: Math.max(0, Number(event.target.value.replace(',', '.')) || 0)} : item))} value={line.unitPrice} /></label></div>)}</div>
     <div className="quote-editor__extra"><label className="buy-field"><span>Spedizione €</span><input inputMode="decimal" onChange={(event) => setShipping(event.target.value)} value={shipping} /></label><label className="buy-field is-wide"><span>Nota per il cliente <small>facoltativo</small></span><input maxLength={2000} onChange={(event) => setNote(event.target.value)} placeholder="Tempi di produzione, validità dell’offerta…" value={note} /></label></div>
     <footer><span>Imponibile <b>{euro(subtotal)}</b> + IVA</span><button className="client-action client-action--primary" disabled={isSaving} onClick={() => void save()} type="button">{isSaving ? <Loader2 className="spin" size={15} /> : <Send size={15} />}{quote.offer ? 'Aggiorna e reinvia' : 'Invia preventivo'}</button></footer>
     {error ? <p className="form-error">{error}</p> : null}
