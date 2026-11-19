@@ -7,6 +7,7 @@ import {
   BadgeEuro,
   ChartNoAxesCombined,
   CreditCard,
+  FileText,
   Crown,
   Headphones,
   Home,
@@ -38,6 +39,7 @@ function getClientLinks(notificationCounts: AdminNotificationCounts): Navigation
   return [
   {href: '/dashboard', label: 'Dashboard', icon: ChartNoAxesCombined},
   {href: '/dashboard/richieste', label: 'Richieste grafiche', icon: MessageSquareText, count: notificationCounts.requests || undefined, section: 'GESTIONE'},
+  {href: '/dashboard/preventivi', label: 'Preventivi', icon: FileText},
   {href: '/dashboard/ordini', label: 'Ordini', icon: PackageCheck},
   {href: '/dashboard/crediti', label: 'Crediti', icon: CreditCard},
   {href: '/dashboard/abbonamento', label: 'Abbonamento', icon: Crown},
@@ -56,6 +58,7 @@ function getAdminLinks(notificationCounts: AdminNotificationCounts, isAdministra
   {href: '/admin', label: isAdministrator ? 'Panoramica' : 'Dashboard', icon: ChartNoAxesCombined},
   {href: '/admin/clienti', label: 'Clienti', icon: UsersRound, section: 'GESTIONE', separated: true, children: [{href: '/admin/archivio-clienti', label: 'Archivio clienti', icon: PackageCheck}]},
   {href: '/admin/richieste', label: 'Richieste', icon: MessageSquareText, count: notificationCounts.requests || undefined},
+  {href: '/admin/preventivi', label: 'Preventivi', icon: FileText},
   {href: '/admin/messaggi', label: 'Messaggi', icon: MessagesSquare, count: notificationCounts.support || undefined},
   {href: '/admin/crediti', label: 'Crediti', icon: BadgeEuro},
   {href: '/admin/feedback', label: 'Feedback & idee', icon: Lightbulb, count: notificationCounts.feedback || undefined, section: 'COMMUNITY'},
