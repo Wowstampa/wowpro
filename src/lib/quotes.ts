@@ -10,7 +10,8 @@ export type QuoteStatus = 'new' | 'in_review' | 'quoted' | 'paid' | 'cancelled';
 export const QUOTE_STATUS_LABELS: Record<QuoteStatus, string> = {new: 'Inviata', in_review: 'In valutazione', quoted: 'Preventivo pronto', paid: 'Pagato', cancelled: 'Annullata'};
 
 export type QuoteItem = {productId: string; variantId: string; productTitle: string; variantTitle: string; imageUrl: string | null; quantity: number; note: string; listPrice: number | null; options?: Array<{name: string; value: string}>};
-export type QuoteOffer = {lines: Array<{variantId: string; title: string; quantity: number; unitPrice: number; properties?: Array<{name: string; value: string}>}>; shipping: number; note: string; validUntil: string | null};
+export type QuoteReceipt = {messageId: string; name: string; uploadedAt: string};
+export type QuoteOffer = {receipt?: QuoteReceipt | null; lines: Array<{variantId: string; title: string; quantity: number; unitPrice: number; properties?: Array<{name: string; value: string}>}>; shipping: number; note: string; validUntil: string | null};
 export type QuoteSummary = {id: string; publicId: string; kind: 'quote' | 'order'; status: QuoteStatus; companyName: string; requesterName: string; items: QuoteItem[]; notes: string; neededBy: string | null; offer: QuoteOffer | null; invoiceUrl: string | null; awaitingPayment: boolean; total: number | null; currency: string; createdAt: string; quotedAt: string | null; paidAt: string | null; orderName: string | null};
 export type QuoteMessage = {id: string; kind: 'comment' | 'event'; body: string; createdAt: string; authorName: string; fromClient: boolean; mine: boolean; file: {name: string; size: number} | null};
 
