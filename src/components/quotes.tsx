@@ -11,7 +11,7 @@ import {RequestDrawer} from '@/components/request-thread';
 type Status = 'new' | 'in_review' | 'quoted' | 'paid' | 'cancelled';
 type Item = {productId: string; variantId: string; productTitle: string; variantTitle: string; imageUrl: string | null; quantity: number; note: string; listPrice: number | null; options?: Array<{name: string; value: string}>};
 type OfferLine = {variantId: string; title: string; quantity: number; unitPrice: number; properties?: Array<{name: string; value: string}>};
-export type QuoteView = {id: string; publicId: string; kind: 'quote' | 'order'; status: Status; companyName: string; requesterName: string; items: Item[]; notes: string; neededBy: string | null; offer: {lines: OfferLine[]; shipping: number; note: string} | null; invoiceUrl: string | null; total: number | null; currency: string; createdAt: string; quotedAt: string | null; paidAt: string | null; orderName: string | null};
+export type QuoteView = {id: string; publicId: string; kind: 'quote' | 'order'; status: Status; companyName: string; requesterName: string; items: Item[]; notes: string; neededBy: string | null; offer: {lines: OfferLine[]; shipping: number; note: string} | null; invoiceUrl: string | null; awaitingPayment?: boolean; total: number | null; currency: string; createdAt: string; quotedAt: string | null; paidAt: string | null; orderName: string | null};
 type Message = {id: string; kind: 'comment' | 'event'; body: string; createdAt: string; authorName: string; fromClient: boolean; mine: boolean; file: {name: string; size: number} | null};
 type Product = CatalogPick;
 const itemDetails = (item: Item) => [item.variantTitle, ...(item.options || []).filter((option) => !item.variantTitle.includes(option.value)).map((option) => `${option.name}: ${option.value}`), (item.options || []).some((option) => /quantit/i.test(option.name)) || item.productId === 'custom' ? '' : `${item.quantity} pz`].filter(Boolean);
@@ -19,6 +19,7 @@ const itemDetails = (item: Item) => [item.variantTitle, ...(item.options || []).
 const STATUS: Record<Status, {label: string; tone: string}> = {
   new: {label: 'Inviata', tone: 'new'}, in_review: {label: 'In valutazione', tone: 'review'}, quoted: {label: 'Preventivo pronto', tone: 'quoted'}, paid: {label: 'Pagato', tone: 'paid'}, cancelled: {label: 'Annullata', tone: 'cancelled'},
 };
+const statusOf = (quote: QuoteView) => quote.awaitingPayment ? {label: 'Attesa bonifico', tone: 'review'} : STATUS[quote.status];
 const FILTERS = {all: {label: 'Tutte', statuses: null}, open: {label: 'In corso', statuses: ['new', 'in_review']}, quoted: {label: 'Da pagare', statuses: ['quoted']}, closed: {label: 'Chiuse', statuses: ['paid', 'cancelled']}} as const;
 
 const euro = (value: number, currency = 'EUR') => new Intl.NumberFormat('it-IT', {style: 'currency', currency}).format(value);
@@ -48,7 +49,7 @@ export function QuotesWorkspace({viewer, initialQuotes}: {viewer: 'client' | 'te
   const closeDrawer = useCallback(() => { setOpenId(null); if (window.location.search.includes('q=')) window.history.replaceState(null, '', window.location.pathname); }, []);
   const replace = useCallback((quote: QuoteView) => setQuotes((current) => current.some((item) => item.id === quote.id) ? current.map((item) => item.id === quote.id ? quote : item) : [quote, ...current]), []);
   const visible = quotes.filter((quote) => !FILTERS[filter].statuses || (FILTERS[filter].statuses as readonly string[]).includes(quote.status));
-  const toPay = quotes.filter((quote) => quote.status === 'quoted').length;
+  const toPay = quotes.filter((quote) => quote.status === 'quoted' && !quote.awaitingPayment).length;
 
   return <section className="quotes">
     <header className="quotes__toolbar">
@@ -63,7 +64,7 @@ export function QuotesWorkspace({viewer, initialQuotes}: {viewer: 'client' | 'te
         {visible.map((quote) => <button className="quote-card" key={quote.id} onClick={() => setOpenId(quote.id)} type="button">
           <span className="quote-card__thumbs">{quote.items.slice(0, 3).map((item, index) => item.imageUrl ? <img alt="" key={index} src={item.imageUrl} /> : <i key={index}><Package size={16} /></i>)}</span>
           <span className="quote-card__main"><small>{quote.publicId} · {quote.kind === 'order' ? 'Ordine' : 'Preventivo'}{viewer === 'team' ? ` · ${quote.companyName}` : ''}</small><strong>{quote.items.map((item) => item.productTitle).join(', ')}</strong><em>{quote.items.length} {quote.items.length === 1 ? 'prodotto' : 'prodotti'} · {shortDate(quote.createdAt)}</em></span>
-          <span className="quote-card__side"><b className={`quote-status quote-status--${STATUS[quote.status].tone}`}>{STATUS[quote.status].label}</b>{quote.total !== null && quote.status !== 'cancelled' ? <strong>{euro(quote.total, quote.currency)}</strong> : null}</span>
+          <span className="quote-card__side"><b className={`quote-status quote-status--${statusOf(quote).tone}`}>{statusOf(quote).label}</b>{quote.total !== null && quote.status !== 'cancelled' ? <strong>{euro(quote.total, quote.currency)}</strong> : null}</span>
         </button>)}
         {!visible.length ? <p className="quotes__none">Nessuna richiesta in questa sezione.</p> : null}
       </div>}
@@ -207,7 +208,7 @@ function QuoteDetail({quoteId, viewer, onChange}: {quoteId: string; viewer: 'cli
     try {
       const result = await api<{quote: QuoteView; messages: Message[]}>(`/api/quotes/${quoteId}`);
       setQuote(result.quote); setMessages(result.messages); onChange(result.quote); setError('');
-      if (result.quote.status === 'paid') setPaying(false);
+      if (result.quote.status === 'paid' || result.quote.awaitingPayment) setPaying(false);
     } catch (caught) { setError(caught instanceof Error ? caught.message : 'Preventivo non disponibile.'); }
   }, [quoteId, onChange]);
 
@@ -254,7 +255,7 @@ function QuoteDetail({quoteId, viewer, onChange}: {quoteId: string; viewer: 'cli
 
   return <div className="rt quote-detail">
     <header className="rt-head">
-      <div className="rt-head__top"><span className="rt-id">{quote.publicId}</span><span className={`quote-status quote-status--${STATUS[quote.status].tone}`}>{STATUS[quote.status].label}</span></div>
+      <div className="rt-head__top"><span className="rt-id">{quote.publicId}</span><span className={`quote-status quote-status--${statusOf(quote).tone}`}>{statusOf(quote).label}</span></div>
       <h2>{quote.kind === 'order' ? 'Richiesta d’ordine' : 'Richiesta di preventivo'}{viewer === 'team' ? ` · ${quote.companyName}` : ''}</h2>
       <div className="rt-meta"><span>Inviata il {shortDate(quote.createdAt)}{viewer === 'team' ? ` da ${quote.requesterName}` : ''}</span>{quote.neededBy ? <span>Serve entro il {shortDate(quote.neededBy)}</span> : null}{quote.orderName ? <span>Ordine {quote.orderName}</span> : null}</div>
     </header>
@@ -266,10 +267,11 @@ function QuoteDetail({quoteId, viewer, onChange}: {quoteId: string; viewer: 'cli
       <ul>{quote.offer.lines.map((line, index) => <li key={index}><span>{line.quantity} × {line.title}{line.properties?.length ? <small className="quote-offer__specs">{line.properties.map((property) => property.name === 'Descrizione' ? property.value : `${property.name}: ${property.value}`).join(' · ')}</small> : null}</span><b>{euro(line.unitPrice * line.quantity)}</b></li>)}{quote.offer.shipping ? <li><span>Spedizione</span><b>{euro(quote.offer.shipping)}</b></li> : null}</ul>
       {quote.offer.note ? <p className="quote-offer__note">{quote.offer.note}</p> : null}
       <div className="quote-offer__total"><span>Totale IVA inclusa</span><strong>{quote.total !== null ? euro(quote.total, quote.currency) : '—'}</strong></div>
-      {viewer === 'client' && quote.status === 'quoted' && quote.invoiceUrl ? <><button className="buy-form__pay" onClick={pay} type="button"><CreditCard size={17} /> Accetta e paga con carta</button>{paying ? <p className="quote-offer__wait"><Loader2 className="spin" size={14} /> In attesa della conferma del pagamento… <a href={quote.invoiceUrl} rel="noreferrer" target="_blank">Riapri il checkout <ExternalLink size={12} /></a></p> : <p className="quote-offer__wait">Pagamento sicuro sul checkout WowStampa. Hai domande? Scrivi qui sotto.</p>}</> : null}
+      {quote.awaitingPayment ? <div className="quote-transfer"><strong>Ordine {quote.orderName} confermato · in attesa del bonifico</strong><p>{viewer === 'client' ? 'Trovi l’IBAN e la causale nel riepilogo dell’ordine. Appena riceviamo l’accredito l’ordine passa in lavorazione e te lo segnaliamo qui.' : 'Il cliente ha scelto il bonifico. Quando ricevi l’accredito apri l’ordine su Shopify e clicca “Segna come pagato”: il preventivo si aggiorna da solo.'}</p>{quote.invoiceUrl ? <a href={quote.invoiceUrl} rel="noreferrer" target="_blank">{viewer === 'client' ? 'Vedi riepilogo e coordinate bancarie' : 'Apri il riepilogo dell’ordine'} <ExternalLink size={12} /></a> : null}</div> : null}
+      {viewer === 'client' && quote.status === 'quoted' && !quote.awaitingPayment && quote.invoiceUrl ? <><button className="buy-form__pay" onClick={pay} type="button"><CreditCard size={17} /> Accetta e paga con carta</button>{paying ? <p className="quote-offer__wait"><Loader2 className="spin" size={14} /> In attesa della conferma del pagamento… <a href={quote.invoiceUrl} rel="noreferrer" target="_blank">Riapri il checkout <ExternalLink size={12} /></a></p> : <p className="quote-offer__wait">Pagamento sicuro sul checkout WowStampa. Hai domande? Scrivi qui sotto.</p>}</> : null}
     </section> : null}
 
-    {viewer === 'team' && !closed ? <OfferEditor onSaved={(next) => { onChange(next); void load(); }} quote={quote} /> : null}
+    {viewer === 'team' && !closed && !quote.awaitingPayment ? <OfferEditor onSaved={(next) => { onChange(next); void load(); }} quote={quote} /> : null}
 
     <section className="rt-section"><h3>Prodotti richiesti</h3>
       <ul className="quote-items">{quote.items.map((item, index) => <li key={index}>{item.imageUrl ? <img alt="" src={item.imageUrl} /> : <i><Package size={16} /></i>}<div><strong>{item.productTitle}</strong><small>{itemDetails(item).join(' · ')}</small>{item.note ? <p>{item.note}</p> : null}</div></li>)}</ul>
