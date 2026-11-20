@@ -59,7 +59,7 @@ export function BankTransferModal({orderName, companyName, total, currency, line
           {ready ? <>
             <CopyField label="Intestatario" value={WOWSTAMPA_BANK.beneficiary} />
             <CopyField display={groupIban(WOWSTAMPA_BANK.iban)} label="IBAN" strong value={WOWSTAMPA_BANK.iban.replace(/\s+/g, '')} />
-            {WOWSTAMPA_BANK.bank || WOWSTAMPA_BANK.bic ? <div className="bt__pair">{WOWSTAMPA_BANK.bank ? <CopyField label="Banca" value={WOWSTAMPA_BANK.bank} /> : null}{WOWSTAMPA_BANK.bic ? <CopyField label="BIC / SWIFT" value={WOWSTAMPA_BANK.bic} /> : null}</div> : null}
+            {WOWSTAMPA_BANK.bank || WOWSTAMPA_BANK.bic ? <div className={WOWSTAMPA_BANK.bank && WOWSTAMPA_BANK.bic ? 'bt__pair' : 'bt__single'}>{WOWSTAMPA_BANK.bank ? <CopyField label="Banca" value={WOWSTAMPA_BANK.bank} /> : null}{WOWSTAMPA_BANK.bic ? <CopyField label="BIC / SWIFT" value={WOWSTAMPA_BANK.bic} /> : null}</div> : null}
             <div className="bt__pair"><CopyField display={money(amount, currency)} label="Importo" value={amount.toFixed(2).replace('.', ',')} /><CopyField label="Causale" strong value={reason} /></div>
           </> : <p className="bt__missing">Le coordinate bancarie sono nel riepilogo dell’ordine. Per qualsiasi dubbio scrivi al tuo account manager qui sotto.</p>}
         </div>
