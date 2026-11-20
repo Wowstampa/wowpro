@@ -2,6 +2,7 @@ import 'server-only';
 
 import type {CurrentProfile} from '@/lib/auth';
 import {escapeHtml, sendEmail} from '@/lib/email';
+import {getDraftOrderState} from '@/lib/integrations/shopify';
 import {getConversationCompany} from '@/lib/support';
 import {createAdminClient} from '@/lib/supabase/admin.server';
 
@@ -10,21 +11,50 @@ export const QUOTE_STATUS_LABELS: Record<QuoteStatus, string> = {new: 'Inviata',
 
 export type QuoteItem = {productId: string; variantId: string; productTitle: string; variantTitle: string; imageUrl: string | null; quantity: number; note: string; listPrice: number | null; options?: Array<{name: string; value: string}>};
 export type QuoteOffer = {lines: Array<{variantId: string; title: string; quantity: number; unitPrice: number; properties?: Array<{name: string; value: string}>}>; shipping: number; note: string; validUntil: string | null};
-export type QuoteSummary = {id: string; publicId: string; kind: 'quote' | 'order'; status: QuoteStatus; companyName: string; requesterName: string; items: QuoteItem[]; notes: string; neededBy: string | null; offer: QuoteOffer | null; invoiceUrl: string | null; total: number | null; currency: string; createdAt: string; quotedAt: string | null; paidAt: string | null; orderName: string | null};
+export type QuoteSummary = {id: string; publicId: string; kind: 'quote' | 'order'; status: QuoteStatus; companyName: string; requesterName: string; items: QuoteItem[]; notes: string; neededBy: string | null; offer: QuoteOffer | null; invoiceUrl: string | null; awaitingPayment: boolean; total: number | null; currency: string; createdAt: string; quotedAt: string | null; paidAt: string | null; orderName: string | null};
 export type QuoteMessage = {id: string; kind: 'comment' | 'event'; body: string; createdAt: string; authorName: string; fromClient: boolean; mine: boolean; file: {name: string; size: number} | null};
 
-type Row = {id: string; public_id: string; company_id: string; kind: 'quote' | 'order'; status: QuoteStatus; items: QuoteItem[]; notes: string; needed_by: string | null; offer: QuoteOffer | null; invoice_url: string | null; quote_total: number | null; currency: string; created_at: string; quoted_at: string | null; paid_at: string | null; order_name: string | null; companies?: {name: string} | {name: string}[] | null; requester?: {full_name: string | null; email: string} | {full_name: string | null; email: string}[] | null};
+type Row = {id: string; public_id: string; company_id: string; kind: 'quote' | 'order'; status: QuoteStatus; items: QuoteItem[]; notes: string; needed_by: string | null; offer: QuoteOffer | null; invoice_url: string | null; draft_order_id?: string | null; quote_total: number | null; currency: string; created_at: string; quoted_at: string | null; paid_at: string | null; order_name: string | null; companies?: {name: string} | {name: string}[] | null; requester?: {full_name: string | null; email: string} | {full_name: string | null; email: string}[] | null};
 
-export const QUOTE_COLUMNS = 'id,public_id,company_id,kind,status,items,notes,needed_by,offer,invoice_url,quote_total,currency,created_at,quoted_at,paid_at,order_name,companies(name),requester:requested_by(full_name,email)';
+export const QUOTE_COLUMNS = 'id,public_id,company_id,kind,status,items,notes,needed_by,offer,invoice_url,draft_order_id,quote_total,currency,created_at,quoted_at,paid_at,order_name,companies(name),requester:requested_by(full_name,email)';
 const one = <T,>(value: T | T[] | null | undefined) => (Array.isArray(value) ? value[0] : value) ?? null;
 
 export function toSummary(row: Row): QuoteSummary {
   const requester = one(row.requester);
   return {
     id: row.id, publicId: row.public_id, kind: row.kind, status: row.status, companyName: one(row.companies)?.name || 'Cliente', requesterName: requester?.full_name || requester?.email || 'Cliente',
-    items: row.items || [], notes: row.notes, neededBy: row.needed_by, offer: row.offer, invoiceUrl: row.status === 'quoted' ? row.invoice_url : null,
+    items: row.items || [], notes: row.notes, neededBy: row.needed_by, offer: row.offer, invoiceUrl: row.status === 'quoted' ? row.invoice_url : null, awaitingPayment: row.status === 'quoted' && !!row.order_name,
     total: row.quote_total === null ? null : Number(row.quote_total), currency: row.currency, createdAt: row.created_at, quotedAt: row.quoted_at, paidAt: row.paid_at, orderName: row.order_name,
   };
+}
+
+const lastSync = new Map<string, number>();
+
+// Checks the draft order on Shopify: a checkout paid by bank transfer creates the order before the money arrives.
+export async function syncQuoteWithShopify<T extends Row>(row: T): Promise<T> {
+  if (row.status !== 'quoted' || !row.draft_order_id) return row;
+  if (Date.now() - (lastSync.get(row.id) || 0) < 15_000) return row;
+  lastSync.set(row.id, Date.now());
+  try {
+    const state = await getDraftOrderState(row.draft_order_id);
+    if (!state) return row;
+    const admin = createAdminClient();
+    const now = new Date().toISOString();
+    if (state.paid) {
+      const {data} = await admin.from('quote_requests').update({status: 'paid', paid_at: now, order_name: state.orderName, updated_at: now}).eq('id', row.id).eq('status', 'quoted').select(QUOTE_COLUMNS).maybeSingle<T>();
+      if (data) { await addQuoteEvent(row.id, null, `Pagamento ricevuto · ordine ${state.orderName}. Il tuo ordine è in lavorazione.`); return data; }
+      return row;
+    }
+    if (row.order_name) return row;
+    const {data} = await admin.from('quote_requests').update({order_name: state.orderName, invoice_url: state.statusPageUrl || row.invoice_url, updated_at: now}).eq('id', row.id).is('order_name', null).select(QUOTE_COLUMNS).maybeSingle<T>();
+    if (!data) return row;
+    await addQuoteEvent(row.id, null, `Ordine ${state.orderName} creato con pagamento tramite bonifico: in attesa dell’accredito.`);
+    await notifyQuote({quote: row, actor: {id: '', role: 'client'} as CurrentProfile, subject: 'Preventivo accettato: in attesa di bonifico', message: `Il cliente ha accettato il preventivo e ha scelto il bonifico. Ordine ${state.orderName}: quando ricevi l’accredito segna l’ordine come pagato su Shopify.`}).catch((error) => console.error('[Quote notify]', error));
+    return data;
+  } catch (error) {
+    console.error('[Quote sync]', error);
+    return row;
+  }
 }
 
 export function isQuoteTeam(profile: CurrentProfile) { return profile.status === 'active' && (profile.role === 'staff' || profile.role === 'admin'); }
@@ -54,6 +84,7 @@ export async function listQuotes(profile: CurrentProfile) {
     for (const companyId of new Set(rows.map((row) => row.company_id))) managers.set(companyId, (await getConversationCompany(companyId))?.manager?.id || null);
     rows = rows.filter((row) => !managers.get(row.company_id) || managers.get(row.company_id) === profile.id);
   }
+  rows = await Promise.all(rows.map((row) => syncQuoteWithShopify(row)));
   return rows.map(toSummary);
 }
 
