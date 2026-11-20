@@ -1,7 +1,7 @@
 'use client';
 /* eslint-disable @next/next/no-img-element -- Shopify CDN thumbnails are already resized. */
 
-import {ArrowRight, CheckCircle2, CreditCard, LayoutGrid, PenLine, ExternalLink, FileText, Loader2, Package, Paperclip, Plus, Search, Send, ShoppingBag, Trash2, X} from 'lucide-react';
+import {ArrowRight, CheckCircle2, Receipt, Upload, CreditCard, LayoutGrid, PenLine, ExternalLink, FileText, Loader2, Package, Paperclip, Plus, Search, Send, ShoppingBag, Trash2, X} from 'lucide-react';
 import {FormEvent, useCallback, useEffect, useMemo, useRef, useState} from 'react';
 
 import {ACCEPTED_FILES, formatBytes, putWithProgress, validateFiles} from '@/components/request-files';
@@ -12,7 +12,7 @@ import {RequestDrawer} from '@/components/request-thread';
 type Status = 'new' | 'in_review' | 'quoted' | 'paid' | 'cancelled';
 type Item = {productId: string; variantId: string; productTitle: string; variantTitle: string; imageUrl: string | null; quantity: number; note: string; listPrice: number | null; options?: Array<{name: string; value: string}>};
 type OfferLine = {variantId: string; title: string; quantity: number; unitPrice: number; properties?: Array<{name: string; value: string}>};
-export type QuoteView = {id: string; publicId: string; kind: 'quote' | 'order'; status: Status; companyName: string; requesterName: string; items: Item[]; notes: string; neededBy: string | null; offer: {lines: OfferLine[]; shipping: number; note: string} | null; invoiceUrl: string | null; awaitingPayment?: boolean; total: number | null; currency: string; createdAt: string; quotedAt: string | null; paidAt: string | null; orderName: string | null};
+export type QuoteView = {id: string; publicId: string; kind: 'quote' | 'order'; status: Status; companyName: string; requesterName: string; items: Item[]; notes: string; neededBy: string | null; offer: {lines: OfferLine[]; shipping: number; note: string; receipt?: {messageId: string; name: string; uploadedAt: string} | null} | null; invoiceUrl: string | null; awaitingPayment?: boolean; total: number | null; currency: string; createdAt: string; quotedAt: string | null; paidAt: string | null; orderName: string | null};
 type Message = {id: string; kind: 'comment' | 'event'; body: string; createdAt: string; authorName: string; fromClient: boolean; mine: boolean; file: {name: string; size: number} | null};
 type Product = CatalogPick;
 const itemDetails = (item: Item) => [item.variantTitle, ...(item.options || []).filter((option) => !item.variantTitle.includes(option.value)).map((option) => `${option.name}: ${option.value}`), (item.options || []).some((option) => /quantit/i.test(option.name)) || item.productId === 'custom' ? '' : `${item.quantity} pz`].filter(Boolean);
@@ -164,6 +164,56 @@ function NewQuoteModal({onClose, onCreated}: {onClose: () => void; onCreated: (q
   </section></div>;
 }
 
+// Bank transfer in progress: the client uploads the receipt, the account manager checks it and marks the order as paid.
+function TransferStatus({quote, viewer, onChange, onOpenDetails}: {quote: QuoteView; viewer: 'client' | 'team'; onChange: (quote: QuoteView) => void; onOpenDetails: () => void}) {
+  const receipt = quote.offer?.receipt || null;
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState('');
+  const input = useRef<HTMLInputElement>(null);
+
+  async function upload(file: File) {
+    setError('');
+    if (!/\.(pdf|jpe?g|png)$/i.test(file.name)) { setError('Carica la contabile in PDF, JPG o PNG.'); return; }
+    if (file.size > 15 * 1024 * 1024) { setError('Il file supera i 15 MB.'); return; }
+    setBusy('Caricamento 0%');
+    try {
+      const ticket = await api<{uploadUrl: string; path: string}>(`/api/quotes/${quote.id}/files`, {method: 'POST', body: JSON.stringify({fileName: file.name, size: file.size})});
+      await putWithProgress(ticket.uploadUrl, file, (bytes) => setBusy(`Caricamento ${Math.min(100, Math.round((bytes / file.size) * 100))}%`));
+      const result = await api<{quote: QuoteView}>(`/api/quotes/${quote.id}/receipt`, {method: 'POST', body: JSON.stringify({path: ticket.path, name: file.name, size: file.size})});
+      onChange(result.quote);
+    } catch (caught) { setError(caught instanceof Error ? caught.message : 'Contabile non caricata.'); } finally { setBusy(null); if (input.current) input.current.value = ''; }
+  }
+
+  async function markPaid() {
+    if (!window.confirm(`Confermi di aver ricevuto il bonifico per l’ordine ${quote.orderName}? L’ordine su Shopify passerà a “Pagato”.`)) return;
+    setError(''); setBusy('Aggiorno Shopify…');
+    try { const result = await api<{quote: QuoteView}>(`/api/quotes/${quote.id}/mark-paid`, {method: 'POST'}); onChange(result.quote); } catch (caught) { setError(caught instanceof Error ? caught.message : 'Ordine non aggiornato.'); } finally { setBusy(null); }
+  }
+
+  const receiptBox = receipt ? <a className="quote-receipt" href={`/api/quotes/files/${receipt.messageId}`} rel="noreferrer" target="_blank"><span><Receipt size={18} /></span><div><strong>Contabile del bonifico</strong><small>{receipt.name} · caricata il {dateTime(receipt.uploadedAt)}</small></div><em>Apri <ExternalLink size={12} /></em></a> : null;
+
+  return <div className="quote-transfer">
+    <strong>Ordine {quote.orderName} confermato · in attesa del bonifico</strong>
+    {viewer === 'client' ? <>
+      <p>{receipt ? 'Abbiamo ricevuto la tua contabile: appena verifichiamo l’accredito l’ordine passa in lavorazione e te lo segnaliamo qui.' : 'Fai il bonifico con i dati indicati, poi carica qui la contabile: velocizza la verifica del pagamento.'}</p>
+      {receiptBox}
+      <div className="quote-transfer__actions">
+        <button className="quote-transfer__open" onClick={onOpenDetails} type="button">Vedi riepilogo e coordinate bancarie</button>
+        <input accept=".pdf,.jpg,.jpeg,.png" hidden onChange={(event) => { const file = event.target.files?.[0]; if (file) void upload(file); }} ref={input} type="file" />
+        <button className="quote-transfer__upload" disabled={!!busy} onClick={() => input.current?.click()} type="button">{busy ? <Loader2 className="spin" size={15} /> : <Upload size={15} />}{busy || (receipt ? 'Sostituisci contabile' : 'Carica la contabile')}</button>
+      </div>
+    </> : <>
+      <p>{receipt ? 'Il cliente ha caricato la contabile. Verifica l’accredito sul conto e conferma il pagamento: l’ordine su Shopify passa a “Pagato”.' : 'Il cliente ha scelto il bonifico e non ha ancora caricato la contabile. Quando ricevi l’accredito conferma il pagamento qui.'}</p>
+      {receiptBox}
+      <div className="quote-transfer__actions">
+        <button className="quote-transfer__paid" disabled={!!busy} onClick={() => void markPaid()} type="button">{busy ? <Loader2 className="spin" size={15} /> : <CheckCircle2 size={15} />}{busy || 'Segna come pagato'}</button>
+        {quote.invoiceUrl ? <a href={quote.invoiceUrl} rel="noreferrer" target="_blank">Riepilogo ordine <ExternalLink size={12} /></a> : null}
+      </div>
+    </>}
+    {error ? <p className="form-error">{error}</p> : null}
+  </div>;
+}
+
 // Free-text request for anything that is not (or not exactly) in the catalog.
 function CustomRequest({onAdd, onSwitch}: {onAdd: (item: Item) => void; onSwitch: () => void}) {
   const [title, setTitle] = useState('');
@@ -269,7 +319,7 @@ function QuoteDetail({quoteId, viewer, onChange}: {quoteId: string; viewer: 'cli
       <ul>{quote.offer.lines.map((line, index) => <li key={index}><span>{line.quantity} × {line.title}{line.properties?.length ? <small className="quote-offer__specs">{line.properties.map((property) => property.name === 'Descrizione' ? property.value : `${property.name}: ${property.value}`).join(' · ')}</small> : null}</span><b>{euro(line.unitPrice * line.quantity)}</b></li>)}{quote.offer.shipping ? <li><span>Spedizione</span><b>{euro(quote.offer.shipping)}</b></li> : null}</ul>
       {quote.offer.note ? <p className="quote-offer__note">{quote.offer.note}</p> : null}
       <div className="quote-offer__total"><span>Totale IVA inclusa</span><strong>{quote.total !== null ? euro(quote.total, quote.currency) : '—'}</strong></div>
-      {quote.awaitingPayment ? <div className="quote-transfer"><strong>Ordine {quote.orderName} confermato · in attesa del bonifico</strong><p>{viewer === 'client' ? 'Trovi IBAN, importo e causale qui sotto. Appena riceviamo l’accredito l’ordine passa in lavorazione e te lo segnaliamo qui.' : 'Il cliente ha scelto il bonifico. Quando ricevi l’accredito apri l’ordine su Shopify e clicca “Segna come pagato”: il preventivo si aggiorna da solo.'}</p>{viewer === 'client' ? <button className="quote-transfer__open" onClick={() => setShowTransfer(true)} type="button">Vedi riepilogo e coordinate bancarie</button> : quote.invoiceUrl ? <a href={quote.invoiceUrl} rel="noreferrer" target="_blank">Apri il riepilogo dell’ordine <ExternalLink size={12} /></a> : null}</div> : null}
+      {quote.awaitingPayment ? <TransferStatus onChange={(next) => { onChange(next); void load(); }} onOpenDetails={() => setShowTransfer(true)} quote={quote} viewer={viewer} /> : null}
       {showTransfer && quote.offer ? <BankTransferModal companyName={quote.companyName} currency={quote.currency} lines={quote.offer.lines} onClose={() => setShowTransfer(false)} orderName={quote.orderName} shipping={quote.offer.shipping} statusUrl={quote.invoiceUrl} total={quote.total} /> : null}
       {viewer === 'client' && quote.status === 'quoted' && !quote.awaitingPayment && quote.invoiceUrl ? <><button className="buy-form__pay" onClick={pay} type="button"><CreditCard size={17} /> Accetta e paga con carta</button>{paying ? <p className="quote-offer__wait"><Loader2 className="spin" size={14} /> In attesa della conferma del pagamento… <a href={quote.invoiceUrl} rel="noreferrer" target="_blank">Riapri il checkout <ExternalLink size={12} /></a></p> : <p className="quote-offer__wait">Pagamento sicuro sul checkout WowStampa. Hai domande? Scrivi qui sotto.</p>}</> : null}
     </section> : null}

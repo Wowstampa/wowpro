@@ -67,7 +67,7 @@ export function BankTransferModal({orderName, companyName, total, currency, line
         <ol className="bt__steps">
           <li><b>1</b><span><strong>Fai il bonifico</strong> dalla tua banca con i dati qui sopra.</span></li>
           <li><b>2</b><span><strong>Usa la causale esatta</strong> “{reason}”: così lo abbiniamo subito al tuo ordine.</span></li>
-          <li><b>3</b><span><strong>Al ricevimento</strong> (di solito {WOWSTAMPA_BANK.creditDays}) l’ordine passa in lavorazione e te lo segnaliamo qui.</span></li>
+          <li><b>3</b><span><strong>Carica la contabile</strong> nel preventivo con “Carica la contabile”: verifichiamo l’accredito (di solito {WOWSTAMPA_BANK.creditDays}) e l’ordine passa in lavorazione.</span></li>
         </ol>
 
         <div className="bt__summary">
