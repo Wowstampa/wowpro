@@ -731,6 +731,49 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .quote-transfer strong { color: #7a4b00; font-size: 14px; }
 .quote-transfer p { margin: 0; color: #5b4a2a; font-size: 13px; line-height: 1.5; }
 .quote-transfer a { display: inline-flex; align-items: center; gap: 4px; justify-self: start; color: #7a4b00; font-size: 13px; font-weight: 800; }
+.quote-transfer__open { justify-self: start; height: 38px; padding: 0 14px; border: 0; border-radius: 10px; background: #7a4b00; color: white; font: inherit; font-size: 13px; font-weight: 800; cursor: pointer; }
+.quote-transfer__open:hover { background: #5e3a00; }
+/* Bank transfer modal */
+.bt-backdrop { z-index: 140; }
+.bt { position: relative; width: min(640px, calc(100vw - 32px)); max-height: calc(100vh - 40px); overflow: hidden auto; border-radius: 26px; background: white; box-shadow: 0 40px 90px -30px rgba(10,13,21,.6); animation: support-pop .2s ease-out; }
+.bt__head { padding: 26px 70px 22px 26px; display: grid; grid-template-columns: auto 1fr auto; gap: 14px; align-items: center; background: linear-gradient(135deg, #0b1220, #12301f); color: white; }
+.bt__head .subscription-buy__close { color: white; }
+.bt__icon { width: 48px; height: 48px; display: grid; place-items: center; border-radius: 15px; background: rgba(29,182,91,.18); color: #5ee49a; }
+.bt__head small { color: rgba(255,255,255,.62); font-size: 12px; font-weight: 700; }
+.bt__head h2 { margin: 2px 0 0; font-size: 24px; letter-spacing: -.04em; }
+.bt__amount { display: grid; justify-items: end; }
+.bt__amount strong { font-size: 26px; letter-spacing: -.04em; }
+.bt__amount em { color: rgba(255,255,255,.55); font-size: 11px; font-style: normal; }
+.bt > .subscription-buy__close { border-color: rgba(255,255,255,.2); background: rgba(255,255,255,.08); color: white; }
+.bt__body { padding: 22px 26px; display: grid; gap: 18px; }
+.bt__bank { padding: 16px; display: grid; gap: 10px; border: 1px solid #cdeedb; border-radius: 18px; background: linear-gradient(180deg, #f3fbf6, #ffffff); }
+.bt__bank-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.bt__bank-top span { display: inline-flex; align-items: center; gap: 6px; color: var(--green-dark); font-size: 12px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+.bt__bank-top button { height: 32px; padding: 0 12px; display: inline-flex; align-items: center; gap: 6px; border: 0; border-radius: 9px; background: var(--green); color: white; font: inherit; font-size: 12px; font-weight: 800; cursor: pointer; }
+.bt__pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.bt-field { padding: 10px 12px; display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; align-items: center; border: 1px solid var(--line); border-radius: 12px; background: white; }
+.bt-field span { grid-column: 1; color: var(--muted); font-size: 11px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+.bt-field strong { grid-column: 1; min-width: 0; overflow-wrap: anywhere; color: var(--ink); font-size: 14px; }
+.bt-field--strong strong { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 16px; letter-spacing: .02em; }
+.bt-field button { grid-column: 2; grid-row: 1 / span 2; height: 32px; padding: 0 10px; display: inline-flex; align-items: center; gap: 5px; border: 1px solid #dce3eb; border-radius: 9px; background: #fbfcfd; color: #3a4556; font: inherit; font-size: 12px; font-weight: 800; cursor: pointer; }
+.bt-field button:hover { border-color: var(--green); color: var(--green-dark); }
+.bt-field button.is-copied { border-color: var(--green); background: #effbf4; color: var(--green-dark); }
+.bt__missing { margin: 0; color: #3a4556; font-size: 13px; }
+.bt__steps { margin: 0; padding: 0; display: grid; gap: 10px; list-style: none; }
+.bt__steps li { display: grid; grid-template-columns: 28px 1fr; gap: 10px; align-items: start; color: #3a4556; font-size: 13px; line-height: 1.45; }
+.bt__steps b { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%; background: #0b1220; color: white; font-size: 12px; }
+.bt__steps strong { color: var(--ink); }
+.bt__summary { padding: 16px; border-radius: 18px; background: #f6f8fa; }
+.bt__summary h3 { margin: 0 0 10px; display: flex; align-items: center; gap: 6px; font-size: 14px; }
+.bt__summary ul { margin: 0; padding: 0; display: grid; gap: 8px; list-style: none; }
+.bt__summary li { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; }
+.bt__summary li small { display: block; margin-top: 2px; color: var(--muted); font-size: 12px; }
+.bt__summary li em { flex: 0 0 auto; font-style: normal; font-weight: 800; }
+.bt__total { margin-top: 12px; padding-top: 12px; display: flex; justify-content: space-between; align-items: baseline; border-top: 1px solid #e1e6ec; }
+.bt__total span { color: #5b6575; font-size: 13px; font-weight: 700; }
+.bt__total strong { font-size: 20px; letter-spacing: -.03em; }
+.bt__foot { position: sticky; bottom: 0; padding: 14px 26px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border-top: 1px solid var(--line); background: rgba(255,255,255,.96); }
+.bt__foot a { display: inline-flex; align-items: center; gap: 4px; color: #5b6575; font-size: 12px; font-weight: 700; }
 .quote-offer__specs { display: block; margin-top: 2px; color: var(--muted); font-size: 12px; font-weight: 600; }
 .quote-editor__extra { display: grid; grid-template-columns: 140px 1fr; gap: 10px; }
 .quote-editor footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: #5b6575; font-size: 13px; }
@@ -1063,6 +1106,12 @@ button, a { -webkit-tap-highlight-color: transparent; }
   .quote-new__modes button > span { top: 18px; left: 16px; width: 48px; height: 48px; }
   .quote-new__head { flex-direction: column; }
   .quote-custom__row { grid-template-columns: 1fr; }
+  .bt { width: 100%; max-height: 94vh; border-radius: 22px 22px 0 0; }
+  .bt__head { padding: 20px 60px 18px 18px; grid-template-columns: auto 1fr; }
+  .bt__amount { grid-column: 1 / -1; justify-items: start; }
+  .bt__body { padding: 18px 16px; }
+  .bt__pair { grid-template-columns: 1fr; }
+  .bt__foot { padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); }
   .quote-custom > .button { width: 100%; justify-content: center; }
   .qc__title h4 { font-size: 18px; }
   .qc__group { padding: 14px 12px; }
