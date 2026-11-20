@@ -292,7 +292,7 @@ function QuoteDetail({quoteId, viewer, onChange}: {quoteId: string; viewer: 'cli
       <div className="rt-composer__bar">
         <span className="quote-composer__left"><input accept={ACCEPTED_FILES} hidden onChange={(event) => setFile(event.target.files?.[0] || null)} ref={fileInput} type="file" /><button className="client-action" onClick={() => fileInput.current?.click()} type="button"><Paperclip size={15} />{file ? file.name : 'Allega'}</button>
           {viewer === 'team' && quote.status === 'new' ? <button className="client-action" disabled={isActing} onClick={() => void act('review')} type="button">Prendi in carico</button> : null}
-          <button className="client-action client-action--danger" disabled={isActing} onClick={() => void act('cancel')} type="button">Annulla richiesta</button></span>
+          {!quote.awaitingPayment ? <button className="client-action client-action--danger" disabled={isActing} onClick={() => void act('cancel')} type="button">Annulla richiesta</button> : null}</span>
         <button className="client-action client-action--primary" disabled={isSending || (!body.trim() && !file)} type="submit">{isSending ? <Loader2 className="spin" size={15} /> : <Send size={15} />}Invia</button>
       </div>
     </form> : null}
