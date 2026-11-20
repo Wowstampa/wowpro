@@ -6,6 +6,7 @@ import {FormEvent, useCallback, useEffect, useMemo, useRef, useState} from 'reac
 
 import {ACCEPTED_FILES, formatBytes, putWithProgress, validateFiles} from '@/components/request-files';
 import {QuoteConfigurator, type CatalogPick} from '@/components/quote-configurator';
+import {BankTransferModal} from '@/components/quote-transfer';
 import {RequestDrawer} from '@/components/request-thread';
 
 type Status = 'new' | 'in_review' | 'quoted' | 'paid' | 'cancelled';
@@ -202,6 +203,7 @@ function QuoteDetail({quoteId, viewer, onChange}: {quoteId: string; viewer: 'cli
   const [isSending, setIsSending] = useState(false);
   const [isActing, setIsActing] = useState(false);
   const [paying, setPaying] = useState(false);
+  const [showTransfer, setShowTransfer] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
@@ -267,7 +269,8 @@ function QuoteDetail({quoteId, viewer, onChange}: {quoteId: string; viewer: 'cli
       <ul>{quote.offer.lines.map((line, index) => <li key={index}><span>{line.quantity} × {line.title}{line.properties?.length ? <small className="quote-offer__specs">{line.properties.map((property) => property.name === 'Descrizione' ? property.value : `${property.name}: ${property.value}`).join(' · ')}</small> : null}</span><b>{euro(line.unitPrice * line.quantity)}</b></li>)}{quote.offer.shipping ? <li><span>Spedizione</span><b>{euro(quote.offer.shipping)}</b></li> : null}</ul>
       {quote.offer.note ? <p className="quote-offer__note">{quote.offer.note}</p> : null}
       <div className="quote-offer__total"><span>Totale IVA inclusa</span><strong>{quote.total !== null ? euro(quote.total, quote.currency) : '—'}</strong></div>
-      {quote.awaitingPayment ? <div className="quote-transfer"><strong>Ordine {quote.orderName} confermato · in attesa del bonifico</strong><p>{viewer === 'client' ? 'Trovi l’IBAN e la causale nel riepilogo dell’ordine. Appena riceviamo l’accredito l’ordine passa in lavorazione e te lo segnaliamo qui.' : 'Il cliente ha scelto il bonifico. Quando ricevi l’accredito apri l’ordine su Shopify e clicca “Segna come pagato”: il preventivo si aggiorna da solo.'}</p>{quote.invoiceUrl ? <a href={quote.invoiceUrl} rel="noreferrer" target="_blank">{viewer === 'client' ? 'Vedi riepilogo e coordinate bancarie' : 'Apri il riepilogo dell’ordine'} <ExternalLink size={12} /></a> : null}</div> : null}
+      {quote.awaitingPayment ? <div className="quote-transfer"><strong>Ordine {quote.orderName} confermato · in attesa del bonifico</strong><p>{viewer === 'client' ? 'Trovi IBAN, importo e causale qui sotto. Appena riceviamo l’accredito l’ordine passa in lavorazione e te lo segnaliamo qui.' : 'Il cliente ha scelto il bonifico. Quando ricevi l’accredito apri l’ordine su Shopify e clicca “Segna come pagato”: il preventivo si aggiorna da solo.'}</p>{viewer === 'client' ? <button className="quote-transfer__open" onClick={() => setShowTransfer(true)} type="button">Vedi riepilogo e coordinate bancarie</button> : quote.invoiceUrl ? <a href={quote.invoiceUrl} rel="noreferrer" target="_blank">Apri il riepilogo dell’ordine <ExternalLink size={12} /></a> : null}</div> : null}
+      {showTransfer && quote.offer ? <BankTransferModal companyName={quote.companyName} currency={quote.currency} lines={quote.offer.lines} onClose={() => setShowTransfer(false)} orderName={quote.orderName} shipping={quote.offer.shipping} statusUrl={quote.invoiceUrl} total={quote.total} /> : null}
       {viewer === 'client' && quote.status === 'quoted' && !quote.awaitingPayment && quote.invoiceUrl ? <><button className="buy-form__pay" onClick={pay} type="button"><CreditCard size={17} /> Accetta e paga con carta</button>{paying ? <p className="quote-offer__wait"><Loader2 className="spin" size={14} /> In attesa della conferma del pagamento… <a href={quote.invoiceUrl} rel="noreferrer" target="_blank">Riapri il checkout <ExternalLink size={12} /></a></p> : <p className="quote-offer__wait">Pagamento sicuro sul checkout WowStampa. Hai domande? Scrivi qui sotto.</p>}</> : null}
     </section> : null}
 
