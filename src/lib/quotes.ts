@@ -31,8 +31,9 @@ export function toSummary(row: Row): QuoteSummary {
 const lastSync = new Map<string, number>();
 
 // Checks the draft order on Shopify: a checkout paid by bank transfer creates the order before the money arrives.
-export async function syncQuoteWithShopify<T extends Row>(row: T): Promise<T> {
-  if (row.status !== 'quoted' || !row.draft_order_id) return row;
+// Paid quotes are checked only when opened (includePaid), so an order cancelled later on Shopify is picked up too.
+export async function syncQuoteWithShopify<T extends Row>(row: T, {includePaid = false} = {}): Promise<T> {
+  if (!row.draft_order_id || !(row.status === 'quoted' || (includePaid && row.status === 'paid'))) return row;
   if (Date.now() - (lastSync.get(row.id) || 0) < 15_000) return row;
   lastSync.set(row.id, Date.now());
   try {
@@ -40,6 +41,14 @@ export async function syncQuoteWithShopify<T extends Row>(row: T): Promise<T> {
     if (!state) return row;
     const admin = createAdminClient();
     const now = new Date().toISOString();
+    if (state.cancelled) {
+      const {data} = await admin.from('quote_requests').update({status: 'cancelled', order_name: state.orderName, updated_at: now}).eq('id', row.id).in('status', ['quoted', 'paid']).select(QUOTE_COLUMNS).maybeSingle<T>();
+      if (!data) return row;
+      await addQuoteEvent(row.id, null, `L’ordine ${state.orderName} è stato annullato.`);
+      await notifyQuote({quote: row, actor: {id: '', role: 'admin'} as CurrentProfile, subject: 'Ordine annullato', message: `L’ordine ${state.orderName} legato a questo preventivo è stato annullato. Per qualsiasi dubbio scrivi al tuo account manager dal portale.`}).catch((error) => console.error('[Quote notify]', error));
+      return data;
+    }
+    if (row.status === 'paid') return row;
     if (state.paid) {
       const {data} = await admin.from('quote_requests').update({status: 'paid', paid_at: now, order_name: state.orderName, updated_at: now}).eq('id', row.id).eq('status', 'quoted').select(QUOTE_COLUMNS).maybeSingle<T>();
       if (data) { await addQuoteEvent(row.id, null, `Pagamento ricevuto · ordine ${state.orderName}. Il tuo ordine è in lavorazione.`); return data; }
