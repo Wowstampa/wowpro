@@ -9,6 +9,6 @@ export async function GET(_request: Request, {params}: {params: Promise<{quoteId
   const {quoteId} = await params;
   const found = await getAccessibleQuote(profile, quoteId);
   if (!found) return NextResponse.json({error: 'Preventivo non trovato.'}, {status: 404});
-  const quote = await syncQuoteWithShopify(found);
+  const quote = await syncQuoteWithShopify(found, {includePaid: true});
   return NextResponse.json({quote: toSummary(quote), messages: await listQuoteMessages(quoteId, profile)}, {headers: {'Cache-Control': 'no-store'}});
 }
