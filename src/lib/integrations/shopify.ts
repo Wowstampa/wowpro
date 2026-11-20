@@ -342,12 +342,22 @@ export async function searchCatalog(term: string) {
 
 // State of a quote's draft order: once the client completes checkout (card or bank transfer) it becomes a real order.
 export async function getDraftOrderState(id: string) {
-  const data = await shopifyAdminQuery<{draftOrder: {status: string; order: {name: string; displayFinancialStatus: string | null; statusPageUrl: string | null; cancelledAt: string | null} | null} | null}>(
-    `query QuoteDraftState($id: ID!) { draftOrder(id: $id) { status order { name displayFinancialStatus statusPageUrl cancelledAt } } }`,
+  const data = await shopifyAdminQuery<{draftOrder: {status: string; order: {id: string; name: string; displayFinancialStatus: string | null; statusPageUrl: string | null; cancelledAt: string | null} | null} | null}>(
+    `query QuoteDraftState($id: ID!) { draftOrder(id: $id) { status order { id name displayFinancialStatus statusPageUrl cancelledAt } } }`,
     {id},
   );
   const order = data.draftOrder?.order;
-  return order ? {orderName: order.name, paid: order.displayFinancialStatus === 'PAID', cancelled: !!order.cancelledAt, statusPageUrl: order.statusPageUrl} : null;
+  return order ? {orderId: order.id, orderName: order.name, paid: order.displayFinancialStatus === 'PAID', cancelled: !!order.cancelledAt, statusPageUrl: order.statusPageUrl} : null;
+}
+
+// Marks a bank-transfer order as paid once the operator has checked the transfer.
+export async function markOrderAsPaid(orderId: string) {
+  const data = await shopifyAdminQuery<{orderMarkAsPaid: {order: {displayFinancialStatus: string | null} | null; userErrors: Array<{message: string}>}}>(
+    `mutation QuoteOrderPaid($input: OrderMarkAsPaidInput!) { orderMarkAsPaid(input: $input) { order { displayFinancialStatus } userErrors { message } } }`,
+    {input: {id: orderId}},
+  );
+  if (data.orderMarkAsPaid.userErrors.length) throw new Error(data.orderMarkAsPaid.userErrors.map((error) => error.message).join(' · '));
+  return data.orderMarkAsPaid.order?.displayFinancialStatus || null;
 }
 
 async function findExistingCustomer(customerId?: string | null, email?: string | null) {
