@@ -749,7 +749,8 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .bt__bank { padding: 16px; display: grid; gap: 10px; border: 1px solid #cdeedb; border-radius: 18px; background: linear-gradient(180deg, #f3fbf6, #ffffff); }
 .bt__bank-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .bt__bank-top span { display: inline-flex; align-items: center; gap: 6px; color: var(--green-dark); font-size: 12px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
-.bt__bank-top button { height: 32px; padding: 0 12px; display: inline-flex; align-items: center; gap: 6px; border: 0; border-radius: 9px; background: var(--green); color: white; font: inherit; font-size: 12px; font-weight: 800; cursor: pointer; }
+.bt__bank-top button { flex: 0 0 auto; white-space: nowrap; height: 32px; padding: 0 12px; display: inline-flex; align-items: center; gap: 6px; border: 0; border-radius: 9px; background: var(--green); color: white; font: inherit; font-size: 12px; font-weight: 800; cursor: pointer; }
+.bt__single { display: grid; }
 .bt__pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .bt-field { padding: 10px 12px; display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; align-items: center; border: 1px solid var(--line); border-radius: 12px; background: white; }
 .bt-field span { grid-column: 1; color: var(--muted); font-size: 11px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
