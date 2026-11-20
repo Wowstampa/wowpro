@@ -21,6 +21,7 @@ export async function POST(request: Request, {params}: {params: Promise<{quoteId
   const quote = await getAccessibleQuote(profile, quoteId);
   if (!quote) return NextResponse.json({error: 'Preventivo non trovato.'}, {status: 404});
   if (quote.status === 'paid' || quote.status === 'cancelled') return NextResponse.json({error: 'Questa richiesta è già chiusa.'}, {status: 409});
+  if (quote.order_name) return NextResponse.json({error: `Il cliente ha già confermato l’ordine ${quote.order_name}: modificalo direttamente su Shopify.`}, {status: 409});
   const parsed = schema.safeParse(await request.json().catch(() => ({})));
   if (!parsed.success) return NextResponse.json({error: parsed.error.issues[0]?.message || 'Preventivo non valido.'}, {status: 400});
 
