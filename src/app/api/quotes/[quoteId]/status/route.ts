@@ -18,6 +18,7 @@ export async function POST(request: Request, {params}: {params: Promise<{quoteId
   if (!parsed.success) return NextResponse.json({error: 'Azione non valida.'}, {status: 400});
   if (quote.status === 'paid' || quote.status === 'cancelled') return NextResponse.json({error: 'Questa richiesta è già chiusa.'}, {status: 409});
   const team = isQuoteTeam(profile);
+  if (parsed.data.action === 'cancel' && quote.order_name) return NextResponse.json({error: team ? `C’è già l’ordine ${quote.order_name}: annullalo su Shopify e il preventivo si chiude da solo.` : 'L’ordine è già stato creato: scrivi al tuo account manager per annullarlo.'}, {status: 409});
   if (parsed.data.action === 'review' && !team) return NextResponse.json({error: 'Accesso non autorizzato.'}, {status: 403});
 
   const admin = createAdminClient();
