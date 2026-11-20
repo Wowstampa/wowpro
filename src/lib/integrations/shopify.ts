@@ -342,12 +342,12 @@ export async function searchCatalog(term: string) {
 
 // State of a quote's draft order: once the client completes checkout (card or bank transfer) it becomes a real order.
 export async function getDraftOrderState(id: string) {
-  const data = await shopifyAdminQuery<{draftOrder: {status: string; order: {name: string; displayFinancialStatus: string | null; statusPageUrl: string | null} | null} | null}>(
-    `query QuoteDraftState($id: ID!) { draftOrder(id: $id) { status order { name displayFinancialStatus statusPageUrl } } }`,
+  const data = await shopifyAdminQuery<{draftOrder: {status: string; order: {name: string; displayFinancialStatus: string | null; statusPageUrl: string | null; cancelledAt: string | null} | null} | null}>(
+    `query QuoteDraftState($id: ID!) { draftOrder(id: $id) { status order { name displayFinancialStatus statusPageUrl cancelledAt } } }`,
     {id},
   );
   const order = data.draftOrder?.order;
-  return order ? {orderName: order.name, paid: order.displayFinancialStatus === 'PAID', statusPageUrl: order.statusPageUrl} : null;
+  return order ? {orderName: order.name, paid: order.displayFinancialStatus === 'PAID', cancelled: !!order.cancelledAt, statusPageUrl: order.statusPageUrl} : null;
 }
 
 async function findExistingCustomer(customerId?: string | null, email?: string | null) {
