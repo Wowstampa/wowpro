@@ -1,5 +1,7 @@
 'use client';
 
+import Image from 'next/image';
+
 import Link from 'next/link';
 import {useEffect, useState} from 'react';
 import {usePathname, useRouter} from 'next/navigation';
@@ -102,14 +104,14 @@ export function AppShell({mode, children, notificationCounts = {requests: 0, fee
   return (
     <div className="app-frame">
       <header className="mobile-bar">
-        <Link className="mobile-bar__brand" href={links[0]?.href || '/'} onClick={() => setMenuOpen(false)}><span className="brand__mark">W</span><span><strong>WOWPRO</strong><small>{activeLink?.label || 'WowStampa'}</small></span></Link>
+        <Link aria-label="WOWPRO" className="mobile-bar__brand" href={links[0]?.href || '/'} onClick={() => setMenuOpen(false)}><Image alt="WOWPRO" className="brand__logo" priority unoptimized height={40} src="/images/wowpro-logo.svg" width={114} /><small>{activeLink?.label || 'WowStampa'}</small></Link>
         <button aria-expanded={menuOpen} aria-label={menuOpen ? 'Chiudi menu' : 'Apri menu'} className="mobile-bar__toggle" onClick={() => setMenuOpen((value) => !value)} type="button">{menuOpen ? <X size={22} /> : <Menu size={22} />}{!menuOpen && totalBadges ? <b>{totalBadges > 9 ? '9+' : totalBadges}</b> : null}</button>
       </header>
       {menuOpen ? <button aria-label="Chiudi menu" className="sidebar-overlay" onClick={() => setMenuOpen(false)} type="button" /> : null}
       <aside className={menuOpen ? 'sidebar is-open' : 'sidebar'}>
         <div className="brand">
-          <span className="brand__mark">W</span>
-          <span><strong>WOWPRO</strong><small>{mode === 'admin' ? 'back-office · WowStampa' : mode === 'graphic' ? 'operatore grafico · WowStampa' : 'by WowStampa'}</small></span>
+          <Image alt="WOWPRO" className="brand__logo" priority unoptimized height={56} src="/images/wowpro-logo.svg" width={160} />
+          <span><small>{mode === 'admin' ? 'back-office · WowStampa' : mode === 'graphic' ? 'operatore grafico · WowStampa' : 'by WowStampa'}</small></span>
         </div>
         {mode === 'admin' ? <div className="internal-pill">PANNELLO INTERNO</div> : mode === 'graphic' ? <div className="internal-pill">ACCESSO OPERATORE GRAFICO</div> : null}
         <nav className="nav-list">
