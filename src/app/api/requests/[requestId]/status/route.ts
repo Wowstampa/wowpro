@@ -1,4 +1,6 @@
 import {NextResponse} from 'next/server';
+
+import {attachApprovedGraphicToQuotes} from '@/lib/quotes';
 import {z} from 'zod';
 
 import {getCurrentProfile} from '@/lib/auth';
@@ -55,5 +57,6 @@ export async function POST(request: Request, {params}: {params: Promise<{request
   if (rule.notify) {
     await notifyRequestUpdate({requestId, actor: profile, subject: rule.notify, message: parsed.data.comment || rule.text(name), force: true}).catch((notifyError) => console.error('[Request notify]', notifyError));
   }
+  if (rule.to === 'completed') await attachApprovedGraphicToQuotes(requestId).catch((attachError) => console.error('[Quote graphic files]', attachError));
   return NextResponse.json({status: rule.to});
 }
