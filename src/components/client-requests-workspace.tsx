@@ -1,6 +1,6 @@
 'use client';
 
-import {ArrowRight, Check, MessageSquareText, Plus, Printer, Upload, X} from 'lucide-react';
+import {ArrowRight, Check, Loader2, MessageSquareText, Plus, Printer, Upload, X} from 'lucide-react';
 import {ChangeEvent, DragEvent, FormEvent, useCallback, useEffect, useState} from 'react';
 import {useRouter} from 'next/navigation';
 
@@ -80,6 +80,15 @@ function CreateRequestModal({extraCredits, includedCredits, onClose, onCreated, 
   const [error, setError] = useState('');
   const [files, setFiles] = useState<File[]>([]);
   const [progress, setProgress] = useState<number | null>(null);
+  const [step, setStep] = useState('');
+
+  // While the request is being sent and the files uploaded, leaving the page would lose them.
+  useEffect(() => {
+    if (!isSaving) return;
+    const guard = (event: BeforeUnloadEvent) => { event.preventDefault(); };
+    window.addEventListener('beforeunload', guard);
+    return () => window.removeEventListener('beforeunload', guard);
+  }, [isSaving]);
   const creditCost = {revision: 1_000, modification: 2_000, creation: 3_000}[type];
   const available = includedCredits + extraCredits;
   const after = available - creditCost;
@@ -89,7 +98,7 @@ function CreateRequestModal({extraCredits, includedCredits, onClose, onCreated, 
     const form = new FormData(event.currentTarget);
     const brief = String(form.get('brief') || '').trim();
     if (brief.length < 10) { setError(`La descrizione deve contenere almeno 10 caratteri: ne mancano ${10 - brief.length}.`); return; }
-    setError(''); setIsSaving(true);
+    setError(''); setIsSaving(true); setStep('Invio della richiesta…');
     try {
       const response = await fetch('/api/client/requests', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({type, brief})});
       const result = await readResponse(response);
@@ -97,13 +106,15 @@ function CreateRequestModal({extraCredits, includedCredits, onClose, onCreated, 
       let uploaded: RequestFileItem[] = [];
       let warning = '';
       if (files.length) {
+        setStep(files.length === 1 ? 'Caricamento del file…' : `Caricamento di ${files.length} file…`);
         setProgress(0);
         const outcome = await uploadRequestFiles(result.request.id, files, setProgress);
         uploaded = outcome.uploaded;
         if (outcome.failed.length) warning = `Richiesta inviata, ma questi file non sono stati caricati: ${outcome.failed.join(', ')}. Puoi aggiungerli dal dettaglio della richiesta.`;
       }
+      if (withPrint) setStep('Fatto! Apro la scelta della stampa…');
       onCreated({...result.request, messages: [], files: uploaded}, warning);
-    } catch (caught) { setError(caught instanceof Error ? caught.message : 'Creazione non riuscita.'); } finally { setIsSaving(false); setProgress(null); }
+    } catch (caught) { setError(caught instanceof Error ? caught.message : 'Creazione non riuscita.'); } finally { setIsSaving(false); setProgress(null); setStep(''); }
   }
 
   function addFiles(selected: File[]) {
@@ -116,7 +127,7 @@ function CreateRequestModal({extraCredits, includedCredits, onClose, onCreated, 
   function selectFiles(event: ChangeEvent<HTMLInputElement>) { addFiles(Array.from(event.target.files || [])); event.target.value = ''; }
   function dropFiles(event: DragEvent<HTMLElement>) { event.preventDefault(); addFiles(Array.from(event.dataTransfer.files || [])); }
 
-  return <div aria-modal="true" className="modal-backdrop" role="dialog"><section aria-labelledby="clientRequestTitle" className="client-request-modal"><header className="client-request-modal__head"><div><h2 id="clientRequestTitle">{withPrint ? 'Grafica + stampa · passo 1 di 2' : 'Nuova richiesta grafica'}</h2><p>{withPrint ? 'Prima descrivi la grafica, poi scegli il prodotto su cui stamparla.' : 'Scegli il servizio, descrivi cosa ti serve e carica i file.'}</p></div><button aria-label="Chiudi" className="modal-close" onClick={onClose} type="button"><X size={19} /></button></header>
+  return <div aria-modal="true" className="modal-backdrop" role="dialog"><section aria-busy={isSaving} aria-labelledby="clientRequestTitle" className="client-request-modal">{isSaving ? <div aria-live="polite" className="request-sending"><span className="request-sending__spinner"><Loader2 className="spin" size={28} /></span><strong>{step || 'Invio in corso…'}</strong>{progress !== null ? <><span className="upload-progress request-sending__bar"><i style={{width: `${Math.round(progress * 100)}%`}} /></span><small>{Math.round(progress * 100)}%</small></> : null}<p>Non chiudere e non lasciare questa pagina{withPrint ? ': subito dopo scegli il prodotto da stampare.' : '.'}</p></div> : null}<header className="client-request-modal__head"><div><h2 id="clientRequestTitle">{withPrint ? 'Grafica + stampa · passo 1 di 2' : 'Nuova richiesta grafica'}</h2><p>{withPrint ? 'Prima descrivi la grafica, poi scegli il prodotto su cui stamparla.' : 'Scegli il servizio, descrivi cosa ti serve e carica i file.'}</p></div><button aria-label="Chiudi" className="modal-close" onClick={onClose} type="button"><X size={19} /></button></header>
     <form onSubmit={createRequest}>
       <div className="client-request-modal__body">
         <fieldset className="service-picker"><legend>Tipo di servizio <b>*</b></legend>{(['revision', 'modification', 'creation'] as const).map((item) => <button aria-pressed={type === item} className={type === item ? 'is-selected' : ''} key={item} onClick={() => setType(item)} type="button"><span className="service-picker__check">{type === item ? <Check size={14} /> : null}</span><span>{requestType(item)}</span><small><b>{number({revision: 1_000, modification: 2_000, creation: 3_000}[item])}</b> crediti</small></button>)}</fieldset>

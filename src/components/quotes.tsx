@@ -36,7 +36,7 @@ async function api<T>(url: string, init?: RequestInit) {
 }
 
 // Quote and order requests for WowStampa products: list, new request and detail drawer.
-export function QuotesWorkspace({viewer, initialQuotes, embedded = false, createSignal}: {viewer: 'client' | 'team'; initialQuotes: QuoteView[]; embedded?: boolean; createSignal?: {nonce: number; linked: LinkedGraphic | null} | null}) {
+export function QuotesWorkspace({viewer, initialQuotes, embedded = false, createSignal, onCreateClosed}: {viewer: 'client' | 'team'; initialQuotes: QuoteView[]; embedded?: boolean; createSignal?: {nonce: number; linked: LinkedGraphic | null} | null; onCreateClosed?: () => void}) {
   const [quotes, setQuotes] = useState(initialQuotes);
   const [filter, setFilter] = useState<keyof typeof FILTERS>('all');
   const [openId, setOpenId] = useState<string | null>(null);
@@ -80,7 +80,7 @@ export function QuotesWorkspace({viewer, initialQuotes, embedded = false, create
 
     {viewer === 'client' && !embedded ? <button className="fab" onClick={() => { setLinked(null); setIsCreating(true); }} type="button"><Plus size={20} /> Preventivo</button> : null}
     {openId ? <RequestDrawer onClose={closeDrawer}><QuoteDetail onChange={replace} quoteId={openId} viewer={viewer} /></RequestDrawer> : null}
-    {isCreating ? <NewQuoteModal linked={linked} onClose={() => setIsCreating(false)} onCreated={(quote) => { replace(quote); setIsCreating(false); setOpenId(quote.id); }} /> : null}
+    {isCreating ? <NewQuoteModal linked={linked} onClose={() => { setIsCreating(false); onCreateClosed?.(); }} onCreated={(quote) => { replace(quote); setIsCreating(false); onCreateClosed?.(); setOpenId(quote.id); }} /> : null}
   </section>;
 }
 
@@ -132,7 +132,7 @@ function NewQuoteModal({onClose, onCreated, linked}: {onClose: () => void; onCre
     <button aria-label="Chiudi" className="subscription-buy__close" onClick={onClose} type="button"><X size={18} /></button>
     <form className="quote-new__layout" onSubmit={submit}>
       <div className="quote-new__catalog">
-        {linked ? <div className="quote-linked"><Palette size={16} /><span><b>Stampa per la grafica {linked.publicId}</b>{linked.title}. Scegli il prodotto su cui stamparla o descrivilo: i file della grafica restano collegati al preventivo.</span></div> : null}
+        {linked ? <div className="quote-linked"><Palette size={16} /><span><b>Grafica {linked.publicId} collegata · ora la stampa</b>{linked.title}. Scegli il prodotto su cui stamparla o descrivilo: i file della grafica restano collegati al preventivo.</span></div> : null}
         {mode === 'choose' ? <>
           <header><span className="buy-form__step">{linked ? 'Ordina la stampa' : 'Preventivo o ordine'}</span><h3>{linked ? 'Su cosa vuoi stamparla?' : 'Come vuoi procedere?'}</h3></header>
           <div className="quote-new__modes">

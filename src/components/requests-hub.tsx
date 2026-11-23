@@ -19,11 +19,16 @@ export function RequestsHub({requests, quotes, includedCredits, extraCredits}: {
     setTab(next);
     const url = new URL(window.location.href);
     url.searchParams.set('tab', next);
-    window.history.replaceState(null, '', `${url.pathname}?tab=${next}${url.searchParams.get('q') ? `&q=${url.searchParams.get('q')}` : ''}${url.searchParams.get('r') ? `&r=${url.searchParams.get('r')}` : ''}`);
+    window.history.replaceState(window.history.state, '', url);
   }, []);
 
   const startGraphic = useCallback((withPrint: boolean) => { setChoosing(false); select('grafica'); setGraphicSignal({nonce: Date.now(), withPrint}); }, [select]);
-  const startQuote = useCallback((linked: LinkedGraphic | null) => { setChoosing(false); select('preventivi'); setQuoteSignal({nonce: Date.now(), linked}); }, [select]);
+  const startQuote = useCallback((linked: LinkedGraphic | null) => {
+    setChoosing(false); select('preventivi'); setQuoteSignal({nonce: Date.now(), linked});
+    // Kept in the URL so the print step survives a reload of the page.
+    if (linked) { const url = new URL(window.location.href); url.searchParams.set('stampa', linked.id); window.history.replaceState(window.history.state, '', url); }
+  }, [select]);
+  const clearPrint = useCallback(() => { const url = new URL(window.location.href); if (!url.searchParams.has('stampa')) return; url.searchParams.delete('stampa'); window.history.replaceState(window.history.state, '', url); }, []);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -31,11 +36,15 @@ export function RequestsHub({requests, quotes, includedCredits, extraCredits}: {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- tab and creation intent come from the URL (dashboard buttons, email links)
     setTab(fromUrl);
     const intent = params.get('new');
-    if (intent === 'quote') startQuote(null);
+    const printFor = params.get('stampa');
+    const pending = printFor ? requests.find((request) => request.id === printFor) : null;
+    if (pending) startQuote({id: pending.id, publicId: pending.publicId, title: pending.title});
+    else if (intent === 'quote') startQuote(null);
     else if (intent === 'grafica') startGraphic(false);
     else if (intent) setChoosing(true);
-    if (intent) { params.delete('new'); window.history.replaceState(null, '', `${window.location.pathname}${params.toString() ? `?${params}` : ''}`); }
-  }, [startGraphic, startQuote]);
+    if (intent) { params.delete('new'); window.history.replaceState(window.history.state, '', `${window.location.pathname}${params.toString() ? `?${params}` : ''}`); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- read once on mount
+  }, []);
 
   const toApprove = requests.filter((request) => request.status === 'review').length;
   const toPay = quotes.filter((quote) => quote.status === 'quoted' && !quote.awaitingPayment).length;
@@ -50,7 +59,7 @@ export function RequestsHub({requests, quotes, includedCredits, extraCredits}: {
       <button aria-selected={tab === 'preventivi'} className={tab === 'preventivi' ? 'is-active' : ''} onClick={() => select('preventivi')} role="tab" type="button"><ShoppingBag size={16} /> Preventivi e ordini <small>{quotes.length}</small>{toPay ? <b title="Preventivi da pagare">{toPay}</b> : null}</button>
     </div>
     <div hidden={tab !== 'grafica'}><ClientRequestsWorkspace createSignal={graphicSignal} embedded extraCredits={extraCredits} includedCredits={includedCredits} onOrderPrint={(request) => startQuote(request)} requests={requests} /></div>
-    <div hidden={tab !== 'preventivi'}><QuotesWorkspace createSignal={quoteSignal} embedded initialQuotes={quotes} viewer="client" /></div>
+    <div hidden={tab !== 'preventivi'}><QuotesWorkspace createSignal={quoteSignal} embedded initialQuotes={quotes} onCreateClosed={clearPrint} viewer="client" /></div>
     <button aria-label="Nuova richiesta" className="fab" onClick={() => setChoosing(true)} type="button"><Plus size={20} /> Nuova richiesta</button>
 
     {choosing ? <div aria-modal="true" className="modal-backdrop" onClick={(event) => { if (event.target === event.currentTarget) setChoosing(false); }} role="dialog">
