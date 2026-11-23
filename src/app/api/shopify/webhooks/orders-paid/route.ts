@@ -3,7 +3,7 @@ import {NextResponse} from 'next/server';
 import {getWowproClient, listWowproClients, updateWowproClient} from '@/lib/integrations/airtable';
 import {creditsFromTitle, getCreditsProductId, getSubscriptionProductId, verifyShopifyWebhook} from '@/lib/integrations/shopify';
 import {recordSubscriptionPayment} from '@/lib/subscription';
-import {addQuoteEvent} from '@/lib/quotes';
+import {addQuoteEvent, notifyQuotePaid} from '@/lib/quotes';
 import {createAdminClient} from '@/lib/supabase/admin.server';
 
 type ShopifyOrder = {
@@ -32,8 +32,11 @@ export async function POST(request: Request) {
       const admin = createAdminClient();
       const {data: quote} = await admin.from('quote_requests').select('id,status').eq('id', quoteId).maybeSingle();
       if (quote && quote.status !== 'paid') {
-        await admin.from('quote_requests').update({status: 'paid', paid_at: new Date().toISOString(), order_name: order.name, updated_at: new Date().toISOString()}).eq('id', quote.id);
-        await addQuoteEvent(quote.id, null, `Pagamento ricevuto · ordine ${order.name}. Il tuo ordine è in lavorazione.`);
+        const {data: updated} = await admin.from('quote_requests').update({status: 'paid', paid_at: new Date().toISOString(), order_name: order.name, updated_at: new Date().toISOString()}).eq('id', quote.id).neq('status', 'paid').select('id,public_id,company_id').maybeSingle();
+        if (updated) {
+          await addQuoteEvent(quote.id, null, `Pagamento ricevuto · ordine ${order.name}. Il tuo ordine è in lavorazione.`);
+          await notifyQuotePaid(updated, order.name);
+        }
       }
     } catch (error) {
       console.error('[Quote webhook]', error);
