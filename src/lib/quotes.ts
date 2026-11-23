@@ -50,6 +50,9 @@ export async function syncQuoteWithShopify<T extends Row>(row: T, {includePaid =
     if (!state) return row;
     const admin = createAdminClient();
     const now = new Date().toISOString();
+    // The order is the source of truth for the amount (e.g. shipping chosen at checkout).
+    const totalsChanged = Math.abs(Number(row.quote_total ?? 0) - state.total) > 0.005 || Math.abs(Number(row.offer?.shipping ?? 0) - state.shipping) > 0.005;
+    const totals = totalsChanged && row.offer ? {quote_total: state.total, offer: {...row.offer, shipping: state.shipping}} : {};
     if (state.cancelled) {
       const {data} = await admin.from('quote_requests').update({status: 'cancelled', order_name: state.orderName, updated_at: now}).eq('id', row.id).in('status', ['quoted', 'paid']).select(QUOTE_COLUMNS).maybeSingle<T>();
       if (!data) return row;
@@ -57,14 +60,17 @@ export async function syncQuoteWithShopify<T extends Row>(row: T, {includePaid =
       await notifyQuote({quote: row, actor: {id: '', role: 'admin'} as CurrentProfile, subject: 'Ordine annullato', message: `L’ordine ${state.orderName} legato a questo preventivo è stato annullato. Per qualsiasi dubbio scrivi al tuo account manager dal portale.`}).catch((error) => console.error('[Quote notify]', error));
       return data;
     }
-    if (row.status === 'paid') return row;
+    if (row.status === 'paid' || row.order_name) {
+      if (!totalsChanged || !row.offer) { if (row.status === 'paid') return row; }
+      else { const {data} = await admin.from('quote_requests').update({...totals, updated_at: now}).eq('id', row.id).select(QUOTE_COLUMNS).maybeSingle<T>(); if (data) row = data; if (row.status === 'paid') return row; }
+    }
     if (state.paid) {
-      const {data} = await admin.from('quote_requests').update({status: 'paid', paid_at: now, order_name: state.orderName, updated_at: now}).eq('id', row.id).eq('status', 'quoted').select(QUOTE_COLUMNS).maybeSingle<T>();
+      const {data} = await admin.from('quote_requests').update({...totals, status: 'paid', paid_at: now, order_name: state.orderName, updated_at: now}).eq('id', row.id).eq('status', 'quoted').select(QUOTE_COLUMNS).maybeSingle<T>();
       if (data) { await addQuoteEvent(row.id, null, `Pagamento ricevuto · ordine ${state.orderName}. Il tuo ordine è in lavorazione.`); await notifyQuotePaid(row, state.orderName); return data; }
       return row;
     }
     if (row.order_name) return row;
-    const {data} = await admin.from('quote_requests').update({order_name: state.orderName, invoice_url: state.statusPageUrl || row.invoice_url, updated_at: now}).eq('id', row.id).is('order_name', null).select(QUOTE_COLUMNS).maybeSingle<T>();
+    const {data} = await admin.from('quote_requests').update({...totals, order_name: state.orderName, invoice_url: state.statusPageUrl || row.invoice_url, updated_at: now}).eq('id', row.id).is('order_name', null).select(QUOTE_COLUMNS).maybeSingle<T>();
     if (!data) return row;
     await addQuoteEvent(row.id, null, `Ordine ${state.orderName} creato con pagamento tramite bonifico: in attesa dell’accredito.`);
     await notifyQuote({quote: row, actor: {id: '', role: 'client'} as CurrentProfile, subject: 'Preventivo accettato: in attesa di bonifico', message: `Il cliente ha accettato il preventivo e ha scelto il bonifico. Ordine ${state.orderName}: quando ricevi l’accredito segna l’ordine come pagato su Shopify.`}).catch((error) => console.error('[Quote notify]', error));
