@@ -1,7 +1,8 @@
 'use client';
 
-import {ArrowRight, Check, Loader2, MessageSquareText, Plus, Printer, Upload, X} from 'lucide-react';
+import {AlertTriangle, ArrowRight, Check, Loader2, MessageSquareText, Plus, Printer, Upload, X} from 'lucide-react';
 import {ChangeEvent, DragEvent, FormEvent, useCallback, useEffect, useState} from 'react';
+import Link from 'next/link';
 import {useRouter} from 'next/navigation';
 
 import {ACCEPTED_FILES, ACCEPTED_LABEL, type RequestFileItem, uploadRequestFiles, validateFiles} from '@/components/request-files';
@@ -135,10 +136,10 @@ function CreateRequestModal({extraCredits, includedCredits, onClose, onCreated, 
         <label className="request-modal-field" onDragOver={(event) => event.preventDefault()} onDrop={dropFiles}>File di riferimento<input accept={ACCEPTED_FILES} multiple onChange={selectFiles} type="file" /><span className="request-file-drop"><i><Upload size={19} /></i><strong>Trascina i file qui o <b>sfoglia</b></strong><small>{ACCEPTED_LABEL}</small></span></label>
         {files.length ? <div className="request-file-list">{files.map((file) => <span key={`${file.name}-${file.lastModified}`}>{file.name}{isSaving ? null : <button aria-label={`Rimuovi ${file.name}`} onClick={() => setFiles((current) => current.filter((item) => item !== file))} type="button"><X size={12} /></button>}</span>)}</div> : null}
         {progress !== null ? <div className="upload-status"><span>Caricamento file {Math.round(progress * 100)}%</span><span className="upload-progress"><i style={{width: `${Math.round(progress * 100)}%`}} /></span></div> : null}
-        <section className="request-credit-check"><h3>Verifica crediti in tempo reale</h3><div><span>Costo del servizio</span><b>−{number(creditCost)}</b></div><div><span>Disponibili ora <small>({number(includedCredits)} inclusi + {number(extraCredits)} extra)</small></span><b>{number(available)}</b></div><div className="request-credit-check__total"><span>Saldo dopo la richiesta</span><b className={after < 0 ? 'negative' : ''}>{number(Math.max(after, 0))}</b></div><p><Check size={15} /> {after >= 0 ? 'Crediti sufficienti per inviare la richiesta.' : 'Crediti insufficienti per questo servizio.'}</p></section>
+        <section className="request-credit-check"><h3>Verifica crediti in tempo reale</h3><div><span>Costo del servizio</span><b>−{number(creditCost)}</b></div><div><span>Disponibili ora <small>({number(includedCredits)} inclusi + {number(extraCredits)} extra)</small></span><b>{number(available)}</b></div><div className="request-credit-check__total"><span>Saldo dopo la richiesta</span><b className={after < 0 ? 'negative' : ''}>{number(Math.max(after, 0))}</b></div>{after >= 0 ? <p><Check size={15} /> Crediti sufficienti per inviare la richiesta.</p> : <p className="request-credit-check__missing"><AlertTriangle size={15} /><span>Ti mancano <b>{number(-after)} crediti</b> per questo servizio.{withPrint ? ' Puoi comunque chiedere il preventivo di stampa da «Nuova richiesta → Un preventivo o un ordine».' : ''}</span><Link href="/dashboard/crediti">Acquista crediti</Link></p>}</section>
         {error ? <p className="form-error">{error}</p> : null}
       </div>
-      <footer className="client-request-modal__foot"><small>I crediti inclusi vengono usati per primi, poi gli extra.</small><span /><button className="client-action" disabled={isSaving} onClick={onClose} type="button">Annulla</button><button className="client-action client-action--primary" disabled={isSaving || after < 0} type="submit">{withPrint ? <Printer size={16} /> : <Check size={16} />}{progress !== null ? 'Caricamento file...' : isSaving ? 'Invio...' : withPrint ? 'Invia e scegli la stampa' : 'Invia richiesta'}{withPrint && !isSaving ? <ArrowRight size={15} /> : null}</button></footer>
+      <footer className="client-request-modal__foot"><small>I crediti inclusi vengono usati per primi, poi gli extra.</small><span /><button className="client-action" disabled={isSaving} onClick={onClose} type="button">Annulla</button><button className="client-action client-action--primary" disabled={isSaving || after < 0} title={after < 0 ? 'Crediti insufficienti' : undefined} type="submit">{withPrint ? <Printer size={16} /> : <Check size={16} />}{progress !== null ? 'Caricamento file...' : isSaving ? 'Invio...' : withPrint ? 'Invia e scegli la stampa' : 'Invia richiesta'}{withPrint && !isSaving ? <ArrowRight size={15} /> : null}</button></footer>
     </form>
   </section></div>;
 }
