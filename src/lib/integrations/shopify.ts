@@ -350,6 +350,17 @@ export async function getDraftOrderState(id: string) {
   return order ? {orderId: order.id, orderName: order.name, paid: order.displayFinancialStatus === 'PAID', cancelled: !!order.cancelledAt, statusPageUrl: order.statusPageUrl, total: Number(order.totalPriceSet.shopMoney.amount), shipping: Number(order.totalShippingPriceSet.shopMoney.amount)} : null;
 }
 
+// Once the order exists its lines can't be changed from here: file links go in the order's additional details.
+export async function setOrderFileLinks(orderId: string, links: Array<{name: string; value: string}>) {
+  const data = await shopifyAdminQuery<{order: {customAttributes: Array<{key: string; value: string | null}>} | null}>(`query QuoteOrderAttributes($id: ID!) { order(id: $id) { customAttributes { key value } } }`, {id: orderId});
+  const kept = (data.order?.customAttributes || []).filter((attribute) => !attribute.key.startsWith('File')).map((attribute) => ({key: attribute.key, value: attribute.value || ''}));
+  const result = await shopifyAdminQuery<{orderUpdate: {userErrors: Array<{message: string}>}}>(
+    `mutation QuoteOrderFiles($input: OrderInput!) { orderUpdate(input: $input) { order { id } userErrors { message } } }`,
+    {input: {id: orderId, customAttributes: [...kept, ...links.map((link) => ({key: link.name, value: link.value}))]}},
+  );
+  if (result.orderUpdate.userErrors.length) throw new Error(result.orderUpdate.userErrors.map((error) => error.message).join(' · '));
+}
+
 // Marks a bank-transfer order as paid once the operator has checked the transfer.
 export async function markOrderAsPaid(orderId: string) {
   const data = await shopifyAdminQuery<{orderMarkAsPaid: {order: {displayFinancialStatus: string | null} | null; userErrors: Array<{message: string}>}}>(
