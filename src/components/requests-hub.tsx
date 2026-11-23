@@ -60,7 +60,7 @@ export function RequestsHub({requests, quotes, includedCredits, extraCredits}: {
         <div className="hub-choose__options">
           <button onClick={() => startGraphic(false)} type="button"><span className="is-green"><Palette size={22} /></span><strong>Una grafica</strong><small>Revisione, modifica o creazione di un file. Usa i crediti del tuo piano.</small><em>Scegli <ArrowRight size={14} /></em></button>
           <button onClick={() => startQuote(null)} type="button"><span className="is-blue"><Printer size={22} /></span><strong>Un preventivo o un ordine</strong><small>Prodotti WowStampa con i tuoi prezzi riservati, dal catalogo o su misura.</small><em>Scegli <ArrowRight size={14} /></em></button>
-          <button className="hub-choose__combo" onClick={() => startGraphic(true)} type="button"><span className="is-violet"><Layers size={22} /></span><strong>Grafica + stampa</strong><small>Prepariamo la grafica e la stampiamo: due richieste collegate, i file passano da sole al preventivo.</small><em>Scegli <ArrowRight size={14} /></em></button>
+          <button className="hub-choose__combo" onClick={() => startGraphic(true)} type="button"><span className="is-violet"><Layers size={22} /></span><strong>Grafica + stampa</strong><small>Prepariamo la grafica e la stampiamo: due richieste collegate, i file passano da soli al preventivo.</small><em>Scegli <ArrowRight size={14} /></em></button>
         </div>
       </section>
     </div> : null}
