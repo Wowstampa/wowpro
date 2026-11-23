@@ -342,12 +342,12 @@ export async function searchCatalog(term: string) {
 
 // State of a quote's draft order: once the client completes checkout (card or bank transfer) it becomes a real order.
 export async function getDraftOrderState(id: string) {
-  const data = await shopifyAdminQuery<{draftOrder: {status: string; order: {id: string; name: string; displayFinancialStatus: string | null; statusPageUrl: string | null; cancelledAt: string | null} | null} | null}>(
-    `query QuoteDraftState($id: ID!) { draftOrder(id: $id) { status order { id name displayFinancialStatus statusPageUrl cancelledAt } } }`,
+  const data = await shopifyAdminQuery<{draftOrder: {status: string; order: {id: string; name: string; displayFinancialStatus: string | null; statusPageUrl: string | null; cancelledAt: string | null; totalPriceSet: {shopMoney: {amount: string}}; totalShippingPriceSet: {shopMoney: {amount: string}}} | null} | null}>(
+    `query QuoteDraftState($id: ID!) { draftOrder(id: $id) { status order { id name displayFinancialStatus statusPageUrl cancelledAt totalPriceSet { shopMoney { amount } } totalShippingPriceSet { shopMoney { amount } } } } }`,
     {id},
   );
   const order = data.draftOrder?.order;
-  return order ? {orderId: order.id, orderName: order.name, paid: order.displayFinancialStatus === 'PAID', cancelled: !!order.cancelledAt, statusPageUrl: order.statusPageUrl} : null;
+  return order ? {orderId: order.id, orderName: order.name, paid: order.displayFinancialStatus === 'PAID', cancelled: !!order.cancelledAt, statusPageUrl: order.statusPageUrl, total: Number(order.totalPriceSet.shopMoney.amount), shipping: Number(order.totalShippingPriceSet.shopMoney.amount)} : null;
 }
 
 // Marks a bank-transfer order as paid once the operator has checked the transfer.
@@ -390,7 +390,8 @@ export async function createQuoteDraftOrder({quoteId, publicId, email, customerI
       quantity: line.quantity,
       ...(line.properties?.length ? {customAttributes: line.properties.map((property) => ({key: property.name, value: property.value}))} : {}),
     })),
-    ...(shipping > 0 ? {shippingLine: {title: 'Spedizione', priceWithCurrency: {amount: shipping.toFixed(2), currencyCode: 'EUR'}}} : {}),
+    // Always set: without a shipping line the checkout would add the store's shipping rates on top of the quote.
+    shippingLine: {title: shipping > 0 ? 'Spedizione' : 'Spedizione inclusa', priceWithCurrency: {amount: shipping.toFixed(2), currencyCode: 'EUR'}},
   };
   // Only a customer that really exists in Shopify is linked: a stale CRM id makes Shopify reject the draft ("Record is invalid").
   const verifiedCustomer = await findExistingCustomer(customerId, email);
