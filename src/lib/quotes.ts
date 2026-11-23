@@ -9,7 +9,7 @@ import {createAdminClient} from '@/lib/supabase/admin.server';
 export type QuoteStatus = 'new' | 'in_review' | 'quoted' | 'paid' | 'cancelled';
 export const QUOTE_STATUS_LABELS: Record<QuoteStatus, string> = {new: 'Inviata', in_review: 'In valutazione', quoted: 'Preventivo pronto', paid: 'Pagato', cancelled: 'Annullata'};
 
-export type QuoteItem = {productId: string; variantId: string; productTitle: string; variantTitle: string; imageUrl: string | null; quantity: number; note: string; listPrice: number | null; options?: Array<{name: string; value: string}>};
+export type QuoteItem = {productId: string; variantId: string; productTitle: string; variantTitle: string; imageUrl: string | null; quantity: number; note: string; listPrice: number | null; options?: Array<{name: string; value: string}>; graphicRequest?: {id: string; publicId: string; title: string} | null};
 export type QuoteReceipt = {messageId: string; name: string; uploadedAt: string};
 export type QuoteOffer = {receipt?: QuoteReceipt | null; lines: Array<{variantId: string; title: string; quantity: number; unitPrice: number; properties?: Array<{name: string; value: string}>}>; shipping: number; note: string; validUntil: string | null};
 export type QuoteSummary = {id: string; publicId: string; kind: 'quote' | 'order'; status: QuoteStatus; companyName: string; requesterName: string; items: QuoteItem[]; notes: string; neededBy: string | null; offer: QuoteOffer | null; invoiceUrl: string | null; awaitingPayment: boolean; total: number | null; currency: string; createdAt: string; quotedAt: string | null; paidAt: string | null; orderName: string | null};
@@ -67,6 +67,19 @@ export async function syncQuoteWithShopify<T extends Row>(row: T, {includePaid =
   }
 }
 
+// Links the files of a graphic request to a print quote: the latest files from the team once the design is approved.
+export async function attachGraphicFiles(quoteId: string, graphic: {id: string; public_id: string; status: string}) {
+  const admin = createAdminClient();
+  if (graphic.status !== 'completed') {
+    await addQuoteEvent(quoteId, null, `Collegato alla grafica ${graphic.public_id}: i file arriveranno con l’approvazione della bozza.`);
+    return;
+  }
+  const {data: files} = await admin.from('request_files').select('storage_path,file_name,size_bytes,uploader:uploaded_by(role)').eq('request_id', graphic.id).eq('customer_visible', true).order('created_at', {ascending: false}).limit(20);
+  const fromTeam = (files || []).filter((file) => (one(file.uploader) as {role?: string} | null)?.role !== 'client').slice(0, 5);
+  if (fromTeam.length) await admin.from('quote_messages').insert(fromTeam.map((file) => ({quote_id: quoteId, author_id: null, kind: 'comment', body: `File della grafica ${graphic.public_id}`, file_path: file.storage_path, file_name: file.file_name, file_size: file.size_bytes})));
+  await addQuoteEvent(quoteId, null, `Collegato alla grafica approvata ${graphic.public_id}${fromTeam.length ? `: ${fromTeam.length === 1 ? 'il file è allegato' : `${fromTeam.length} file allegati`} qui sotto` : ''}.`);
+}
+
 export function isQuoteTeam(profile: CurrentProfile) { return profile.status === 'active' && (profile.role === 'staff' || profile.role === 'admin'); }
 
 // Clients see their company's quotes; admins all; account managers their clients (and clients without a manager).
@@ -122,7 +135,7 @@ export async function notifyQuote({quote, actor, subject, message}: {quote: {id:
   const admin = createAdminClient();
   const origin = (process.env.NEXT_PUBLIC_APP_URL || 'https://wowpro.it').replace(/\/$/, '');
   let recipients: Array<{id: string; email: string}> = [];
-  let link = `${origin}/dashboard/preventivi?q=${quote.id}`;
+  let link = `${origin}/dashboard/richieste?tab=preventivi&q=${quote.id}`;
   if (actor.role === 'client') {
     const manager = (await getConversationCompany(quote.company_id))?.manager;
     if (manager) recipients = [manager];
