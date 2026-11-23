@@ -9,6 +9,7 @@ import {createAdminClient} from '@/lib/supabase/admin.server';
 type ShopifyOrder = {
   id: number;
   name: string;
+  total_price?: string;
   email?: string | null;
   contact_email?: string | null;
   customer?: {id?: number | null; email?: string | null} | null;
@@ -32,7 +33,7 @@ export async function POST(request: Request) {
       const admin = createAdminClient();
       const {data: quote} = await admin.from('quote_requests').select('id,status').eq('id', quoteId).maybeSingle();
       if (quote && quote.status !== 'paid') {
-        const {data: updated} = await admin.from('quote_requests').update({status: 'paid', paid_at: new Date().toISOString(), order_name: order.name, updated_at: new Date().toISOString()}).eq('id', quote.id).neq('status', 'paid').select('id,public_id,company_id').maybeSingle();
+        const {data: updated} = await admin.from('quote_requests').update({status: 'paid', paid_at: new Date().toISOString(), order_name: order.name, ...(order.total_price ? {quote_total: Number(order.total_price)} : {}), updated_at: new Date().toISOString()}).eq('id', quote.id).neq('status', 'paid').select('id,public_id,company_id').maybeSingle();
         if (updated) {
           await addQuoteEvent(quote.id, null, `Pagamento ricevuto · ordine ${order.name}. Il tuo ordine è in lavorazione.`);
           await notifyQuotePaid(updated, order.name);
