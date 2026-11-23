@@ -2,8 +2,8 @@ import 'server-only';
 
 import type {CurrentProfile} from '@/lib/auth';
 import {escapeHtml, sendEmail} from '@/lib/email';
-import {deleteDraftOrder, getDraftOrderState} from '@/lib/integrations/shopify';
-import {refreshQuoteDraftFiles} from '@/lib/quote-draft';
+import {deleteDraftOrder, getDraftOrderState, setOrderFileLinks} from '@/lib/integrations/shopify';
+import {quoteFileLinks, refreshQuoteDraftFiles} from '@/lib/quote-draft';
 import {getConversationCompany} from '@/lib/support';
 import {createAdminClient} from '@/lib/supabase/admin.server';
 
@@ -86,14 +86,41 @@ export async function attachApprovedGraphicToQuotes(graphicId: string) {
   const admin = createAdminClient();
   const {data: graphic} = await admin.from('graphic_requests').select('id,public_id,status').eq('id', graphicId).maybeSingle();
   if (!graphic || graphic.status !== 'completed') return;
-  const {data: quotes} = await admin.from('quote_requests').select('id,public_id,company_id,status,order_name').contains('items', JSON.stringify([{graphicRequest: {id: graphicId}}])).in('status', ['new', 'in_review', 'quoted']).is('order_name', null);
+  const {data: quotes} = await admin.from('quote_requests').select('id,public_id,company_id,status,order_name').contains('items', JSON.stringify([{graphicRequest: {id: graphicId}}])).in('status', ['new', 'in_review', 'quoted', 'paid']);
   for (const quote of quotes || []) {
-    const {data: already} = await admin.from('quote_messages').select('id').eq('quote_id', quote.id).eq('body', `File della grafica ${graphic.public_id}`).limit(1);
-    if (already?.length) continue;
-    await attachGraphicFiles(quote.id, graphic);
-    if (quote.status === 'quoted') await refreshQuoteDraftFiles(quote.id).catch((error) => console.error('[Quote draft refresh]', error));
-    await notifyQuote({quote, actor: {id: '', role: 'client'} as CurrentProfile, subject: 'Grafica approvata: file pronti per la stampa', message: `Il cliente ha approvato la grafica ${graphic.public_id}: i file sono allegati al preventivo di stampa ${quote.public_id}.`}).catch((error) => console.error('[Quote notify]', error));
+    if (!(await ensureGraphicFiles(quote.id))) continue;
+    await syncQuoteFilesToShopify(quote.id).catch((error) => console.error('[Quote files sync]', error));
+    await notifyQuote({quote, actor: {id: '', role: 'client'} as CurrentProfile, subject: 'Grafica approvata: file pronti per la stampa', message: `Il cliente ha approvato la grafica ${graphic.public_id}: i file sono allegati al preventivo di stampa ${quote.public_id}${quote.order_name ? ` e all’ordine ${quote.order_name}` : ''}.`}).catch((error) => console.error('[Quote notify]', error));
   }
+}
+
+// Attaches the files of every approved design linked to the quote that are not there yet. Returns true when something was added.
+export async function ensureGraphicFiles(quoteId: string) {
+  const admin = createAdminClient();
+  const {data: quote} = await admin.from('quote_requests').select('items').eq('id', quoteId).maybeSingle();
+  const ids = [...new Set(((quote?.items || []) as QuoteItem[]).map((item) => item.graphicRequest?.id).filter(Boolean) as string[])];
+  let added = false;
+  for (const id of ids) {
+    const {data: graphic} = await admin.from('graphic_requests').select('id,public_id,status').eq('id', id).maybeSingle();
+    if (!graphic || graphic.status !== 'completed') continue;
+    const {data: already} = await admin.from('quote_messages').select('id').eq('quote_id', quoteId).eq('body', `File della grafica ${graphic.public_id}`).limit(1);
+    if (already?.length) continue;
+    await attachGraphicFiles(quoteId, graphic);
+    added = true;
+  }
+  return added;
+}
+
+// Puts the current file links on Shopify: on the draft lines while unpaid, in the order details once the order exists.
+export async function syncQuoteFilesToShopify(quoteId: string) {
+  const admin = createAdminClient();
+  const {data: quote} = await admin.from('quote_requests').select('status,order_name,draft_order_id').eq('id', quoteId).maybeSingle();
+  if (!quote?.draft_order_id) return 'none';
+  if (!quote.order_name && quote.status === 'quoted') { await refreshQuoteDraftFiles(quoteId); return 'draft'; }
+  const state = await getDraftOrderState(quote.draft_order_id);
+  if (!state || state.cancelled) return 'none';
+  await setOrderFileLinks(state.orderId, await quoteFileLinks(quoteId));
+  return 'order';
 }
 
 // Links the files of a graphic request to a print quote: the latest files from the team once the design is approved.

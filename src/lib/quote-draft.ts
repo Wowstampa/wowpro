@@ -22,10 +22,22 @@ export function quoteFileLink(messageId: string) {
   return `${origin}/api/f/${messageId}?t=${fileToken(messageId)}`;
 }
 
+async function quoteAttachments(quoteId: string) {
+  const {data: files} = await createAdminClient().from('quote_messages').select('id,body,file_name,file_path').eq('quote_id', quoteId).not('file_path', 'is', null).order('created_at');
+  return (files || []).filter((file) => file.body !== 'Contabile del bonifico');
+}
+
+// All file links of a quote, as Shopify attributes.
+export async function quoteFileLinks(quoteId: string) {
+  return (await quoteAttachments(quoteId)).slice(0, 30).map((file) => {
+    const design = /^File della grafica (\S+)/.exec(file.body || '')?.[1];
+    return {name: `File${design ? ` grafica ${design}` : ''}: ${(file.file_name || 'file').slice(0, 80)}`, value: quoteFileLink(file.id)};
+  });
+}
+
 // Adds one "File" property per attachment: design files go on the line linked to that design, the client's own files on the first line.
 async function withFileProperties(quoteId: string, lines: Line[]) {
-  const {data: files} = await createAdminClient().from('quote_messages').select('id,body,file_name,file_path').eq('quote_id', quoteId).not('file_path', 'is', null).order('created_at');
-  const attachments = (files || []).filter((file) => file.body !== 'Contabile del bonifico');
+  const attachments = await quoteAttachments(quoteId);
   if (!attachments.length) return lines;
   const result = lines.map((line) => ({...line, properties: [...(line.properties || [])]}));
   for (const file of attachments) {
