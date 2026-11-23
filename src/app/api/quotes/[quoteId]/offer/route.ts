@@ -3,7 +3,7 @@ import {z} from 'zod';
 
 import {getCurrentProfile} from '@/lib/auth';
 import {publishQuoteDraft} from '@/lib/quote-draft';
-import {QUOTE_COLUMNS, addQuoteEvent, getAccessibleQuote, isQuoteTeam, notifyQuote, toSummary} from '@/lib/quotes';
+import {QUOTE_COLUMNS, addQuoteEvent, ensureGraphicFiles, getAccessibleQuote, isQuoteTeam, notifyQuote, toSummary} from '@/lib/quotes';
 import {createAdminClient} from '@/lib/supabase/admin.server';
 
 const schema = z.object({
@@ -27,6 +27,7 @@ export async function POST(request: Request, {params}: {params: Promise<{quoteId
 
   const admin = createAdminClient();
   try {
+    await ensureGraphicFiles(quote.id).catch((attachError) => console.error('[Quote graphic files]', attachError));
     const draft = await publishQuoteDraft({quote, lines: parsed.data.lines, shipping: parsed.data.shipping, note: parsed.data.note});
     const offer = {lines: parsed.data.lines, shipping: parsed.data.shipping, note: parsed.data.note, validUntil: parsed.data.validUntil};
     const {data: updated, error} = await admin.from('quote_requests').update({status: 'quoted', offer, draft_order_id: draft.id, invoice_url: draft.invoiceUrl, quote_total: draft.total, currency: draft.currency, quoted_at: new Date().toISOString(), updated_at: new Date().toISOString()}).eq('id', quote.id).select(QUOTE_COLUMNS).single();
