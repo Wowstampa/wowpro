@@ -40,8 +40,7 @@ type NavigationLink = {
 function getClientLinks(notificationCounts: AdminNotificationCounts): NavigationLink[] {
   return [
   {href: '/dashboard', label: 'Dashboard', icon: ChartNoAxesCombined},
-  {href: '/dashboard/richieste', label: 'Richieste grafiche', icon: MessageSquareText, count: notificationCounts.requests || undefined, section: 'GESTIONE'},
-  {href: '/dashboard/preventivi', label: 'Preventivi', icon: FileText},
+  {href: '/dashboard/richieste', label: 'Richieste', icon: MessageSquareText, count: notificationCounts.requests || undefined, section: 'GESTIONE'},
   {href: '/dashboard/ordini', label: 'Ordini', icon: PackageCheck},
   {href: '/dashboard/crediti', label: 'Crediti', icon: CreditCard},
   {href: '/dashboard/abbonamento', label: 'Abbonamento', icon: Crown},

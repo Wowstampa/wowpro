@@ -1,7 +1,7 @@
 'use client';
 
-import {Check, MessageSquareText, Plus, Upload, X} from 'lucide-react';
-import {ChangeEvent, DragEvent, FormEvent, useCallback, useState} from 'react';
+import {ArrowRight, Check, MessageSquareText, Plus, Printer, Upload, X} from 'lucide-react';
+import {ChangeEvent, DragEvent, FormEvent, useCallback, useEffect, useState} from 'react';
 import {useRouter} from 'next/navigation';
 
 import {ACCEPTED_FILES, ACCEPTED_LABEL, type RequestFileItem, uploadRequestFiles, validateFiles} from '@/components/request-files';
@@ -20,13 +20,22 @@ export type ClientWorkspaceRequest = {
   files: RequestFileItem[];
 };
 
-export function ClientRequestsWorkspace({extraCredits, includedCredits, requests}: {extraCredits: number; includedCredits: number; requests: ClientWorkspaceRequest[]}) {
+type LinkedRequest = {id: string; publicId: string; title: string};
+
+export function ClientRequestsWorkspace({extraCredits, includedCredits, requests, embedded = false, createSignal, onOrderPrint}: {extraCredits: number; includedCredits: number; requests: ClientWorkspaceRequest[]; embedded?: boolean; createSignal?: {nonce: number; withPrint: boolean} | null; onOrderPrint?: (request: LinkedRequest) => void}) {
   const router = useRouter();
   const [items, setItems] = useState(requests);
   const [balances, setBalances] = useState({included: includedCredits, extra: extraCredits});
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
+  const [withPrint, setWithPrint] = useState(false);
   const [notice, setNotice] = useState('');
+
+  useEffect(() => {
+    if (!createSignal) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the requests hub asks this workspace to open its creation modal
+    setWithPrint(createSignal.withPrint); setIsCreating(true);
+  }, [createSignal]);
   // Mobile-only status filter: the pills are hidden on desktop, where the filter always stays on "all".
   const [filter, setFilter] = useState<keyof typeof FILTERS>('all');
   const visible = filter === 'all' ? items : items.filter((item) => FILTERS[filter].statuses.includes(item.status));
@@ -34,18 +43,18 @@ export function ClientRequestsWorkspace({extraCredits, includedCredits, requests
   useRequestFromUrl(useCallback((id: string) => setSelectedId(id), []));
 
   return <section className="client-requests-workspace">
-    <header className="client-requests-toolbar">
+    {!embedded ? <header className="client-requests-toolbar">
       <div>
         <h2>Le tue richieste grafiche</h2>
         <p>Segui lo stato di ogni lavorazione in tempo reale</p>
       </div>
-      <button className="button button--primary" onClick={() => setIsCreating(true)} type="button">
+      <button className="button button--primary" onClick={() => { setWithPrint(false); setIsCreating(true); }} type="button">
         <Plus size={17} /> Nuova richiesta
       </button>
-    </header>
+    </header> : null}
     {items.length ? <div aria-label="Filtra richieste" className="mobile-filters" role="tablist">{(Object.keys(FILTERS) as Array<keyof typeof FILTERS>).map((key) => { const count = key === 'all' ? items.length : items.filter((item) => FILTERS[key].statuses.includes(item.status)).length; return <button aria-selected={filter === key} className={filter === key ? 'is-active' : ''} key={key} onClick={() => setFilter(key)} role="tab" type="button">{FILTERS[key].label}{count ? <small>{count}</small> : null}</button>; })}</div> : null}
     {notice ? <p className="form-error request-notice">{notice}</p> : null}
-    {!items.length ? <section className="empty-card empty-card--section"><span className="eyebrow">NESSUNA RICHIESTA</span><h2>Non hai richieste attive</h2><p>Inizia con una nuova richiesta per coinvolgere il tuo team grafico.</p></section> : <div className="client-requests-grid client-requests-grid--single">
+    {!items.length ? <section className="empty-card empty-card--section"><span className="eyebrow">NESSUNA RICHIESTA</span><h2>Non hai richieste attive</h2><p>Usa «Nuova richiesta» per chiedere una revisione, una modifica o una nuova grafica.</p></section> : <div className="client-requests-grid client-requests-grid--single">
       <div className="client-request-list client-request-list--workspace">
         {visible.map((request) => <button aria-pressed={selectedId === request.id} className={'client-request-row' + (selectedId === request.id ? ' client-request-row--selected' : '')} key={request.id} onClick={() => setSelectedId(request.id)} type="button">
           <span className="client-request-row__icon"><MessageSquareText size={17} /></span>
@@ -59,13 +68,13 @@ export function ClientRequestsWorkspace({extraCredits, includedCredits, requests
         {!visible.length ? <p className="mobile-filters__empty">Nessuna richiesta in questa sezione.</p> : null}
       </div>
     </div>}
-    <button aria-label="Nuova richiesta" className="fab" onClick={() => setIsCreating(true)} type="button"><Plus size={20} /> Nuova richiesta</button>
-    {selectedId ? <RequestDrawer onClose={closeDrawer}><RequestThread onStatusChange={(value) => setItems((current) => current.map((item) => item.id === selectedId ? {...item, status: value} : item))} requestId={selectedId} viewer="client" /></RequestDrawer> : null}
-    {isCreating ? <CreateRequestModal extraCredits={balances.extra} includedCredits={balances.included} onClose={() => setIsCreating(false)} onCreated={(request, warning) => { setNotice(warning || ''); const usedIncluded = Math.min(balances.included, request.creditCost); setBalances({included: balances.included - usedIncluded, extra: balances.extra - (request.creditCost - usedIncluded)}); setItems((current) => [request, ...current]); setSelectedId(request.id); setIsCreating(false); router.refresh(); }} /> : null}
+    {!embedded ? <button aria-label="Nuova richiesta" className="fab" onClick={() => { setWithPrint(false); setIsCreating(true); }} type="button"><Plus size={20} /> Nuova richiesta</button> : null}
+    {selectedId ? <RequestDrawer onClose={closeDrawer}><RequestThread onOrderPrint={onOrderPrint ? (request) => { closeDrawer(); onOrderPrint(request); } : undefined} onStatusChange={(value) => setItems((current) => current.map((item) => item.id === selectedId ? {...item, status: value} : item))} requestId={selectedId} viewer="client" /></RequestDrawer> : null}
+    {isCreating ? <CreateRequestModal withPrint={withPrint} extraCredits={balances.extra} includedCredits={balances.included} onClose={() => setIsCreating(false)} onCreated={(request, warning) => { setNotice(warning || ''); const usedIncluded = Math.min(balances.included, request.creditCost); setBalances({included: balances.included - usedIncluded, extra: balances.extra - (request.creditCost - usedIncluded)}); setItems((current) => [request, ...current]); setIsCreating(false); router.refresh(); if (withPrint && onOrderPrint) onOrderPrint({id: request.id, publicId: request.publicId, title: request.title}); else setSelectedId(request.id); }} /> : null}
   </section>;
 }
 
-function CreateRequestModal({extraCredits, includedCredits, onClose, onCreated}: {extraCredits: number; includedCredits: number; onClose: () => void; onCreated: (request: ClientWorkspaceRequest, warning?: string) => void}) {
+function CreateRequestModal({extraCredits, includedCredits, onClose, onCreated, withPrint = false}: {extraCredits: number; includedCredits: number; onClose: () => void; onCreated: (request: ClientWorkspaceRequest, warning?: string) => void; withPrint?: boolean}) {
   const [type, setType] = useState<'revision' | 'modification' | 'creation'>('modification');
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
@@ -107,7 +116,7 @@ function CreateRequestModal({extraCredits, includedCredits, onClose, onCreated}:
   function selectFiles(event: ChangeEvent<HTMLInputElement>) { addFiles(Array.from(event.target.files || [])); event.target.value = ''; }
   function dropFiles(event: DragEvent<HTMLElement>) { event.preventDefault(); addFiles(Array.from(event.dataTransfer.files || [])); }
 
-  return <div aria-modal="true" className="modal-backdrop" role="dialog"><section aria-labelledby="clientRequestTitle" className="client-request-modal"><header className="client-request-modal__head"><div><h2 id="clientRequestTitle">Nuova richiesta grafica</h2><p>Scegli il servizio, descrivi cosa ti serve e carica i file.</p></div><button aria-label="Chiudi" className="modal-close" onClick={onClose} type="button"><X size={19} /></button></header>
+  return <div aria-modal="true" className="modal-backdrop" role="dialog"><section aria-labelledby="clientRequestTitle" className="client-request-modal"><header className="client-request-modal__head"><div><h2 id="clientRequestTitle">{withPrint ? 'Grafica + stampa · passo 1 di 2' : 'Nuova richiesta grafica'}</h2><p>{withPrint ? 'Prima descrivi la grafica, poi scegli il prodotto su cui stamparla.' : 'Scegli il servizio, descrivi cosa ti serve e carica i file.'}</p></div><button aria-label="Chiudi" className="modal-close" onClick={onClose} type="button"><X size={19} /></button></header>
     <form onSubmit={createRequest}>
       <div className="client-request-modal__body">
         <fieldset className="service-picker"><legend>Tipo di servizio <b>*</b></legend>{(['revision', 'modification', 'creation'] as const).map((item) => <button aria-pressed={type === item} className={type === item ? 'is-selected' : ''} key={item} onClick={() => setType(item)} type="button"><span className="service-picker__check">{type === item ? <Check size={14} /> : null}</span><span>{requestType(item)}</span><small><b>{number({revision: 1_000, modification: 2_000, creation: 3_000}[item])}</b> crediti</small></button>)}</fieldset>
@@ -118,7 +127,7 @@ function CreateRequestModal({extraCredits, includedCredits, onClose, onCreated}:
         <section className="request-credit-check"><h3>Verifica crediti in tempo reale</h3><div><span>Costo del servizio</span><b>−{number(creditCost)}</b></div><div><span>Disponibili ora <small>({number(includedCredits)} inclusi + {number(extraCredits)} extra)</small></span><b>{number(available)}</b></div><div className="request-credit-check__total"><span>Saldo dopo la richiesta</span><b className={after < 0 ? 'negative' : ''}>{number(Math.max(after, 0))}</b></div><p><Check size={15} /> {after >= 0 ? 'Crediti sufficienti per inviare la richiesta.' : 'Crediti insufficienti per questo servizio.'}</p></section>
         {error ? <p className="form-error">{error}</p> : null}
       </div>
-      <footer className="client-request-modal__foot"><small>I crediti inclusi vengono usati per primi, poi gli extra.</small><span /><button className="client-action" disabled={isSaving} onClick={onClose} type="button">Annulla</button><button className="client-action client-action--primary" disabled={isSaving || after < 0} type="submit"><Check size={16} />{progress !== null ? 'Caricamento file...' : isSaving ? 'Invio...' : 'Invia richiesta'}</button></footer>
+      <footer className="client-request-modal__foot"><small>I crediti inclusi vengono usati per primi, poi gli extra.</small><span /><button className="client-action" disabled={isSaving} onClick={onClose} type="button">Annulla</button><button className="client-action client-action--primary" disabled={isSaving || after < 0} type="submit">{withPrint ? <Printer size={16} /> : <Check size={16} />}{progress !== null ? 'Caricamento file...' : isSaving ? 'Invio...' : withPrint ? 'Invia e scegli la stampa' : 'Invia richiesta'}{withPrint && !isSaving ? <ArrowRight size={15} /> : null}</button></footer>
     </form>
   </section></div>;
 }

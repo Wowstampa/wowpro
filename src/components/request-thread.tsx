@@ -1,7 +1,7 @@
 'use client';
 
 import {useCallback, useEffect, useRef, useState, type FormEvent, type KeyboardEvent} from 'react';
-import {CalendarDays, CheckCircle2, CircleDot, Eye, FileText, Loader2, Lock, Play, RotateCcw, Send, ThumbsUp, Upload, User, Wrench, X, XCircle} from 'lucide-react';
+import {CalendarDays, CheckCircle2, Printer, CircleDot, Eye, FileText, Loader2, Lock, Play, RotateCcw, Send, ThumbsUp, Upload, User, Wrench, X, XCircle} from 'lucide-react';
 
 import {AddFilesButton, FileList, formatBytes, type RequestFileItem} from '@/components/request-files';
 
@@ -20,7 +20,7 @@ type Thread = {
 export const REQUEST_STATUS_LABELS: Record<Status, string> = {new: 'Nuova', in_progress: 'In lavorazione', review: 'Bozza da approvare', completed: 'Completata', rejected: 'Rifiutata'};
 const STEPS: Status[] = ['new', 'in_progress', 'review', 'completed'];
 
-export function RequestThread({requestId, viewer, canReject = false, onStatusChange}: {requestId: string; viewer: 'client' | 'team'; canReject?: boolean; onStatusChange?: (status: Status) => void}) {
+export function RequestThread({requestId, viewer, canReject = false, onStatusChange, onOrderPrint}: {requestId: string; viewer: 'client' | 'team'; canReject?: boolean; onStatusChange?: (status: Status) => void; onOrderPrint?: (request: {id: string; publicId: string; title: string}) => void}) {
   const [thread, setThread] = useState<Thread | null>(null);
   const [error, setError] = useState('');
   const [comment, setComment] = useState('');
@@ -117,6 +117,8 @@ export function RequestThread({requestId, viewer, canReject = false, onStatusCha
     <div aria-label="Sezioni della richiesta" className="mtabs__bar rt-tabs" role="tablist">{mobileTabs.map((tab) => <button aria-selected={mobileTab === tab.id} className={mobileTab === tab.id ? 'is-active' : ''} key={tab.id} onClick={() => setMobileTab(tab.id)} role="tab" type="button">{tab.label}{tab.count ? <small>{tab.count}</small> : null}</button>)}</div>
 
     <ActionBar canReject={canReject} changesOpen={changesOpen} isActing={isActing} onAct={act} onToggleChanges={setChangesOpen} status={request.status} viewer={viewer} />
+
+    {viewer === 'client' && request.status === 'completed' && onOrderPrint ? <section className="rt-print"><span><Printer size={20} /></span><div><strong>La grafica è pronta: vuoi stamparla?</strong><p>Scegli il prodotto WowStampa: i file approvati vengono allegati al preventivo in automatico.</p></div><button className="client-action client-action--primary" onClick={() => onOrderPrint({id: request.id, publicId: request.publicId, title: request.title})} type="button"><Printer size={15} />Ordina la stampa</button></section> : null}
 
     <section className="rt-section rt-section--brief"><h3>Brief</h3><p className="rt-brief">{request.brief}</p></section>
 

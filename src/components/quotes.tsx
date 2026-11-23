@@ -1,7 +1,7 @@
 'use client';
 /* eslint-disable @next/next/no-img-element -- Shopify CDN thumbnails are already resized. */
 
-import {ArrowRight, CheckCircle2, Receipt, Upload, CreditCard, LayoutGrid, PenLine, ExternalLink, FileText, Loader2, Package, Paperclip, Plus, Search, Send, ShoppingBag, Trash2, X} from 'lucide-react';
+import {ArrowRight, CheckCircle2, Palette, Receipt, Upload, CreditCard, LayoutGrid, PenLine, ExternalLink, FileText, Loader2, Package, Paperclip, Plus, Search, Send, ShoppingBag, Trash2, X} from 'lucide-react';
 import {FormEvent, useCallback, useEffect, useMemo, useRef, useState} from 'react';
 
 import {ACCEPTED_FILES, formatBytes, putWithProgress, validateFiles} from '@/components/request-files';
@@ -10,7 +10,8 @@ import {BankTransferModal} from '@/components/quote-transfer';
 import {RequestDrawer} from '@/components/request-thread';
 
 type Status = 'new' | 'in_review' | 'quoted' | 'paid' | 'cancelled';
-type Item = {productId: string; variantId: string; productTitle: string; variantTitle: string; imageUrl: string | null; quantity: number; note: string; listPrice: number | null; options?: Array<{name: string; value: string}>};
+type Item = {productId: string; variantId: string; productTitle: string; variantTitle: string; imageUrl: string | null; quantity: number; note: string; listPrice: number | null; options?: Array<{name: string; value: string}>; graphicRequest?: LinkedGraphic | null};
+export type LinkedGraphic = {id: string; publicId: string; title: string};
 type OfferLine = {variantId: string; title: string; quantity: number; unitPrice: number; properties?: Array<{name: string; value: string}>};
 export type QuoteView = {id: string; publicId: string; kind: 'quote' | 'order'; status: Status; companyName: string; requesterName: string; items: Item[]; notes: string; neededBy: string | null; offer: {lines: OfferLine[]; shipping: number; note: string; receipt?: {messageId: string; name: string; uploadedAt: string} | null} | null; invoiceUrl: string | null; awaitingPayment?: boolean; total: number | null; currency: string; createdAt: string; quotedAt: string | null; paidAt: string | null; orderName: string | null};
 type Message = {id: string; kind: 'comment' | 'event'; body: string; createdAt: string; authorName: string; fromClient: boolean; mine: boolean; file: {name: string; size: number} | null};
@@ -35,11 +36,18 @@ async function api<T>(url: string, init?: RequestInit) {
 }
 
 // Quote and order requests for WowStampa products: list, new request and detail drawer.
-export function QuotesWorkspace({viewer, initialQuotes}: {viewer: 'client' | 'team'; initialQuotes: QuoteView[]}) {
+export function QuotesWorkspace({viewer, initialQuotes, embedded = false, createSignal}: {viewer: 'client' | 'team'; initialQuotes: QuoteView[]; embedded?: boolean; createSignal?: {nonce: number; linked: LinkedGraphic | null} | null}) {
   const [quotes, setQuotes] = useState(initialQuotes);
   const [filter, setFilter] = useState<keyof typeof FILTERS>('all');
   const [openId, setOpenId] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
+  const [linked, setLinked] = useState<LinkedGraphic | null>(null);
+
+  useEffect(() => {
+    if (!createSignal) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the requests hub asks this workspace to open its creation modal
+    setLinked(createSignal.linked); setIsCreating(true);
+  }, [createSignal]);
 
   useEffect(() => {
     const id = new URLSearchParams(window.location.search).get('q');
@@ -53,14 +61,14 @@ export function QuotesWorkspace({viewer, initialQuotes}: {viewer: 'client' | 'te
   const toPay = quotes.filter((quote) => quote.status === 'quoted' && !quote.awaitingPayment).length;
 
   return <section className="quotes">
-    <header className="quotes__toolbar">
+    {!embedded ? <header className="quotes__toolbar">
       <div><h2>{viewer === 'client' ? 'Preventivi e ordini' : 'Richieste di preventivo'}</h2><p>{viewer === 'client' ? 'Chiedi un preventivo sui prodotti WowStampa con i tuoi prezzi riservati e paga online quando sei pronto.' : 'Prezza le richieste dei clienti: il preventivo diventa un ordine Shopify che il cliente paga dal portale.'}</p></div>
-      {viewer === 'client' ? <button className="button button--primary" onClick={() => setIsCreating(true)} type="button"><Plus size={17} /> Nuova richiesta</button> : null}
-    </header>
+      {viewer === 'client' ? <button className="button button--primary" onClick={() => { setLinked(null); setIsCreating(true); }} type="button"><Plus size={17} /> Nuova richiesta</button> : null}
+    </header> : null}
     {toPay && viewer === 'client' ? <button className="quotes__alert" onClick={() => setFilter('quoted')} type="button"><CreditCard size={18} /><span><b>{toPay === 1 ? 'Hai un preventivo pronto' : `Hai ${toPay} preventivi pronti`}</b> da confermare e pagare.</span></button> : null}
     <div className="quotes__filters" role="tablist">{(Object.keys(FILTERS) as Array<keyof typeof FILTERS>).map((key) => { const statuses = FILTERS[key].statuses as readonly string[] | null; const count = statuses ? quotes.filter((quote) => statuses.includes(quote.status)).length : quotes.length; return <button aria-selected={filter === key} className={filter === key ? 'is-active' : ''} key={key} onClick={() => setFilter(key)} role="tab" type="button">{FILTERS[key].label}{count ? <small>{count}</small> : null}</button>; })}</div>
 
-    {!quotes.length ? <div className="quotes__empty"><span><ShoppingBag size={26} /></span><h3>{viewer === 'client' ? 'Nessuna richiesta, per ora' : 'Nessuna richiesta di preventivo'}</h3><p>{viewer === 'client' ? 'Scegli i prodotti dal catalogo WowStampa, indica quantità e dettagli: il tuo account manager ti manda il preventivo con i prezzi WOWPRO.' : 'Le richieste dei clienti compariranno qui.'}</p>{viewer === 'client' ? <button className="button button--primary" onClick={() => setIsCreating(true)} type="button"><Plus size={17} /> Chiedi un preventivo</button> : null}</div>
+    {!quotes.length ? <div className="quotes__empty"><span><ShoppingBag size={26} /></span><h3>{viewer === 'client' ? 'Nessuna richiesta, per ora' : 'Nessuna richiesta di preventivo'}</h3><p>{viewer === 'client' ? 'Scegli i prodotti dal catalogo WowStampa, indica quantità e dettagli: il tuo account manager ti manda il preventivo con i prezzi WOWPRO.' : 'Le richieste dei clienti compariranno qui.'}</p>{viewer === 'client' ? <button className="button button--primary" onClick={() => { setLinked(null); setIsCreating(true); }} type="button"><Plus size={17} /> Chiedi un preventivo</button> : null}</div>
       : <div className="quotes__list">
         {visible.map((quote) => <button className="quote-card" key={quote.id} onClick={() => setOpenId(quote.id)} type="button">
           <span className="quote-card__thumbs">{quote.items.slice(0, 3).map((item, index) => item.imageUrl ? <img alt="" key={index} src={item.imageUrl} /> : <i key={index}><Package size={16} /></i>)}</span>
@@ -70,13 +78,13 @@ export function QuotesWorkspace({viewer, initialQuotes}: {viewer: 'client' | 'te
         {!visible.length ? <p className="quotes__none">Nessuna richiesta in questa sezione.</p> : null}
       </div>}
 
-    {viewer === 'client' ? <button className="fab" onClick={() => setIsCreating(true)} type="button"><Plus size={20} /> Preventivo</button> : null}
+    {viewer === 'client' && !embedded ? <button className="fab" onClick={() => { setLinked(null); setIsCreating(true); }} type="button"><Plus size={20} /> Preventivo</button> : null}
     {openId ? <RequestDrawer onClose={closeDrawer}><QuoteDetail onChange={replace} quoteId={openId} viewer={viewer} /></RequestDrawer> : null}
-    {isCreating ? <NewQuoteModal onClose={() => setIsCreating(false)} onCreated={(quote) => { replace(quote); setIsCreating(false); setOpenId(quote.id); }} /> : null}
+    {isCreating ? <NewQuoteModal linked={linked} onClose={() => setIsCreating(false)} onCreated={(quote) => { replace(quote); setIsCreating(false); setOpenId(quote.id); }} /> : null}
   </section>;
 }
 
-function NewQuoteModal({onClose, onCreated}: {onClose: () => void; onCreated: (quote: QuoteView) => void}) {
+function NewQuoteModal({onClose, onCreated, linked}: {onClose: () => void; onCreated: (quote: QuoteView) => void; linked: LinkedGraphic | null}) {
   const [kind, setKind] = useState<'quote' | 'order'>('quote');
   const [term, setTerm] = useState('');
   const [products, setProducts] = useState<Product[] | null>(null);
@@ -109,7 +117,7 @@ function NewQuoteModal({onClose, onCreated}: {onClose: () => void; onCreated: (q
     if (fileError) { setError(fileError); return; }
     setIsSaving(true); setError('');
     try {
-      const {quote} = await api<{quote: QuoteView}>('/api/quotes', {method: 'POST', body: JSON.stringify({kind, items, notes, neededBy})});
+      const {quote} = await api<{quote: QuoteView}>('/api/quotes', {method: 'POST', body: JSON.stringify({kind, items: items.map((item) => (linked ? {...item, graphicRequest: linked} : item)), notes, neededBy})});
       for (const [index, file] of files.entries()) {
         setProgress(`Caricamento file ${index + 1} di ${files.length}…`);
         const ticket = await api<{uploadUrl: string; path: string}>(`/api/quotes/${quote.id}/files`, {method: 'POST', body: JSON.stringify({fileName: file.name, size: file.size})});
@@ -124,8 +132,9 @@ function NewQuoteModal({onClose, onCreated}: {onClose: () => void; onCreated: (q
     <button aria-label="Chiudi" className="subscription-buy__close" onClick={onClose} type="button"><X size={18} /></button>
     <form className="quote-new__layout" onSubmit={submit}>
       <div className="quote-new__catalog">
+        {linked ? <div className="quote-linked"><Palette size={16} /><span><b>Stampa per la grafica {linked.publicId}</b>{linked.title}. Scegli il prodotto su cui stamparla o descrivilo: i file della grafica restano collegati al preventivo.</span></div> : null}
         {mode === 'choose' ? <>
-          <header><span className="buy-form__step">Nuova richiesta</span><h3>Come vuoi procedere?</h3></header>
+          <header><span className="buy-form__step">{linked ? 'Ordina la stampa' : 'Preventivo o ordine'}</span><h3>{linked ? 'Su cosa vuoi stamparla?' : 'Come vuoi procedere?'}</h3></header>
           <div className="quote-new__modes">
             <button onClick={() => setMode('catalog')} type="button"><span><LayoutGrid size={22} /></span><strong>Scegli dal catalogo</strong><small>Prodotti WowStampa con le stesse opzioni del sito: misure, materiali, finiture, colori e taglie.</small><em>Sfoglia il catalogo <ArrowRight size={14} /></em></button>
             <button onClick={() => setMode('custom')} type="button"><span><PenLine size={22} /></span><strong>Richiesta personalizzata</strong><small>Non trovi quello che cerchi o hai un progetto particolare? Descrivilo con parole tue, ti rispondiamo noi.</small><em>Scrivi la richiesta <ArrowRight size={14} /></em></button>
@@ -151,7 +160,7 @@ function NewQuoteModal({onClose, onCreated}: {onClose: () => void; onCreated: (q
         <p className="quote-new__hint">{kind === 'quote' ? 'Ricevi i prezzi WOWPRO e decidi poi se ordinare.' : 'Sai già cosa ti serve: ti mandiamo l’ordine con i prezzi WOWPRO da pagare.'}</p>
         <h4>La tua richiesta <small>{items.length} {items.length === 1 ? 'prodotto' : 'prodotti'}</small></h4>
         <ul className="quote-new__items">
-          {items.map((item, index) => <li key={`${item.variantId}-${index}`}>{item.imageUrl ? <img alt="" src={item.imageUrl} /> : <i>{item.productId === 'custom' ? <PenLine size={16} /> : <Package size={16} />}</i>}<div><strong>{item.productTitle}</strong><small>{[...itemDetails(item), item.note].filter(Boolean).join(' · ')}</small></div><button aria-label="Rimuovi" onClick={() => setItems((current) => current.filter((_, position) => position !== index))} type="button"><Trash2 size={15} /></button></li>)}
+          {items.map((item, index) => <li key={`${item.variantId}-${index}`}>{item.imageUrl ? <img alt="" src={item.imageUrl} /> : <i>{item.productId === 'custom' ? <PenLine size={16} /> : <Package size={16} />}</i>}<div><strong>{item.productTitle}</strong><small>{[...itemDetails(item), item.note].filter(Boolean).join(' · ')}</small>{linked ? <em className="quote-graphic-chip"><Palette size={11} /> Grafica {linked.publicId}</em> : null}</div><button aria-label="Rimuovi" onClick={() => setItems((current) => current.filter((_, position) => position !== index))} type="button"><Trash2 size={15} /></button></li>)}
           {!items.length ? <li className="quote-new__placeholder">Scegli un prodotto dal catalogo o descrivi una richiesta personalizzata.</li> : null}
         </ul>
         <label className="buy-field is-wide"><span>Note per l’account manager <small>facoltativo</small></span><textarea maxLength={4000} onChange={(event) => setNotes(event.target.value)} placeholder="Tempi, indirizzo di consegna, richieste particolari…" rows={3} value={notes} /></label>
@@ -327,7 +336,7 @@ function QuoteDetail({quoteId, viewer, onChange}: {quoteId: string; viewer: 'cli
     {viewer === 'team' && !closed && !quote.awaitingPayment ? <OfferEditor onSaved={(next) => { onChange(next); void load(); }} quote={quote} /> : null}
 
     <section className="rt-section"><h3>Prodotti richiesti</h3>
-      <ul className="quote-items">{quote.items.map((item, index) => <li key={index}>{item.imageUrl ? <img alt="" src={item.imageUrl} /> : <i><Package size={16} /></i>}<div><strong>{item.productTitle}</strong><small>{itemDetails(item).join(' · ')}</small>{item.note ? <p>{item.note}</p> : null}</div></li>)}</ul>
+      <ul className="quote-items">{quote.items.map((item, index) => <li key={index}>{item.imageUrl ? <img alt="" src={item.imageUrl} /> : <i><Package size={16} /></i>}<div><strong>{item.productTitle}</strong><small>{itemDetails(item).join(' · ')}</small>{item.note ? <p>{item.note}</p> : null}{item.graphicRequest ? <a className="quote-graphic-chip" href={viewer === 'client' ? `/dashboard/richieste?r=${item.graphicRequest.id}` : `/admin/richieste?r=${item.graphicRequest.id}`}><Palette size={11} /> Grafica {item.graphicRequest.publicId} · {item.graphicRequest.title}</a> : null}</div></li>)}</ul>
       {quote.notes ? <p className="rt-brief">{quote.notes}</p> : null}
     </section>
 
@@ -370,7 +379,7 @@ function OfferEditor({quote, onSaved}: {quote: QuoteView; onSaved: (quote: Quote
       return {
         key: `i${index}`, variantId: item.variantId, title: custom ? item.productTitle : [item.productTitle, item.variantTitle].filter(Boolean).join(' – '),
         quantity: String(item.quantity), unitPrice: item.listPrice ? String(item.listPrice).replace('.', ',') : '',
-        details: custom ? '' : [...options.map((option) => `${option.name}: ${option.value}`), ...(item.note ? [`Note: ${item.note}`] : [])].join('\n'),
+        details: [...(custom ? [] : options.map((option) => `${option.name}: ${option.value}`)), ...(!custom && item.note ? [`Note: ${item.note}`] : []), ...(item.graphicRequest ? [`Grafica: ${item.graphicRequest.publicId}`] : [])].join('\n'),
         request: custom ? [item.productTitle, ...options.map((option) => `${option.name}: ${option.value}`), item.note].filter(Boolean).join('\n') : '',
       };
     });
