@@ -33,6 +33,11 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .brand strong { font-size: 18px; letter-spacing: -0.04em; }
 .brand small { margin-top: 2px; color: #8d98aa; font-size: 9px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
 .brand--login { margin-bottom: 64px; }
+.brand__logo { display: block; width: auto; height: 52px; }
+.sidebar .brand { flex-direction: column; align-items: flex-start; gap: 6px; }
+.sidebar .brand .brand__logo { height: 50px; margin-left: -4px; }
+.brand--login { flex-direction: column; align-items: flex-start; gap: 6px; }
+.brand--login .brand__logo { height: 64px; margin-left: -6px; }
 .login-copy .eyebrow { color: var(--green-dark); }
 .login-copy h1 { margin: 12px 0 16px; max-width: 460px; font-size: clamp(38px, 4vw, 58px); line-height: .98; letter-spacing: -.055em; }
 .login-copy p { max-width: 430px; color: #5d687a; font-size: 17px; line-height: 1.6; }
@@ -798,7 +803,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
   .app-main { overflow-x: clip; }
   .mobile-bar { position: sticky; z-index: 60; top: 0; height: 60px; padding: 0 12px 0 14px; display: flex; align-items: center; justify-content: space-between; background: var(--nav); box-shadow: 0 6px 20px -12px rgba(0,0,0,.6); }
   .mobile-bar__brand { display: flex; align-items: center; gap: 10px; color: white; text-decoration: none; }
-  .mobile-bar__brand .brand__mark { width: 36px; height: 36px; border-radius: 11px; font-size: 16px; }
+  .mobile-bar__brand .brand__logo { height: 34px; }
   .mobile-bar__brand strong { display: block; font-size: 15px; letter-spacing: -.03em; }
   .mobile-bar__brand small { display: block; color: #8d98aa; font-size: 11px; font-weight: 700; }
   .mobile-bar__toggle { position: relative; width: 42px; height: 42px; display: grid; place-items: center; border: 1px solid rgba(255,255,255,.12); border-radius: 12px; background: rgba(255,255,255,.04); color: white; cursor: pointer; }
