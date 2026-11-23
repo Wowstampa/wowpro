@@ -1,8 +1,9 @@
 import Link from 'next/link';
+import {redirect} from 'next/navigation';
 import {BadgeCheck, CreditCard, ExternalLink, Info, Mail, MessageSquareText, Palette, Pencil, Phone, Receipt, Sparkles} from 'lucide-react';
 
 import {PageHeader} from '@/components/app-shell';
-import {ClientRequestsWorkspace} from '@/components/client-requests-workspace';
+import {RequestsHub} from '@/components/requests-hub';
 import {ClientOrders} from '@/components/client-orders';
 import {CreditPurchase} from '@/components/credit-purchase';
 import {OpenChatButton} from '@/components/support-widget';
@@ -16,7 +17,6 @@ import {getWowproClient} from '@/lib/integrations/airtable';
 import {getCustomerAccountUrl, getCustomerSubscription, getLatestBillingDetails, getSubscriptionOptions, listCustomerOrders, subscriptionPlanLabel, type CustomerOrder, type CustomerSubscription} from '@/lib/integrations/shopify';
 import {SubscriptionActions, type BillingDraft} from '@/components/subscription-actions';
 import {SubscriptionLanding} from '@/components/subscription-landing';
-import {QuotesWorkspace} from '@/components/quotes';
 import {listQuotes} from '@/lib/quotes';
 import {billingFromClient} from '@/lib/billing';
 import {countSubscriptionPayments} from '@/lib/subscription';
@@ -25,13 +25,13 @@ import {createClient} from '@/lib/supabase/server';
 
 const titles: Record<string, string> = {crediti: 'Crediti', richieste: 'Richieste grafiche', ordini: 'Ordini', abbonamento: 'Abbonamento', preventivi: 'Preventivi', supporto: 'Supporto', feedback: 'Feedback & idee'};
 
-export default async function ClientSectionPage({params}: {params: Promise<{section: string}>}) {
+export default async function ClientSectionPage({params, searchParams}: {params: Promise<{section: string}>; searchParams: Promise<Record<string, string | string[] | undefined>>}) {
   const {section} = await params;
   if (section === 'crediti') return <CreditsPage />;
   if (section === 'richieste') return <RequestsPage />;
   if (section === 'ordini') return <OrdersPage />;
   if (section === 'abbonamento') return <SubscriptionPage />;
-  if (section === 'preventivi') return <QuotesPage />;
+  if (section === 'preventivi') return redirectQuotes(await searchParams);
   if (section === 'supporto') return <SupportPage />;
   if (section === 'feedback') return <FeedbackPage />;
   const title = titles[section] || 'WOWPRO';
@@ -149,10 +149,11 @@ async function SubscriptionPage() {
 
 function money(value: number, currency: string) { return new Intl.NumberFormat('it-IT', {style: 'currency', currency}).format(value); }
 
-async function QuotesPage() {
-  const profile = await requireProfile(['client']);
-  const quotes = await listQuotes(profile).catch((error) => { console.error('[Quotes]', error); return []; });
-  return <><PageHeader eyebrow="WOWPRO · Area cliente" title="Preventivi" /><main className="page-content"><QuotesWorkspace initialQuotes={quotes} viewer="client" /></main></>;
+// Quotes now live in the Richieste page: old links (emails, bookmarks) are redirected there.
+async function redirectQuotes(search: Record<string, string | string[] | undefined>): Promise<never> {
+  await requireProfile(['client']);
+  const q = typeof search.q === 'string' ? search.q : '';
+  redirect(`/dashboard/richieste?tab=preventivi${q ? `&q=${encodeURIComponent(q)}` : ''}`);
 }
 
 async function OrdersPage() {
@@ -289,7 +290,8 @@ async function RequestsPage() {
     if (!error) for (const message of messages || []) messagesByRequest.set(message.request_id, [...(messagesByRequest.get(message.request_id) || []), message]);
   }
   const workspaceRequests = (requests || []).map((request) => ({id: request.id, publicId: request.public_id, title: request.title, brief: request.brief, status: request.status, type: request.type, creditCost: request.credit_cost, createdAt: request.created_at, messages: (messagesByRequest.get(request.id) || []).map((message) => ({id: message.id, body: message.body, createdAt: message.created_at})), files: filesByRequest.get(request.id) || []}));
-  return <><PageHeader eyebrow="WOWPRO · Area cliente" title="Richieste grafiche" action={<div className="credit-chip"><i /> <strong>{number(includedCredits + extraCredits)}</strong> crediti disponibili</div>} /><main className="page-content"><ClientRequestsWorkspace extraCredits={extraCredits} includedCredits={includedCredits} requests={workspaceRequests} /></main></>;
+  const quotes = await listQuotes(profile).catch((error) => { console.error('[Quotes]', error); return []; });
+  return <><PageHeader eyebrow="WOWPRO · Area cliente" title="Richieste" action={<div className="credit-chip"><i /> <strong>{number(includedCredits + extraCredits)}</strong> crediti disponibili</div>} /><main className="page-content"><RequestsHub extraCredits={extraCredits} includedCredits={includedCredits} quotes={quotes} requests={workspaceRequests} /></main></>;
 }
 
 function Service({credits, icon, text, title}: {credits: string; icon: React.ReactNode; text: string; title: string}) { return <article><span>{icon}</span><h3>{title}</h3><p>{text}</p><div><strong>{credits}</strong><small>crediti</small></div></article>; }
