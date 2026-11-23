@@ -175,6 +175,17 @@ function NewQuoteModal({onClose, onCreated, linked}: {onClose: () => void; onCre
   </section></div>;
 }
 
+// Writes the file links (client files and approved designs) on the Shopify draft or order.
+function FilesSync({quoteId, onDone}: {quoteId: string; onDone: () => void}) {
+  const [state, setState] = useState<'idle' | 'busy' | 'done'>('idle');
+  const [error, setError] = useState('');
+  async function run() {
+    setState('busy'); setError('');
+    try { await api(`/api/quotes/${quoteId}/files-sync`, {method: 'POST'}); setState('done'); onDone(); } catch (caught) { setState('idle'); setError(caught instanceof Error ? caught.message : 'Aggiornamento non riuscito.'); }
+  }
+  return <div className="quote-files-sync"><span><FileText size={15} /> Link ai file su Shopify</span><button className="client-action" disabled={state === 'busy'} onClick={() => void run()} type="button">{state === 'busy' ? <Loader2 className="spin" size={14} /> : state === 'done' ? <CheckCircle2 size={14} /> : null}{state === 'done' ? 'Aggiornati' : 'Aggiorna link file'}</button>{error ? <p className="form-error">{error}</p> : null}</div>;
+}
+
 // Bank transfer in progress: the client uploads the receipt, the account manager checks it and marks the order as paid.
 function TransferStatus({quote, viewer, onChange, onOpenDetails}: {quote: QuoteView; viewer: 'client' | 'team'; onChange: (quote: QuoteView) => void; onOpenDetails: () => void}) {
   const receipt = quote.offer?.receipt || null;
@@ -337,6 +348,8 @@ function QuoteDetail({quoteId, viewer, onChange}: {quoteId: string; viewer: 'cli
     </section> : null}
 
     {viewer === 'team' && !closed && !quote.awaitingPayment ? <OfferEditor onSaved={(next) => { onChange(next); void load(); }} quote={quote} /> : null}
+
+    {viewer === 'team' && (quote.status === 'quoted' || quote.status === 'paid') && !quote.expired ? <FilesSync onDone={() => void load()} quoteId={quote.id} /> : null}
 
     <section className="rt-section"><h3>Prodotti richiesti</h3>
       <ul className="quote-items">{quote.items.map((item, index) => <li key={index}>{item.imageUrl ? <img alt="" src={item.imageUrl} /> : <i><Package size={16} /></i>}<div><strong>{item.productTitle}</strong><small>{itemDetails(item).join(' · ')}</small>{item.note ? <p>{item.note}</p> : null}{item.graphicRequest ? <a className="quote-graphic-chip" href={viewer === 'client' ? `/dashboard/richieste?r=${item.graphicRequest.id}` : `/admin/richieste?r=${item.graphicRequest.id}`}><Palette size={11} /> Grafica {item.graphicRequest.publicId} · {item.graphicRequest.title}</a> : null}</div></li>)}</ul>
