@@ -1,0 +1,14 @@
+name: Promemoria preventivi
+
+# Once a day: reminds clients of quotes waiting for payment and expires the old ones.
+on:
+  schedule:
+    - cron: '17 6 * * *'
+  workflow_dispatch:
+
+jobs:
+  reminders:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run quote reminders
+        run: curl -fsS --max-time 120 --retry 3 --retry-delay 30 https://wowpro.it/api/cron/quote-reminders
