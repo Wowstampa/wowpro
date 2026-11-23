@@ -2,7 +2,8 @@ import {NextResponse} from 'next/server';
 import {z} from 'zod';
 
 import {getCurrentProfile} from '@/lib/auth';
-import {QUOTE_COLUMNS, addQuoteEvent, listQuotes, newQuotePublicId, notifyQuote, toSummary} from '@/lib/quotes';
+import {getAccessibleRequest} from '@/lib/request-files';
+import {QUOTE_COLUMNS, addQuoteEvent, attachGraphicFiles, listQuotes, newQuotePublicId, notifyQuote, toSummary} from '@/lib/quotes';
 import {createAdminClient} from '@/lib/supabase/admin.server';
 
 export async function GET() {
@@ -15,6 +16,7 @@ const itemSchema = z.object({
   productId: z.string().min(1).max(80), variantId: z.string().max(80).default(''), productTitle: z.string().trim().min(1).max(200), variantTitle: z.string().trim().max(200).default(''),
   imageUrl: z.string().url().max(600).nullable().default(null), quantity: z.number().int().min(1).max(100_000), note: z.string().trim().max(3000).default(''), listPrice: z.number().nonnegative().nullable().default(null),
   options: z.array(z.object({name: z.string().trim().min(1).max(120), value: z.string().trim().min(1).max(400)})).max(40).default([]),
+  graphicRequest: z.object({id: z.string().uuid(), publicId: z.string().trim().min(1).max(40), title: z.string().trim().max(200).default('')}).nullable().optional(),
 });
 const createSchema = z.object({
   kind: z.enum(['quote', 'order']), items: z.array(itemSchema).min(1, 'Aggiungi almeno un prodotto.').max(30),
@@ -28,14 +30,23 @@ export async function POST(request: Request) {
   const parsed = createSchema.safeParse(await request.json().catch(() => ({})));
   if (!parsed.success) return NextResponse.json({error: parsed.error.issues[0]?.message || 'Richiesta non valida.'}, {status: 400});
   const {kind, items, notes, neededBy} = parsed.data;
+  // A print linked to a graphic request must belong to the same company.
+  const graphicIds = [...new Set(items.map((item) => item.graphicRequest?.id).filter(Boolean) as string[])];
   const admin = createAdminClient();
+  const graphics: Array<{id: string; public_id: string; status: string}> = [];
+  for (const id of graphicIds) {
+    if (!(await getAccessibleRequest(profile, id))) return NextResponse.json({error: 'Richiesta grafica collegata non trovata.'}, {status: 400});
+    const {data: graphic} = await admin.from('graphic_requests').select('id,public_id,status').eq('id', id).single();
+    if (graphic) graphics.push(graphic);
+  }
   const {data, error} = await admin.from('quote_requests').insert({public_id: newQuotePublicId(), company_id: profile.company_id, requested_by: profile.id, kind, items, notes, needed_by: neededBy || null}).select(QUOTE_COLUMNS).single();
   if (error || !data) {
     console.error('[Quote create]', error);
     return NextResponse.json({error: 'Richiesta non inviata. Riprova.'}, {status: 502});
   }
   await addQuoteEvent(data.id, profile.id, kind === 'order' ? 'Richiesta d’ordine inviata.' : 'Richiesta di preventivo inviata.');
-  const summary = items.map((item) => `• ${item.quantity} × ${item.productTitle}${item.variantTitle ? ` (${item.variantTitle})` : ''}${item.options.length ? `\n  ${item.options.map((option) => `${option.name}: ${option.value}`).join(' · ')}` : ''}`).join('\n');
+  for (const graphic of graphics) await attachGraphicFiles(data.id, graphic).catch((attachError) => console.error('[Quote graphic files]', attachError));
+  const summary = items.map((item) => `• ${item.quantity} × ${item.productTitle}${item.variantTitle ? ` (${item.variantTitle})` : ''}${item.graphicRequest ? ` · grafica ${item.graphicRequest.publicId}` : ''}${item.options.length ? `\n  ${item.options.map((option) => `${option.name}: ${option.value}`).join(' · ')}` : ''}`).join('\n');
   await notifyQuote({quote: data, actor: profile, subject: kind === 'order' ? 'Nuova richiesta d’ordine' : 'Nuova richiesta di preventivo', message: `${summary}${notes ? `\n\n${notes}` : ''}`}).catch((notifyError) => console.error('[Quote notify]', notifyError));
   return NextResponse.json({quote: toSummary(data as never)}, {status: 201});
 }
