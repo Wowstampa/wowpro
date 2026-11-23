@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import {LoginForm} from './login-form';
 
 export default function LoginPage() {
@@ -5,8 +6,8 @@ export default function LoginPage() {
     <main className="login-page">
       <section className="login-card">
         <div className="brand brand--login">
-          <span className="brand__mark">W</span>
-          <span><strong>WOWPRO</strong><small>by WowStampa</small></span>
+          <Image alt="WOWPRO" className="brand__logo" priority unoptimized height={64} src="/images/wowpro-logo.svg" width={183} />
+          <small>by WowStampa</small>
         </div>
         <div className="login-copy">
           <span className="eyebrow">AREA CLIENTI PREMIUM</span>
