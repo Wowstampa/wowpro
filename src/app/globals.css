@@ -626,6 +626,9 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .quote-custom__tip { margin: 0; padding: 10px 12px; border-radius: 12px; background: #f4f6f8; color: #5b6575; font-size: 12px; }
 .quote-custom > .button { justify-self: start; }
 
+.request-credit-check > p.request-credit-check__missing { align-items: center; background: #fdecea; color: #b42318; font-size: 11px; }
+.request-credit-check__missing span { flex: 1; }
+.request-credit-check__missing a { flex: 0 0 auto; padding: 5px 10px; border-radius: 8px; background: #b42318; color: white; font-weight: 800; text-decoration: none; }
 /* Sending overlay for new graphic requests */
 .request-sending { position: absolute; z-index: 5; inset: 0; padding: 32px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; border-radius: inherit; background: rgba(255,255,255,.94); backdrop-filter: blur(3px); text-align: center; animation: support-pop .2s ease-out; }
 .request-sending__spinner { width: 64px; height: 64px; display: grid; place-items: center; border-radius: 50%; background: #e8f8ef; color: var(--green-dark); }
