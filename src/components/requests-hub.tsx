@@ -1,6 +1,7 @@
 'use client';
 
-import {ArrowRight, Layers, Palette, Plus, Printer, ShoppingBag, X} from 'lucide-react';
+import {AlertTriangle, ArrowRight, CreditCard, FileCheck2, Layers, Palette, Plus, Printer, ShoppingBag, X} from 'lucide-react';
+import Link from 'next/link';
 import {useCallback, useEffect, useState} from 'react';
 
 import {ClientRequestsWorkspace, type ClientWorkspaceRequest} from '@/components/client-requests-workspace';
@@ -12,6 +13,8 @@ type Tab = 'grafica' | 'preventivi';
 export function RequestsHub({requests, quotes, includedCredits, extraCredits}: {requests: ClientWorkspaceRequest[]; quotes: QuoteView[]; includedCredits: number; extraCredits: number}) {
   const [tab, setTab] = useState<Tab>('grafica');
   const [choosing, setChoosing] = useState(false);
+  const [lowCredits, setLowCredits] = useState(false);
+  const credits = includedCredits + extraCredits;
   const [graphicSignal, setGraphicSignal] = useState<{nonce: number; withPrint: boolean} | null>(null);
   const [quoteSignal, setQuoteSignal] = useState<{nonce: number; linked: LinkedGraphic | null} | null>(null);
 
@@ -22,7 +25,12 @@ export function RequestsHub({requests, quotes, includedCredits, extraCredits}: {
     window.history.replaceState(window.history.state, '', url);
   }, []);
 
-  const startGraphic = useCallback((withPrint: boolean) => { setChoosing(false); select('grafica'); setGraphicSignal({nonce: Date.now(), withPrint}); }, [select]);
+  const startGraphic = useCallback((withPrint: boolean) => {
+    setChoosing(false);
+    // Graphic + print needs at least the cheapest design service (1.000 credits).
+    if (withPrint && credits < 1_000) { setLowCredits(true); return; }
+    select('grafica'); setGraphicSignal({nonce: Date.now(), withPrint});
+  }, [select, credits]);
   const startQuote = useCallback((linked: LinkedGraphic | null) => {
     setChoosing(false); select('preventivi'); setQuoteSignal({nonce: Date.now(), linked});
     // Kept in the URL so the print step survives a reload of the page.
@@ -58,10 +66,22 @@ export function RequestsHub({requests, quotes, includedCredits, extraCredits}: {
       <button aria-selected={tab === 'grafica'} className={tab === 'grafica' ? 'is-active' : ''} onClick={() => select('grafica')} role="tab" type="button"><Palette size={16} /> Grafica <small>{requests.length}</small>{toApprove ? <b title="Bozze da approvare">{toApprove}</b> : null}</button>
       <button aria-selected={tab === 'preventivi'} className={tab === 'preventivi' ? 'is-active' : ''} onClick={() => select('preventivi')} role="tab" type="button"><ShoppingBag size={16} /> Preventivi e ordini <small>{quotes.length}</small>{toPay ? <b title="Preventivi da pagare">{toPay}</b> : null}</button>
     </div>
-    <div hidden={tab !== 'grafica'}><ClientRequestsWorkspace createSignal={graphicSignal} embedded extraCredits={extraCredits} includedCredits={includedCredits} onOrderPrint={(request) => startQuote(request)} requests={requests} /></div>
+    <div hidden={tab !== 'grafica'}><ClientRequestsWorkspace createSignal={graphicSignal} embedded extraCredits={extraCredits} includedCredits={includedCredits} onOrderPrint={(request) => startQuote(request)} onSkipToQuote={() => startQuote(null)} requests={requests} /></div>
     <div hidden={tab !== 'preventivi'}><QuotesWorkspace createSignal={quoteSignal} embedded initialQuotes={quotes} onCreateClosed={clearPrint} viewer="client" /></div>
     <button aria-label="Nuova richiesta" className="fab" onClick={() => setChoosing(true)} type="button"><Plus size={20} /> Nuova richiesta</button>
 
+    {lowCredits ? <div aria-modal="true" className="modal-backdrop" onClick={(event) => { if (event.target === event.currentTarget) setLowCredits(false); }} role="dialog">
+      <section className="hub-choose hub-block">
+        <button aria-label="Chiudi" className="subscription-buy__close" onClick={() => setLowCredits(false)} type="button"><X size={18} /></button>
+        <span className="hub-block__icon"><AlertTriangle size={24} /></span>
+        <h3>Crediti insufficienti per la grafica</h3>
+        <p>Hai <b>{credits.toLocaleString('it-IT')} crediti</b>: per far preparare la grafica ne servono almeno <b>1.000</b> (revisione). Come vuoi proseguire?</p>
+        <div className="hub-block__options">
+          <Link className="hub-block__option" href="/dashboard/crediti"><span className="is-green"><CreditCard size={20} /></span><strong>Ricarica i crediti</strong><small>Acquista crediti extra e torna a chiedere grafica + stampa.</small><em>Vai ai crediti <ArrowRight size={14} /></em></Link>
+          <button className="hub-block__option" onClick={() => { setLowCredits(false); startQuote(null); }} type="button"><span className="is-blue"><FileCheck2 size={20} /></span><strong>Ho già il file pronto</strong><small>Salta la grafica e chiedi subito il preventivo di stampa: allega il tuo file.</small><em>Vai al preventivo <ArrowRight size={14} /></em></button>
+        </div>
+      </section>
+    </div> : null}
     {choosing ? <div aria-modal="true" className="modal-backdrop" onClick={(event) => { if (event.target === event.currentTarget) setChoosing(false); }} role="dialog">
       <section className="hub-choose">
         <button aria-label="Chiudi" className="subscription-buy__close" onClick={() => setChoosing(false)} type="button"><X size={18} /></button>

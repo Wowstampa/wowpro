@@ -13,7 +13,7 @@ type Status = 'new' | 'in_review' | 'quoted' | 'paid' | 'cancelled';
 type Item = {productId: string; variantId: string; productTitle: string; variantTitle: string; imageUrl: string | null; quantity: number; note: string; listPrice: number | null; options?: Array<{name: string; value: string}>; graphicRequest?: LinkedGraphic | null};
 export type LinkedGraphic = {id: string; publicId: string; title: string};
 type OfferLine = {variantId: string; title: string; quantity: number; unitPrice: number; properties?: Array<{name: string; value: string}>};
-export type QuoteView = {id: string; publicId: string; kind: 'quote' | 'order'; status: Status; companyName: string; requesterName: string; items: Item[]; notes: string; neededBy: string | null; offer: {lines: OfferLine[]; shipping: number; note: string; receipt?: {messageId: string; name: string; uploadedAt: string} | null} | null; invoiceUrl: string | null; awaitingPayment?: boolean; total: number | null; currency: string; createdAt: string; quotedAt: string | null; paidAt: string | null; orderName: string | null};
+export type QuoteView = {id: string; publicId: string; kind: 'quote' | 'order'; status: Status; companyName: string; requesterName: string; items: Item[]; notes: string; neededBy: string | null; offer: {lines: OfferLine[]; shipping: number; note: string; receipt?: {messageId: string; name: string; uploadedAt: string} | null} | null; invoiceUrl: string | null; awaitingPayment?: boolean; expired?: boolean; validUntil?: string | null; total: number | null; currency: string; createdAt: string; quotedAt: string | null; paidAt: string | null; orderName: string | null};
 type Message = {id: string; kind: 'comment' | 'event'; body: string; createdAt: string; authorName: string; fromClient: boolean; mine: boolean; file: {name: string; size: number} | null};
 type Product = CatalogPick;
 const itemDetails = (item: Item) => [item.variantTitle, ...(item.options || []).filter((option) => !item.variantTitle.includes(option.value)).map((option) => `${option.name}: ${option.value}`), (item.options || []).some((option) => /quantit/i.test(option.name)) || item.productId === 'custom' ? '' : `${item.quantity} pz`].filter(Boolean);
@@ -21,7 +21,9 @@ const itemDetails = (item: Item) => [item.variantTitle, ...(item.options || []).
 const STATUS: Record<Status, {label: string; tone: string}> = {
   new: {label: 'Inviata', tone: 'new'}, in_review: {label: 'In valutazione', tone: 'review'}, quoted: {label: 'Preventivo pronto', tone: 'quoted'}, paid: {label: 'Pagato', tone: 'paid'}, cancelled: {label: 'Annullata', tone: 'cancelled'},
 };
-const statusOf = (quote: QuoteView) => quote.awaitingPayment ? {label: 'Attesa bonifico', tone: 'review'} : STATUS[quote.status];
+const statusOf = (quote: QuoteView) => quote.awaitingPayment ? {label: 'Attesa bonifico', tone: 'review'} : quote.expired ? {label: 'Scaduto', tone: 'cancelled'} : STATUS[quote.status];
+const longDay = (value: string) => new Intl.DateTimeFormat('it-IT', {day: 'numeric', month: 'long', year: 'numeric'}).format(new Date(`${value}T12:00:00`));
+const inDays = (days: number) => { const date = new Date(); date.setDate(date.getDate() + days); return date.toISOString().slice(0, 10); };
 const FILTERS = {all: {label: 'Tutte', statuses: null}, open: {label: 'In corso', statuses: ['new', 'in_review']}, quoted: {label: 'Da pagare', statuses: ['quoted']}, closed: {label: 'Chiuse', statuses: ['paid', 'cancelled']}} as const;
 
 const euro = (value: number, currency = 'EUR') => new Intl.NumberFormat('it-IT', {style: 'currency', currency}).format(value);
@@ -58,7 +60,7 @@ export function QuotesWorkspace({viewer, initialQuotes, embedded = false, create
   const closeDrawer = useCallback(() => { setOpenId(null); if (window.location.search.includes('q=')) window.history.replaceState(null, '', window.location.pathname); }, []);
   const replace = useCallback((quote: QuoteView) => setQuotes((current) => current.some((item) => item.id === quote.id) ? current.map((item) => item.id === quote.id ? quote : item) : [quote, ...current]), []);
   const visible = quotes.filter((quote) => !FILTERS[filter].statuses || (FILTERS[filter].statuses as readonly string[]).includes(quote.status));
-  const toPay = quotes.filter((quote) => quote.status === 'quoted' && !quote.awaitingPayment).length;
+  const toPay = quotes.filter((quote) => quote.status === 'quoted' && !quote.awaitingPayment && !quote.expired).length;
 
   return <section className="quotes">
     {!embedded ? <header className="quotes__toolbar">
@@ -328,6 +330,7 @@ function QuoteDetail({quoteId, viewer, onChange}: {quoteId: string; viewer: 'cli
       <ul>{quote.offer.lines.map((line, index) => <li key={index}><span>{line.quantity} × {line.title}{line.properties?.length ? <small className="quote-offer__specs">{line.properties.map((property) => property.name === 'Descrizione' ? property.value : `${property.name}: ${property.value}`).join(' · ')}</small> : null}</span><b>{euro(line.unitPrice * line.quantity)}</b></li>)}{quote.offer.shipping ? <li><span>Spedizione</span><b>{euro(quote.offer.shipping)}</b></li> : null}</ul>
       {quote.offer.note ? <p className="quote-offer__note">{quote.offer.note}</p> : null}
       <div className="quote-offer__total"><span>Totale IVA inclusa</span><strong>{quote.total !== null ? euro(quote.total, quote.currency) : '—'}</strong></div>
+      {quote.status === 'quoted' && !quote.awaitingPayment && quote.validUntil ? quote.expired ? <div className="quote-expired"><strong>Preventivo scaduto il {longDay(quote.validUntil)}</strong><p>{viewer === 'client' ? 'Non è più pagabile: scrivi qui sotto al tuo account manager per ricevere un preventivo aggiornato.' : 'Il cliente non può più pagarlo. Aggiorna prezzi e validità qui sotto e reinvialo.'}</p></div> : <p className="quote-offer__valid">Valido fino al <b>{longDay(quote.validUntil)}</b></p> : null}
       {quote.awaitingPayment ? <TransferStatus onChange={(next) => { onChange(next); void load(); }} onOpenDetails={() => setShowTransfer(true)} quote={quote} viewer={viewer} /> : null}
       {showTransfer && quote.offer ? <BankTransferModal companyName={quote.companyName} currency={quote.currency} lines={quote.offer.lines} onClose={() => setShowTransfer(false)} orderName={quote.orderName} shipping={quote.offer.shipping} statusUrl={quote.invoiceUrl} total={quote.total} /> : null}
       {viewer === 'client' && quote.status === 'quoted' && !quote.awaitingPayment && quote.invoiceUrl ? <><button className="buy-form__pay" onClick={pay} type="button"><CreditCard size={17} /> Accetta e paga con carta</button>{paying ? <p className="quote-offer__wait"><Loader2 className="spin" size={14} /> In attesa della conferma del pagamento… <a href={quote.invoiceUrl} rel="noreferrer" target="_blank">Riapri il checkout <ExternalLink size={12} /></a></p> : <p className="quote-offer__wait">Pagamento sicuro sul checkout WowStampa. Hai domande? Scrivi qui sotto.</p>}</> : null}
@@ -387,6 +390,7 @@ function OfferEditor({quote, onSaved}: {quote: QuoteView; onSaved: (quote: Quote
   const [lines, setLines] = useState(initial);
   const [shipping, setShipping] = useState(String(quote.offer?.shipping || 0));
   const [note, setNote] = useState(quote.offer?.note || '');
+  const [validUntil, setValidUntil] = useState(quote.offer && quote.validUntil && !quote.expired ? quote.validUntil : inDays(15));
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
   const subtotal = lines.reduce((total, line) => total + toNumber(line.unitPrice) * (Number(line.quantity) || 0), 0) + toNumber(shipping);
@@ -400,7 +404,7 @@ function OfferEditor({quote, onSaved}: {quote: QuoteView; onSaved: (quote: Quote
     if (missing) { setError('Ogni riga personalizzata deve avere un nome prodotto.'); return; }
     const payload = lines.map((line) => ({variantId: line.variantId, title: line.title.trim(), quantity: Math.max(1, Number(line.quantity) || 1), unitPrice: toNumber(line.unitPrice), properties: detailsToProperties(line.details)}));
     setIsSaving(true);
-    try { const result = await api<{quote: QuoteView}>(`/api/quotes/${quote.id}/offer`, {method: 'POST', body: JSON.stringify({lines: payload, shipping: toNumber(shipping), note})}); onSaved(result.quote); } catch (caught) { setError(caught instanceof Error ? caught.message : 'Preventivo non inviato.'); } finally { setIsSaving(false); }
+    try { const result = await api<{quote: QuoteView}>(`/api/quotes/${quote.id}/offer`, {method: 'POST', body: JSON.stringify({lines: payload, shipping: toNumber(shipping), note, validUntil: validUntil || null})}); onSaved(result.quote); } catch (caught) { setError(caught instanceof Error ? caught.message : 'Preventivo non inviato.'); } finally { setIsSaving(false); }
   }
 
   return <section className="quote-editor">
@@ -429,7 +433,7 @@ function OfferEditor({quote, onSaved}: {quote: QuoteView; onSaved: (quote: Quote
     })}
       <button className="quote-editor__add" onClick={() => setLines((current) => [...current, {key: `n${Date.now()}`, variantId: '', title: '', quantity: '1', unitPrice: '', details: '', request: ''}])} type="button"><Plus size={15} /> Aggiungi riga personalizzata</button>
     </div>
-    <div className="quote-editor__extra"><label className="buy-field"><span>Spedizione €</span><input inputMode="decimal" onChange={(event) => setShipping(event.target.value)} value={shipping} /></label><label className="buy-field is-wide"><span>Nota per il cliente <small>facoltativo</small></span><input maxLength={2000} onChange={(event) => setNote(event.target.value)} placeholder="Tempi di produzione, validità dell’offerta…" value={note} /></label></div>
+    <div className="quote-editor__extra"><label className="buy-field"><span>Spedizione €</span><input inputMode="decimal" onChange={(event) => setShipping(event.target.value)} value={shipping} /></label><label className="buy-field"><span>Valido fino al</span><input min={inDays(0)} onChange={(event) => setValidUntil(event.target.value)} type="date" value={validUntil} /></label><label className="buy-field is-wide"><span>Nota per il cliente <small>facoltativo</small></span><input maxLength={2000} onChange={(event) => setNote(event.target.value)} placeholder="Tempi di produzione, condizioni…" value={note} /></label></div>
     <footer><span>Imponibile <b>{euro(subtotal)}</b> + IVA</span><button className="client-action client-action--primary" disabled={isSaving} onClick={() => void save()} type="button">{isSaving ? <Loader2 className="spin" size={15} /> : <Send size={15} />}{quote.offer ? 'Aggiorna e reinvia' : 'Invia preventivo'}</button></footer>
     {error ? <p className="form-error">{error}</p> : null}
   </section>;
