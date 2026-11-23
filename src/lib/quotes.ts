@@ -3,6 +3,7 @@ import 'server-only';
 import type {CurrentProfile} from '@/lib/auth';
 import {escapeHtml, sendEmail} from '@/lib/email';
 import {deleteDraftOrder, getDraftOrderState} from '@/lib/integrations/shopify';
+import {refreshQuoteDraftFiles} from '@/lib/quote-draft';
 import {getConversationCompany} from '@/lib/support';
 import {createAdminClient} from '@/lib/supabase/admin.server';
 
@@ -84,6 +85,7 @@ export async function attachApprovedGraphicToQuotes(graphicId: string) {
     const {data: already} = await admin.from('quote_messages').select('id').eq('quote_id', quote.id).eq('body', `File della grafica ${graphic.public_id}`).limit(1);
     if (already?.length) continue;
     await attachGraphicFiles(quote.id, graphic);
+    if (quote.status === 'quoted') await refreshQuoteDraftFiles(quote.id).catch((error) => console.error('[Quote draft refresh]', error));
     await notifyQuote({quote, actor: {id: '', role: 'client'} as CurrentProfile, subject: 'Grafica approvata: file pronti per la stampa', message: `Il cliente ha approvato la grafica ${graphic.public_id}: i file sono allegati al preventivo di stampa ${quote.public_id}.`}).catch((error) => console.error('[Quote notify]', error));
   }
 }
