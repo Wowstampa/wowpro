@@ -115,7 +115,7 @@ export function PurchaseModal({billing, options, payments, onClose, initialPlan}
     {phase === 'form' ? <form className="subscription-buy__layout" onSubmit={start}>
       <aside className="buy-summary">
         <span className="buy-summary__brand"><b>W</b> WOWPRO</span>
-        <h2>Attiva il tuo<br /><em>reparto grafico.</em></h2>
+        <h2>Attiva il tuo<br /><em>servizio WOWPRO.</em></h2>
         <div aria-label="Frequenza di pagamento" className="buy-summary__toggle" role="radiogroup">
           {options.map((option) => <button aria-checked={plan === option.id} className={plan === option.id ? 'is-active' : ''} key={option.id} onClick={() => setPlan(option.id)} role="radio" type="button">{option.label}{option.id === 'annual' ? <small>-2 mesi</small> : null}</button>)}
         </div>

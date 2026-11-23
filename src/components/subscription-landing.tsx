@@ -50,7 +50,7 @@ export function SubscriptionLanding({options, billing, payments, managerName}: {
     <section className="sub-landing__hero">
       <div className="sub-landing__intro">
         <span className="sub-landing__eyebrow"><i /> PROGRAMMA WOWPRO · SU INVITO</span>
-        <h2>Il tuo reparto grafico,<br /><em>a canone fisso.</em></h2>
+        <h2>Grafica, stampa e servizio,<br /><em>a canone fisso.</em></h2>
         <p>Un grafico dedicato, prezzi riservati e ordini in corsia preferenziale: tutto con un canone fisso, senza assumere nessuno.</p>
         {toggle}
         <div className="sub-landing__price">
