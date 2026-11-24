@@ -2,6 +2,7 @@ import {NextResponse} from 'next/server';
 import {z} from 'zod';
 
 import {getCurrentProfile} from '@/lib/auth';
+import {requestExpress} from '@/lib/express';
 import {getAccessibleRequest} from '@/lib/request-files';
 import {QUOTE_COLUMNS, addQuoteEvent, attachGraphicFiles, listQuotes, newQuotePublicId, notifyQuote, toSummary} from '@/lib/quotes';
 import {createAdminClient} from '@/lib/supabase/admin.server';
@@ -20,6 +21,7 @@ const itemSchema = z.object({
 });
 const createSchema = z.object({
   kind: z.enum(['quote', 'order']), items: z.array(itemSchema).min(1, 'Aggiungi almeno un prodotto.').max(30),
+  express: z.boolean().default(false),
   notes: z.string().trim().max(4000).default(''), neededBy: z.union([z.string().regex(/^\d{4}-\d{2}-\d{2}$/), z.literal('')]).default(''),
 });
 
@@ -29,7 +31,7 @@ export async function POST(request: Request) {
   if (!profile || profile.status !== 'active' || profile.role !== 'client' || !profile.company_id) return NextResponse.json({error: 'Accesso non autorizzato.'}, {status: 403});
   const parsed = createSchema.safeParse(await request.json().catch(() => ({})));
   if (!parsed.success) return NextResponse.json({error: parsed.error.issues[0]?.message || 'Richiesta non valida.'}, {status: 400});
-  const {kind, items, notes, neededBy} = parsed.data;
+  const {kind, items, notes, neededBy, express} = parsed.data;
   // A print linked to a graphic request must belong to the same company.
   const graphicIds = [...new Set(items.map((item) => item.graphicRequest?.id).filter(Boolean) as string[])];
   const admin = createAdminClient();
@@ -45,8 +47,16 @@ export async function POST(request: Request) {
     return NextResponse.json({error: 'Richiesta non inviata. Riprova.'}, {status: 502});
   }
   await addQuoteEvent(data.id, profile.id, kind === 'order' ? 'Richiesta d’ordine inviata.' : 'Richiesta di preventivo inviata.');
+  let created = data;
+  if (express) {
+    try { created = (await requestExpress(profile, data as never)) || data; } catch (expressError) {
+      // No credits charged: the request is withdrawn so the client can decide without express.
+      await admin.from('quote_requests').delete().eq('id', data.id);
+      return NextResponse.json({error: expressError instanceof Error ? expressError.message : 'Spedizione express non disponibile.'}, {status: 400});
+    }
+  }
   for (const graphic of graphics) await attachGraphicFiles(data.id, graphic).catch((attachError) => console.error('[Quote graphic files]', attachError));
   const summary = items.map((item) => `• ${item.quantity} × ${item.productTitle}${item.variantTitle ? ` (${item.variantTitle})` : ''}${item.graphicRequest ? ` · grafica ${item.graphicRequest.publicId}` : ''}${item.options.length ? `\n  ${item.options.map((option) => `${option.name}: ${option.value}`).join(' · ')}` : ''}`).join('\n');
   await notifyQuote({quote: data, actor: profile, subject: kind === 'order' ? 'Nuova richiesta d’ordine' : 'Nuova richiesta di preventivo', message: `${summary}${notes ? `\n\n${notes}` : ''}`}).catch((notifyError) => console.error('[Quote notify]', notifyError));
-  return NextResponse.json({quote: toSummary(data as never)}, {status: 201});
+  return NextResponse.json({quote: toSummary(created as never)}, {status: 201});
 }
