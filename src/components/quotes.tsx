@@ -7,7 +7,7 @@ import {FormEvent, useCallback, useEffect, useMemo, useRef, useState} from 'reac
 
 import {ACCEPTED_FILES, formatBytes, putWithProgress, validateFiles} from '@/components/request-files';
 import {useConfirm} from '@/components/confirm-dialog';
-import {QuoteConfigurator, type CatalogPick} from '@/components/quote-configurator';
+import {QuoteConfigurator, type CatalogPick, type PendingResult} from '@/components/quote-configurator';
 import {BankTransferModal} from '@/components/quote-transfer';
 import {RequestDrawer} from '@/components/request-thread';
 
@@ -96,6 +96,9 @@ function NewQuoteModal({onClose, onCreated, linked}: {onClose: () => void; onCre
   const [picked, setPicked] = useState<Product | null>(null);
   const [mode, setMode] = useState<'choose' | 'catalog' | 'custom'>('choose');
   const [items, setItems] = useState<Item[]>([]);
+  const pendingRef = useRef<(() => PendingResult) | null>(null);
+  const [hasPending, setHasPending] = useState(false);
+  const registerPending = useCallback((build: (() => PendingResult) | null) => { pendingRef.current = build; setHasPending(!!build); }, []);
   const [notes, setNotes] = useState('');
   const [express, setExpress] = useState(false);
   const [neededBy, setNeededBy] = useState('');
@@ -117,12 +120,17 @@ function NewQuoteModal({onClose, onCreated, linked}: {onClose: () => void; onCre
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    if (!items.length) { setError('Aggiungi almeno un prodotto.'); return; }
+    // A product still being configured (or a custom request being written) is added automatically on send.
+    let list = items;
+    const pending = pendingRef.current?.() ?? null;
+    if (pending && 'error' in pending) { setError(`Completa il prodotto a sinistra: ${pending.error}`); return; }
+    if (pending && 'item' in pending) { list = [...items, pending.item]; setItems(list); setPicked(null); setMode('choose'); }
+    if (!list.length) { setError('Scegli almeno un prodotto dal catalogo o descrivi una richiesta personalizzata.'); return; }
     const fileError = validateFiles(files);
     if (fileError) { setError(fileError); return; }
     setIsSaving(true); setError('');
     try {
-      const {quote} = await api<{quote: QuoteView}>('/api/quotes', {method: 'POST', body: JSON.stringify({kind, express, items: items.map((item) => (linked ? {...item, graphicRequest: linked} : item)), notes, neededBy})});
+      const {quote} = await api<{quote: QuoteView}>('/api/quotes', {method: 'POST', body: JSON.stringify({kind, express, items: list.map((item) => (linked ? {...item, graphicRequest: linked} : item)), notes, neededBy})});
       for (const [index, file] of files.entries()) {
         setProgress(`Caricamento file ${index + 1} di ${files.length}…`);
         const ticket = await api<{uploadUrl: string; path: string}>(`/api/quotes/${quote.id}/files`, {method: 'POST', body: JSON.stringify({fileName: file.name, size: file.size})});
@@ -145,11 +153,11 @@ function NewQuoteModal({onClose, onCreated, linked}: {onClose: () => void; onCre
             <button onClick={() => setMode('custom')} type="button"><span><PenLine size={22} /></span><strong>Richiesta personalizzata</strong><small>Non trovi quello che cerchi o hai un progetto particolare? Descrivilo con parole tue, ti rispondiamo noi.</small><em>Scrivi la richiesta <ArrowRight size={14} /></em></button>
           </div>
         </> : null}
-        {mode === 'custom' ? <CustomRequest onAdd={(item) => { setItems((current) => [...current, item]); setMode('choose'); }} onSwitch={() => setMode('catalog')} /> : null}
+        {mode === 'custom' ? <CustomRequest registerPending={registerPending} onAdd={(item) => { setItems((current) => [...current, item]); setMode('choose'); }} onSwitch={() => setMode('catalog')} /> : null}
         {mode === 'catalog' ? <>
         <header className="quote-new__head"><div><span className="buy-form__step">Catalogo WowStampa</span><h3>Scegli i prodotti</h3></div><button className="quote-new__switch" onClick={() => { setPicked(null); setMode('custom'); }} type="button"><PenLine size={14} /> Richiesta personalizzata</button></header>
         <label className="quote-new__search"><Search size={17} /><input autoFocus onChange={(event) => setTerm(event.target.value)} placeholder="Cerca: roll-up, banner, adesivi, t-shirt…" value={term} />{isSearching ? <Loader2 className="spin" size={16} /> : null}</label>
-        {picked ? <QuoteConfigurator onAdd={(item) => { setItems((current) => [...current, item]); setPicked(null); }} onBack={() => setPicked(null)} product={picked} />
+        {picked ? <QuoteConfigurator registerPending={registerPending} onAdd={(item) => { setItems((current) => [...current, item]); setPicked(null); }} onBack={() => setPicked(null)} product={picked} />
           : <div className="quote-new__results">
           {products?.map((product) => <button key={product.id} onClick={() => pick(product)} type="button">{product.imageUrl ? <img alt="" src={product.imageUrl} /> : <i><Package size={20} /></i>}<strong>{product.title}</strong><small>{product.variants.length ? `da ${euro(Math.min(...product.variants.map((item) => item.price)))}` : ''}</small></button>)}
           {products && !products.length ? <p className="quotes__none">Nessun prodotto trovato. <button className="quote-new__inline" onClick={() => setMode('custom')} type="button">Fai una richiesta personalizzata</button></p> : null}
@@ -166,14 +174,15 @@ function NewQuoteModal({onClose, onCreated, linked}: {onClose: () => void; onCre
         <h4>La tua richiesta <small>{items.length} {items.length === 1 ? 'prodotto' : 'prodotti'}</small></h4>
         <ul className="quote-new__items">
           {items.map((item, index) => <li key={`${item.variantId}-${index}`}>{item.imageUrl ? <img alt="" src={item.imageUrl} /> : <i>{item.productId === 'custom' ? <PenLine size={16} /> : <Package size={16} />}</i>}<div><strong>{item.productTitle}</strong><small>{[...itemDetails(item), item.note].filter(Boolean).join(' · ')}</small>{linked ? <em className="quote-graphic-chip"><Palette size={11} /> Grafica {linked.publicId}</em> : null}</div><button aria-label="Rimuovi" onClick={() => setItems((current) => current.filter((_, position) => position !== index))} type="button"><Trash2 size={15} /></button></li>)}
-          {!items.length ? <li className="quote-new__placeholder">Scegli un prodotto dal catalogo o descrivi una richiesta personalizzata.</li> : null}
+          {hasPending && (picked || mode === 'custom') ? <li className="quote-new__pending"><i><Loader2 size={15} /></i><div><strong>{picked ? picked.title : 'Richiesta personalizzata'}</strong><small>In preparazione a sinistra: clicca «Aggiungi alla richiesta», oppure invia e verrà aggiunto da solo.</small></div></li> : null}
+          {!items.length && !(hasPending && (picked || mode === 'custom')) ? <li className="quote-new__placeholder">Scegli un prodotto dal catalogo o descrivi una richiesta personalizzata.</li> : null}
         </ul>
         <button aria-pressed={express} className={express ? 'quote-new__express is-on' : 'quote-new__express'} onClick={() => setExpress((value) => !value)} type="button"><span className="quote-new__switch-ui"><i /></span><Zap size={16} /><span><b>Spedizione express</b><small>{EXPRESS_COST.toLocaleString('it-IT')} crediti, scalati all’invio. Se annulli o il preventivo scade, te li restituiamo.</small></span></button>
         <label className="buy-field is-wide"><span>Note per l’account manager <small>facoltativo</small></span><textarea maxLength={4000} onChange={(event) => setNotes(event.target.value)} placeholder="Tempi, indirizzo di consegna, richieste particolari…" rows={3} value={notes} /></label>
         <label className="buy-field is-wide"><span>Ti serve entro <small>facoltativo</small></span><input onChange={(event) => setNeededBy(event.target.value)} type="date" value={neededBy} /></label>
         <div className="quote-new__files"><input accept={ACCEPTED_FILES} hidden multiple onChange={(event) => setFiles((current) => [...current, ...Array.from(event.target.files || [])])} ref={fileInput} type="file" /><button onClick={() => fileInput.current?.click()} type="button"><Paperclip size={15} /> Allega file grafici</button>{files.map((file, index) => <span key={index}>{file.name} <small>{formatBytes(file.size)}</small><button aria-label="Rimuovi file" onClick={() => setFiles((current) => current.filter((_, position) => position !== index))} type="button"><X size={12} /></button></span>)}</div>
         {error ? <p className="form-error">{error}</p> : null}
-        <button className="buy-form__pay" disabled={isSaving || !items.length} type="submit">{isSaving ? <Loader2 className="spin" size={17} /> : <Send size={17} />}{progress || (kind === 'quote' ? 'Chiedi il preventivo' : 'Invia la richiesta d’ordine')}{express && !progress ? ' · express' : ''}</button>
+        <button className="buy-form__pay" disabled={isSaving || (!items.length && !(hasPending && (picked || mode === 'custom')))} type="submit">{isSaving ? <Loader2 className="spin" size={17} /> : <Send size={17} />}{progress || (kind === 'quote' ? 'Chiedi il preventivo' : 'Invia la richiesta d’ordine')}{express && !progress ? ' · express' : ''}</button>
       </div>
     </form>
   </section></div>;
@@ -262,19 +271,31 @@ function TransferStatus({quote, viewer, onChange, onOpenDetails}: {quote: QuoteV
 }
 
 // Free-text request for anything that is not (or not exactly) in the catalog.
-function CustomRequest({onAdd, onSwitch}: {onAdd: (item: Item) => void; onSwitch: () => void}) {
+function CustomRequest({onAdd, onSwitch, registerPending}: {onAdd: (item: Item) => void; onSwitch: () => void; registerPending?: (build: (() => PendingResult) | null) => void}) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [quantity, setQuantity] = useState('');
   const [size, setSize] = useState('');
   const [error, setError] = useState('');
 
-  function add() {
-    if (title.trim().length < 3) { setError('Dai un nome alla richiesta, ad esempio “Adesivi sagomati per vetrina”.'); return; }
-    if (description.trim().length < 10) { setError('Descrivi cosa ti serve: materiale, uso, finiture, quantità…'); return; }
+  function build(): PendingResult {
+    if (!title.trim() && !description.trim()) return null;
+    const fail = (message: string): PendingResult => { setError(message); return {error: message}; };
+    if (title.trim().length < 3) return fail('Dai un nome alla richiesta, ad esempio “Adesivi sagomati per vetrina”.');
+    if (description.trim().length < 10) return fail('Descrivi cosa ti serve: materiale, uso, finiture, quantità…');
+    setError('');
     const options = [size.trim() ? {name: 'Misure', value: size.trim()} : null, quantity.trim() ? {name: 'Quantità indicativa', value: quantity.trim()} : null].filter(Boolean) as Array<{name: string; value: string}>;
-    onAdd({productId: 'custom', variantId: '', productTitle: title.trim(), variantTitle: '', imageUrl: null, quantity: Math.max(1, Number(quantity.replace(/\D/g, '')) || 1), note: description.trim(), listPrice: null, options});
+    return {item: {productId: 'custom', variantId: '', productTitle: title.trim(), variantTitle: '', imageUrl: null, quantity: Math.max(1, Number(quantity.replace(/\D/g, '')) || 1), note: description.trim(), listPrice: null, options}};
   }
+
+  function add() { const result = build(); if (result && 'item' in result) onAdd(result.item); else if (!result) setError('Scrivi cosa ti serve prima di aggiungerlo.'); }
+
+  const buildRef = useRef(build);
+  useEffect(() => { buildRef.current = build; });
+  useEffect(() => {
+    registerPending?.(() => buildRef.current());
+    return () => registerPending?.(null);
+  }, [registerPending]);
 
   return <div className="quote-custom">
     <header className="quote-new__head"><div><span className="buy-form__step">Richiesta personalizzata</span><h3>Raccontaci cosa ti serve</h3></div><button className="quote-new__switch" onClick={onSwitch} type="button"><LayoutGrid size={14} /> Scegli dal catalogo</button></header>

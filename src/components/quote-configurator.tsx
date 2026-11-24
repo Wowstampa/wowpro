@@ -2,7 +2,7 @@
 /* eslint-disable @next/next/no-img-element -- Shopify CDN images. */
 
 import {Check, ExternalLink, Loader2, Minus, Package, Plus, Ruler} from 'lucide-react';
-import {useEffect, useMemo, useState} from 'react';
+import {useEffect, useMemo, useRef, useState} from 'react';
 
 type Value = {label: string; image: string | null; surcharge: number | null};
 type Field =
@@ -24,7 +24,9 @@ const euro = (value: number) => new Intl.NumberFormat('it-IT', {style: 'currency
 const isQuantityOption = (name: string) => /quantit/i.test(name);
 
 // Product configurator for quote requests: the same options the customer finds on wowstampa.com.
-export function QuoteConfigurator({product, onBack, onAdd}: {product: CatalogPick; onBack: () => void; onAdd: (item: ConfiguredItem) => void}) {
+export type PendingResult = {item: ConfiguredItem} | {error: string} | null;
+
+export function QuoteConfigurator({product, onBack, onAdd, registerPending}: {product: CatalogPick; onBack: () => void; onAdd: (item: ConfiguredItem) => void; registerPending?: (build: (() => PendingResult) | null) => void}) {
   const [config, setConfig] = useState<Config | null>(null);
   const [loadError, setLoadError] = useState('');
   const [selected, setSelected] = useState<string[]>([]);
@@ -68,16 +70,21 @@ export function QuoteConfigurator({product, onBack, onAdd}: {product: CatalogPic
   const shownImage = image || variant?.imageUrl || config?.imageUrl || product.imageUrl;
   const swatchImage = visibleFields.map((field) => (field.kind === 'swatch' ? field.values.find((value) => value.label === fieldValues[field.id])?.image : null)).find(Boolean);
 
-  function add() {
-    if (!config) return;
+  // Admin prices (the ones used in the draft order) win over the storefront ones.
+  const adminPrice = (id?: string) => product.variants.find((item) => item.id === id)?.price;
+
+  // Builds the configured item (or shows what is missing): used by the add button and when the request is sent directly.
+  function build(): PendingResult {
+    const fail = (message: string): PendingResult => { setError(message); return {error: message}; };
+    if (!config) return loadError ? {item: {productId: product.id, variantId: product.variants[0]?.id || '', productTitle: product.title, variantTitle: '', imageUrl: product.imageUrl, quantity, note: note.trim(), listPrice: product.variants[0]?.price ?? null, options: []}} : fail('Attendi il caricamento delle opzioni.');
     setError('');
     const chosen = variant || config.variants[0];
-    if (!chosen) { setError('Prodotto non disponibile.'); return; }
+    if (!chosen) return fail('Prodotto non disponibile.');
     const options: ConfiguredItem['options'] = config.options.map((option, index) => ({name: option.name, value: selected[index] || ''})).filter((option) => option.value);
     for (const field of visibleFields) {
       if (field.kind === 'choice' || field.kind === 'swatch' || field.kind === 'text') {
         const value = (fieldValues[field.id] || '').trim();
-        if (!value && field.required) { setError(`Scegli: ${field.title}.`); return; }
+        if (!value && field.required) return fail(`Scegli: ${field.title}.`);
         if (value) options.push({name: field.title, value});
       }
       if (field.kind === 'sizes') {
@@ -87,19 +94,27 @@ export function QuoteConfigurator({product, onBack, onAdd}: {product: CatalogPic
     }
     if (config.dimensions) {
       const base = Number(width); const tall = Number(height);
-      if (!base || !tall) { setError('Indica base e altezza in cm.'); return; }
-      if (base < config.dimensions.minWidth || tall < config.dimensions.minHeight) { setError(`Misura minima ${config.dimensions.minWidth} × ${config.dimensions.minHeight} cm.`); return; }
-      if ((config.dimensions.maxWidth && base > config.dimensions.maxWidth) || (config.dimensions.maxHeight && tall > config.dimensions.maxHeight)) { setError(`Misura massima ${config.dimensions.maxWidth || '–'} × ${config.dimensions.maxHeight || '–'} cm.`); return; }
+      if (!base || !tall) return fail('Indica base e altezza in cm.');
+      if (base < config.dimensions.minWidth || tall < config.dimensions.minHeight) return fail(`Misura minima ${config.dimensions.minWidth} × ${config.dimensions.minHeight} cm.`);
+      if ((config.dimensions.maxWidth && base > config.dimensions.maxWidth) || (config.dimensions.maxHeight && tall > config.dimensions.maxHeight)) return fail(`Misura massima ${config.dimensions.maxWidth || '–'} × ${config.dimensions.maxHeight || '–'} cm.`);
       options.push({name: 'Misure', value: `${base} × ${tall} cm`});
     }
-    onAdd({productId: product.id, variantId: chosen.id, productTitle: config.title, variantTitle: chosen.title, imageUrl: swatchImage || chosen.imageUrl || product.imageUrl, quantity: hasQuantityOption ? 1 : quantity, note: note.trim(), listPrice: adminPrice(chosen.id) ?? chosen.price, options});
+    return {item: {productId: product.id, variantId: chosen.id, productTitle: config.title, variantTitle: chosen.title, imageUrl: swatchImage || chosen.imageUrl || product.imageUrl, quantity: hasQuantityOption ? 1 : quantity, note: note.trim(), listPrice: adminPrice(chosen.id) ?? chosen.price, options}};
   }
 
-  // Admin prices (the ones used in the draft order) win over the storefront ones.
-  const adminPrice = (id?: string) => product.variants.find((item) => item.id === id)?.price;
+  function add() { const result = build(); if (result && 'item' in result) onAdd(result.item); }
+
+  const buildRef = useRef(build);
+  useEffect(() => { buildRef.current = build; });
+  useEffect(() => {
+    registerPending?.(() => buildRef.current());
+    return () => registerPending?.(null);
+  }, [registerPending]);
+
   const fromPrice = adminPrice(variant?.id) ?? variant?.price ?? (product.variants.length ? Math.min(...product.variants.map((item) => item.price)) : null);
-  let step = 0;
-  const stepLabel = () => String(++step).padStart(2, '0');
+  // Step numbers follow the order of the visible sections.
+  const stepKeys = [...(config?.options || []).map((option) => `option:${option.name}`), ...(config?.dimensions ? ['dimensions'] : []), ...visibleFields.filter((field) => field.kind !== 'heading').map((field) => `field:${field.id}`)];
+  const stepLabel = (key: string) => String(stepKeys.indexOf(key) + 1).padStart(2, '0');
 
   return <div className="qc">
     <button className="quote-new__back" onClick={onBack} type="button">← Torna ai risultati</button>
@@ -122,7 +137,7 @@ export function QuoteConfigurator({product, onBack, onAdd}: {product: CatalogPic
 
     {config ? <div className="qc__steps">
       {config.options.map((option, index) => <section className="qc__group" key={option.name}>
-        <header><b>{stepLabel()}</b>{option.name}<em>{selected[index]}</em></header>
+        <header><b>{stepLabel(`option:${option.name}`)}</b>{option.name}<em>{selected[index]}</em></header>
         <div className="qc__chips">{option.values.map((value) => {
           const available = config.variants.some((item) => item.available && item.options[index] === value && item.options.every((other, position) => position === index || !config.options[position] || other === selected[position]));
           return <button aria-pressed={selected[index] === value} className={`${selected[index] === value ? 'is-active' : ''}${available ? '' : ' is-muted'}`} key={value} onClick={() => setSelected((current) => { const next = [...current]; next[index] = value; return next; })} type="button">{selected[index] === value ? <Check size={13} /> : null}{value}</button>;
@@ -130,7 +145,7 @@ export function QuoteConfigurator({product, onBack, onAdd}: {product: CatalogPic
       </section>)}
 
       {config.dimensions ? <section className="qc__group">
-        <header><b>{stepLabel()}</b>Misure<em>{area ? `${area.toLocaleString('it-IT', {maximumFractionDigits: 2})} m²` : ''}</em></header>
+        <header><b>{stepLabel('dimensions')}</b>Misure<em>{area ? `${area.toLocaleString('it-IT', {maximumFractionDigits: 2})} m²` : ''}</em></header>
         {config.dimensions.formats.length ? <div className="qc__chips qc__chips--formats">{config.dimensions.formats.map((format) => { const active = Number(width) === format.base && Number(height) === format.height; return <button aria-pressed={active} className={active ? 'is-active' : ''} key={format.label} onClick={() => { setWidth(String(format.base)); setHeight(String(format.height)); }} type="button">{format.label}</button>; })}</div> : null}
         <div className="qc__size">
           <label><span>Base</span><input inputMode="numeric" onChange={(event) => setWidth(event.target.value.replace(/\D/g, '').slice(0, 5))} value={width} /><small>cm</small></label>
@@ -145,16 +160,16 @@ export function QuoteConfigurator({product, onBack, onAdd}: {product: CatalogPic
         if (field.kind === 'sizes') {
           const total = Object.values(sizes[field.id] || {}).reduce((sum, value) => sum + value, 0);
           return <section className="qc__group" key={field.id}>
-            <header><b>{stepLabel()}</b>{field.title}<em>{total ? `${total} pz` : 'indica i pezzi per taglia'}</em></header>
+            <header><b>{stepLabel(`field:${field.id}`)}</b>{field.title}<em>{total ? `${total} pz` : 'indica i pezzi per taglia'}</em></header>
             <div className="qc__sizes">{field.sizes.map((size) => <label key={size.code}><b>{size.code}</b><small>{size.name}</small><input inputMode="numeric" onChange={(event) => { const value = Number(event.target.value.replace(/\D/g, '').slice(0, 5)) || 0; setSizes((current) => ({...current, [field.id]: {...(current[field.id] || {}), [size.code]: value}})); }} placeholder="0" value={sizes[field.id]?.[size.code] || ''} /></label>)}</div>
           </section>;
         }
         if (field.kind === 'text') return <section className="qc__group" key={field.id}>
-          <header><b>{stepLabel()}</b>{field.title}{field.required ? null : <em>facoltativo</em>}</header>
+          <header><b>{stepLabel(`field:${field.id}`)}</b>{field.title}{field.required ? null : <em>facoltativo</em>}</header>
           <input className="qc__input" maxLength={300} onChange={(event) => setFieldValues((current) => ({...current, [field.id]: event.target.value}))} value={fieldValues[field.id] || ''} />
         </section>;
         return <section className="qc__group" key={field.id}>
-          <header><b>{stepLabel()}</b>{field.title}<em>{fieldValues[field.id]}</em></header>
+          <header><b>{stepLabel(`field:${field.id}`)}</b>{field.title}<em>{fieldValues[field.id]}</em></header>
           <div className={field.kind === 'swatch' ? 'qc__swatches' : 'qc__chips'}>{field.values.map((value) => {
             const active = fieldValues[field.id] === value.label;
             const choose = () => setFieldValues((current) => ({...current, [field.id]: active && !field.required ? '' : value.label}));
@@ -173,8 +188,8 @@ export function QuoteConfigurator({product, onBack, onAdd}: {product: CatalogPic
 
     {error ? <p className="form-error">{error}</p> : null}
     <div className="qc__footer">
-      <span>{variant?.title || (config?.dimensions && area ? `${width} × ${height} cm` : product.title)}</span>
-      <button className="button button--primary" disabled={!config && !loadError} onClick={() => (config ? add() : onAdd({productId: product.id, variantId: product.variants[0]?.id || '', productTitle: product.title, variantTitle: '', imageUrl: product.imageUrl, quantity, note: note.trim(), listPrice: product.variants[0]?.price ?? null, options: []}))} type="button"><Plus size={16} /> Aggiungi alla richiesta</button>
+      <span>{variant?.title || (config?.dimensions && area ? `${width} × ${height} cm` : product.title)}<small>Aggiungi e scegli altri prodotti, oppure invia direttamente la richiesta.</small></span>
+      <button className="button button--primary" disabled={!config && !loadError} onClick={add} type="button"><Plus size={16} /> Aggiungi alla richiesta</button>
     </div>
   </div>;
 }
