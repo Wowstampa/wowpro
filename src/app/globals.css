@@ -597,6 +597,12 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .quote-new__items small { color: #6b7686; font-size: 12px; }
 .quote-new__items button { width: 30px; height: 30px; display: grid; place-items: center; border: 0; border-radius: 8px; background: transparent; color: #a2aaba; cursor: pointer; }
 .quote-new__items button:hover { background: #fde9e7; color: var(--red); }
+.quote-new__items li { animation: quote-item-in .45s ease-out; }
+@keyframes quote-item-in { from { opacity: 0; transform: translateY(-6px); background: #e8f8ef; } to { opacity: 1; transform: none; } }
+.quote-new__items .quote-new__pending { border-style: dashed; border-color: #f5c46b; background: #fffaf0; }
+.quote-new__pending i { color: #b7791f !important; background: #fff1d1 !important; }
+.quote-new__pending small { white-space: normal; }
+.qc__footer span small { display: block; margin-top: 2px; color: var(--muted); font-size: 11px; font-weight: 600; white-space: normal; }
 .quote-new__items .quote-new__placeholder { display: block; padding: 18px; border-style: dashed; background: transparent; color: var(--muted); font-size: 13px; text-align: center; }
 .quote-new__files { display: flex; flex-wrap: wrap; gap: 6px; }
 .quote-new__files > button { height: 36px; padding: 0 12px; display: inline-flex; align-items: center; gap: 6px; border: 1px dashed #b9c3cf; border-radius: 10px; background: white; color: #3a4556; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
