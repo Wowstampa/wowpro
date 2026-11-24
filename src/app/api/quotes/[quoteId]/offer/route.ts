@@ -28,8 +28,9 @@ export async function POST(request: Request, {params}: {params: Promise<{quoteId
   const admin = createAdminClient();
   try {
     await ensureGraphicFiles(quote.id).catch((attachError) => console.error('[Quote graphic files]', attachError));
-    const draft = await publishQuoteDraft({quote, lines: parsed.data.lines, shipping: parsed.data.shipping, note: parsed.data.note});
-    const offer = {lines: parsed.data.lines, shipping: parsed.data.shipping, note: parsed.data.note, validUntil: parsed.data.validUntil};
+    const express = quote.offer?.express && !quote.offer.express.refundedAt ? quote.offer.express : null;
+    const draft = await publishQuoteDraft({quote, lines: parsed.data.lines, shipping: parsed.data.shipping, note: parsed.data.note, express: !!express});
+    const offer = {lines: parsed.data.lines, shipping: parsed.data.shipping, note: parsed.data.note, validUntil: parsed.data.validUntil, express: quote.offer?.express || null};
     const {data: updated, error} = await admin.from('quote_requests').update({status: 'quoted', offer, draft_order_id: draft.id, invoice_url: draft.invoiceUrl, quote_total: draft.total, currency: draft.currency, quoted_at: new Date().toISOString(), updated_at: new Date().toISOString()}).eq('id', quote.id).select(QUOTE_COLUMNS).single();
     if (error || !updated) throw error || new Error('Preventivo non salvato.');
     const total = new Intl.NumberFormat('it-IT', {style: 'currency', currency: draft.currency}).format(draft.total);
