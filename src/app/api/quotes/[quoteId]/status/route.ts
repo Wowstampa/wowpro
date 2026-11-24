@@ -2,6 +2,7 @@ import {NextResponse} from 'next/server';
 import {z} from 'zod';
 
 import {getCurrentProfile} from '@/lib/auth';
+import {refundExpressOnClose} from '@/lib/express';
 import {deleteDraftOrder} from '@/lib/integrations/shopify';
 import {QUOTE_COLUMNS, addQuoteEvent, getAccessibleQuote, isQuoteTeam, notifyQuote, toSummary} from '@/lib/quotes';
 import {createAdminClient} from '@/lib/supabase/admin.server';
@@ -31,6 +32,7 @@ export async function POST(request: Request, {params}: {params: Promise<{quoteId
   if (error || !data) return NextResponse.json({error: 'Aggiornamento non riuscito.'}, {status: 502});
   const text = status === 'in_review' ? 'Richiesta presa in carico: stiamo preparando il preventivo.' : team ? 'Richiesta annullata da WowStampa.' : 'Richiesta annullata dal cliente.';
   await addQuoteEvent(quote.id, profile.id, text);
+  if (status === 'cancelled') await refundExpressOnClose(quote.id, 'La richiesta è stata annullata.');
   await notifyQuote({quote, actor: profile, subject: status === 'in_review' ? 'Stiamo preparando il tuo preventivo' : 'Richiesta annullata', message: text}).catch((notifyError) => console.error('[Quote notify]', notifyError));
   return NextResponse.json({quote: toSummary(data as never)});
 }
