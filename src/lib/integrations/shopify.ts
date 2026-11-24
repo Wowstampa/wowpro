@@ -342,12 +342,12 @@ export async function searchCatalog(term: string) {
 
 // State of a quote's draft order: once the client completes checkout (card or bank transfer) it becomes a real order.
 export async function getDraftOrderState(id: string) {
-  const data = await shopifyAdminQuery<{draftOrder: {status: string; order: {id: string; name: string; displayFinancialStatus: string | null; statusPageUrl: string | null; cancelledAt: string | null; totalPriceSet: {shopMoney: {amount: string}}; totalShippingPriceSet: {shopMoney: {amount: string}}} | null} | null}>(
-    `query QuoteDraftState($id: ID!) { draftOrder(id: $id) { status order { id name displayFinancialStatus statusPageUrl cancelledAt totalPriceSet { shopMoney { amount } } totalShippingPriceSet { shopMoney { amount } } } } }`,
+  const data = await shopifyAdminQuery<{draftOrder: {status: string; order: {id: string; name: string; displayFinancialStatus: string | null; statusPageUrl: string | null; cancelledAt: string | null; displayFulfillmentStatus: string | null; totalPriceSet: {shopMoney: {amount: string}}; totalShippingPriceSet: {shopMoney: {amount: string}}} | null} | null}>(
+    `query QuoteDraftState($id: ID!) { draftOrder(id: $id) { status order { id name displayFinancialStatus displayFulfillmentStatus statusPageUrl cancelledAt totalPriceSet { shopMoney { amount } } totalShippingPriceSet { shopMoney { amount } } } } }`,
     {id},
   );
   const order = data.draftOrder?.order;
-  return order ? {orderId: order.id, orderName: order.name, paid: order.displayFinancialStatus === 'PAID', cancelled: !!order.cancelledAt, statusPageUrl: order.statusPageUrl, total: Number(order.totalPriceSet.shopMoney.amount), shipping: Number(order.totalShippingPriceSet.shopMoney.amount)} : null;
+  return order ? {orderId: order.id, orderName: order.name, paid: order.displayFinancialStatus === 'PAID', cancelled: !!order.cancelledAt, fulfilled: order.displayFulfillmentStatus === 'FULFILLED', statusPageUrl: order.statusPageUrl, total: Number(order.totalPriceSet.shopMoney.amount), shipping: Number(order.totalShippingPriceSet.shopMoney.amount)} : null;
 }
 
 // Once the order exists its lines can't be changed from here: file links go in the order's additional details.
@@ -358,6 +358,18 @@ export async function setOrderFileLinks(orderId: string, links: Array<{name: str
     `mutation QuoteOrderFiles($input: OrderInput!) { orderUpdate(input: $input) { order { id } userErrors { message } } }`,
     {input: {id: orderId, customAttributes: [...kept, ...links.map((link) => ({key: link.name, value: link.value}))]}},
   );
+  if (result.orderUpdate.userErrors.length) throw new Error(result.orderUpdate.userErrors.map((error) => error.message).join(' · '));
+}
+
+// Express shipping requested from the portal: a visible tag and a line at the top of the order note.
+export async function setOrderExpress(orderId: string, active: boolean, noteLine: string) {
+  const mutation = active ? 'tagsAdd' : 'tagsRemove';
+  const tags = await shopifyAdminQuery<Record<string, {userErrors: Array<{message: string}>}>>(`mutation QuoteExpressTag($id: ID!, $tags: [String!]!) { ${mutation}(id: $id, tags: $tags) { userErrors { message } } }`, {id: orderId, tags: ['SPEDIZIONE EXPRESS']});
+  if (tags[mutation].userErrors.length) throw new Error(tags[mutation].userErrors.map((error) => error.message).join(' · '));
+  const current = await shopifyAdminQuery<{order: {note: string | null} | null}>(`query QuoteOrderNote($id: ID!) { order(id: $id) { note } }`, {id: orderId});
+  const kept = (current.order?.note || '').split('\n').filter((line) => !line.includes('SPEDIZIONE EXPRESS')).join('\n').trim();
+  const note = active ? `${noteLine}${kept ? `\n${kept}` : ''}` : kept;
+  const result = await shopifyAdminQuery<{orderUpdate: {userErrors: Array<{message: string}>}}>(`mutation QuoteOrderNoteUpdate($input: OrderInput!) { orderUpdate(input: $input) { order { id } userErrors { message } } }`, {input: {id: orderId, note}});
   if (result.orderUpdate.userErrors.length) throw new Error(result.orderUpdate.userErrors.map((error) => error.message).join(' · '));
 }
 
