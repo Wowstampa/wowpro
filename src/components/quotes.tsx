@@ -6,6 +6,7 @@ import Link from 'next/link';
 import {FormEvent, useCallback, useEffect, useMemo, useRef, useState} from 'react';
 
 import {ACCEPTED_FILES, formatBytes, putWithProgress, validateFiles} from '@/components/request-files';
+import {useConfirm} from '@/components/confirm-dialog';
 import {QuoteConfigurator, type CatalogPick} from '@/components/quote-configurator';
 import {BankTransferModal} from '@/components/quote-transfer';
 import {RequestDrawer} from '@/components/request-thread';
@@ -185,16 +186,17 @@ function ExpressShipping({quote, viewer, onChange}: {quote: QuoteView; viewer: '
   const express = quote.express || null;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [confirmUi, ask] = useConfirm();
   async function act(action: 'request' | 'refund') {
     let reason = '';
-    if (action === 'request' && !window.confirm(`Richiedi la spedizione express per l’ordine ${quote.orderName}? Ti verranno scalati ${EXPRESS_COST.toLocaleString('it-IT')} crediti.`)) return;
-    if (action === 'refund') { const answer = window.prompt('Motivo del rimborso (lo vede il cliente):', 'La spedizione express non è disponibile per questo ordine.'); if (answer === null) return; reason = answer; }
+    if (action === 'request' && (await ask({tone: 'express', title: 'Richiedi la spedizione express', message: <>L’ordine <b>{quote.orderName}</b> partirà con corriere express. Ti verranno scalati <b>{EXPRESS_COST.toLocaleString('it-IT')} crediti</b>: se non fosse possibile, te li restituiamo.</>, confirmLabel: `Usa ${EXPRESS_COST.toLocaleString('it-IT')} crediti`})) === null) return;
+    if (action === 'refund') { const answer = await ask({tone: 'danger', title: 'Rimborsa i crediti della spedizione express', message: `Il cliente riceve indietro ${EXPRESS_COST.toLocaleString('it-IT')} crediti e un’email con il motivo. Il tag express viene tolto dall’ordine.`, confirmLabel: 'Rimborsa crediti', input: {label: 'Motivo (lo vede il cliente)', defaultValue: 'La spedizione express non è disponibile per questo ordine.'}}); if (answer === null) return; reason = answer; }
     setBusy(true); setError('');
     try { const result = await api<{quote: QuoteView}>(`/api/quotes/${quote.id}/express`, {method: 'POST', body: JSON.stringify({action, reason})}); onChange(result.quote); } catch (caught) { setError(caught instanceof Error ? caught.message : 'Operazione non riuscita.'); } finally { setBusy(false); }
   }
-  if (express) return <section className="quote-express is-active"><span><Zap size={18} /></span><div><strong>Spedizione express richiesta</strong><p>{viewer === 'client' ? `${quote.orderName ? `Il tuo ordine ${quote.orderName}` : 'Il tuo ordine'} partirà con spedizione express. ${express.credits.toLocaleString('it-IT')} crediti scalati il ${shortDate(express.requestedAt)}${quote.orderName ? '' : ': se il preventivo viene annullato o scade, te li restituiamo'}.` : `Il cliente ha usato ${express.credits.toLocaleString('it-IT')} crediti il ${shortDate(express.requestedAt)}${quote.orderName ? ': l’ordine su Shopify ha il tag «SPEDIZIONE EXPRESS».' : '. Considera il corriere express nel prezzo della spedizione: l’ordine avrà il tag «SPEDIZIONE EXPRESS».'}`}</p>{error ? <p className="form-error">{error}</p> : null}</div>{viewer === 'team' ? <button className="client-action" disabled={busy} onClick={() => void act('refund')} type="button">{busy ? <Loader2 className="spin" size={14} /> : null}Rimborsa crediti</button> : null}</section>;
+  if (express) return <>{confirmUi}<section className="quote-express is-active"><span><Zap size={18} /></span><div><strong>Spedizione express richiesta</strong><p>{viewer === 'client' ? `${quote.orderName ? `Il tuo ordine ${quote.orderName}` : 'Il tuo ordine'} partirà con spedizione express. ${express.credits.toLocaleString('it-IT')} crediti scalati il ${shortDate(express.requestedAt)}${quote.orderName ? '' : ': se il preventivo viene annullato o scade, te li restituiamo'}.` : `Il cliente ha usato ${express.credits.toLocaleString('it-IT')} crediti il ${shortDate(express.requestedAt)}${quote.orderName ? ': l’ordine su Shopify ha il tag «SPEDIZIONE EXPRESS».' : '. Considera il corriere express nel prezzo della spedizione: l’ordine avrà il tag «SPEDIZIONE EXPRESS».'}`}</p>{error ? <p className="form-error">{error}</p> : null}</div>{viewer === 'team' ? <button className="client-action" disabled={busy} onClick={() => void act('refund')} type="button">{busy ? <Loader2 className="spin" size={14} /> : null}Rimborsa crediti</button> : null}</section></>;
   if (viewer !== 'client') return null;
-  return <section className="quote-express"><span><Zap size={18} /></span><div><strong>Ti serve prima? Spedizione express</strong><p>Con {EXPRESS_COST.toLocaleString('it-IT')} crediti il tuo ordine parte con corriere express. I crediti si scalano subito; se non fosse possibile te li restituiamo.</p>{error ? <p className="form-error">{error}{/insufficienti/i.test(error) ? <> <Link href="/dashboard/crediti">Ricarica crediti</Link></> : null}</p> : null}</div><button className="client-action client-action--primary" disabled={busy} onClick={() => void act('request')} type="button">{busy ? <Loader2 className="spin" size={14} /> : <Zap size={14} />}Richiedi express</button></section>;
+  return <>{confirmUi}<section className="quote-express"><span><Zap size={18} /></span><div><strong>Ti serve prima? Spedizione express</strong><p>Con {EXPRESS_COST.toLocaleString('it-IT')} crediti il tuo ordine parte con corriere express. I crediti si scalano subito; se non fosse possibile te li restituiamo.</p>{error ? <p className="form-error">{error}{/insufficienti/i.test(error) ? <> <Link href="/dashboard/crediti">Ricarica crediti</Link></> : null}</p> : null}</div><button className="client-action client-action--primary" disabled={busy} onClick={() => void act('request')} type="button">{busy ? <Loader2 className="spin" size={14} /> : <Zap size={14} />}Richiedi express</button></section></>;
 }
 
 // Writes the file links (client files and approved designs) on the Shopify draft or order.
@@ -211,6 +213,7 @@ function FilesSync({quoteId, onDone}: {quoteId: string; onDone: () => void}) {
 // Bank transfer in progress: the client uploads the receipt, the account manager checks it and marks the order as paid.
 function TransferStatus({quote, viewer, onChange, onOpenDetails}: {quote: QuoteView; viewer: 'client' | 'team'; onChange: (quote: QuoteView) => void; onOpenDetails: () => void}) {
   const receipt = quote.offer?.receipt || null;
+  const [confirmUi, ask] = useConfirm();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState('');
   const input = useRef<HTMLInputElement>(null);
@@ -229,14 +232,14 @@ function TransferStatus({quote, viewer, onChange, onOpenDetails}: {quote: QuoteV
   }
 
   async function markPaid() {
-    if (!window.confirm(`Confermi di aver ricevuto il bonifico per l’ordine ${quote.orderName}? L’ordine su Shopify passerà a “Pagato”.`)) return;
+    if ((await ask({title: 'Confermi il bonifico ricevuto?', message: <>L’ordine <b>{quote.orderName}</b> su Shopify passerà a “Pagato” e il cliente riceverà la conferma.</>, confirmLabel: 'Segna come pagato'})) === null) return;
     setError(''); setBusy('Aggiorno Shopify…');
     try { const result = await api<{quote: QuoteView}>(`/api/quotes/${quote.id}/mark-paid`, {method: 'POST'}); onChange(result.quote); } catch (caught) { setError(caught instanceof Error ? caught.message : 'Ordine non aggiornato.'); } finally { setBusy(null); }
   }
 
   const receiptBox = receipt ? <a className="quote-receipt" href={`/api/quotes/files/${receipt.messageId}`} rel="noreferrer" target="_blank"><span><Receipt size={18} /></span><div><strong>Contabile del bonifico</strong><small>{receipt.name} · caricata il {dateTime(receipt.uploadedAt)}</small></div><em>Apri <ExternalLink size={12} /></em></a> : null;
 
-  return <div className="quote-transfer">
+  return <div className="quote-transfer">{confirmUi}
     <strong>Ordine {quote.orderName} confermato · in attesa del bonifico</strong>
     {viewer === 'client' ? <>
       <p>{receipt ? 'Abbiamo ricevuto la tua contabile: appena verifichiamo l’accredito l’ordine passa in lavorazione e te lo segnaliamo qui.' : 'Fai il bonifico con i dati indicati, poi carica qui la contabile: velocizza la verifica del pagamento.'}</p>
@@ -291,6 +294,7 @@ function CustomRequest({onAdd, onSwitch}: {onAdd: (item: Item) => void; onSwitch
 function QuoteDetail({quoteId, viewer, onChange}: {quoteId: string; viewer: 'client' | 'team'; onChange: (quote: QuoteView) => void}) {
   const [quote, setQuote] = useState<QuoteView | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [confirmUi, ask] = useConfirm();
   const [error, setError] = useState('');
   const [body, setBody] = useState('');
   const [file, setFile] = useState<File | null>(null);
@@ -316,7 +320,7 @@ function QuoteDetail({quoteId, viewer, onChange}: {quoteId: string; viewer: 'cli
   }, [load, paying]);
 
   async function act(action: 'review' | 'cancel') {
-    if (action === 'cancel' && !window.confirm('Vuoi annullare questa richiesta?')) return;
+    if (action === 'cancel' && (await ask({tone: 'danger', title: 'Annullare la richiesta?', message: quote?.express ? 'La richiesta verrà chiusa e i crediti della spedizione express ti verranno restituiti.' : 'La richiesta verrà chiusa e non potrà più essere pagata.', confirmLabel: 'Annulla richiesta', cancelLabel: 'Indietro'})) === null) return;
     setIsActing(true);
     try { const result = await api<{quote: QuoteView}>(`/api/quotes/${quoteId}/status`, {method: 'POST', body: JSON.stringify({action})}); onChange(result.quote); await load(); } catch (caught) { setError(caught instanceof Error ? caught.message : 'Operazione non riuscita.'); } finally { setIsActing(false); }
   }
@@ -349,7 +353,7 @@ function QuoteDetail({quoteId, viewer, onChange}: {quoteId: string; viewer: 'cli
   if (!quote) return <div className="rt-loading">{error ? <p className="form-error">{error}</p> : <><Loader2 className="spin" size={20} /> Caricamento…</>}</div>;
   const closed = quote.status === 'paid' || quote.status === 'cancelled';
 
-  return <div className="rt quote-detail">
+  return <div className="rt quote-detail">{confirmUi}
     <header className="rt-head">
       <div className="rt-head__top"><span className="rt-id">{quote.publicId}</span><span className={`quote-status quote-status--${statusOf(quote).tone}`}>{statusOf(quote).label}</span></div>
       <h2>{quote.kind === 'order' ? 'Richiesta d’ordine' : 'Richiesta di preventivo'}{viewer === 'team' ? ` · ${quote.companyName}` : ''}</h2>
