@@ -853,6 +853,15 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .bt__total strong { font-size: 20px; letter-spacing: -.03em; }
 .bt__foot { position: sticky; bottom: 0; padding: 14px 26px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border-top: 1px solid var(--line); background: rgba(255,255,255,.96); }
 .bt__foot a { display: inline-flex; align-items: center; gap: 4px; color: #5b6575; font-size: 12px; font-weight: 700; }
+.quote-new__express { width: 100%; padding: 12px 14px; display: grid; grid-template-columns: 38px 18px 1fr; gap: 10px; align-items: center; border: 1.5px solid #dce3eb; border-radius: 14px; background: white; color: var(--ink); font: inherit; text-align: left; cursor: pointer; transition: border-color .15s, background .15s; }
+.quote-new__express > svg { color: #b7791f; }
+.quote-new__express b { display: block; font-size: 14px; }
+.quote-new__express small { display: block; margin-top: 2px; color: #6b7686; font-size: 11px; line-height: 1.4; }
+.quote-new__express.is-on { border-color: #f59e0b; background: #fff8e8; }
+.quote-new__switch-ui { width: 38px; height: 22px; padding: 3px; display: block; border-radius: 999px; background: #d6dde6; transition: background .15s; }
+.quote-new__switch-ui i { width: 16px; height: 16px; display: block; border-radius: 50%; background: white; box-shadow: 0 1px 3px rgba(0,0,0,.2); transition: transform .15s; }
+.quote-new__express.is-on .quote-new__switch-ui { background: #f59e0b; }
+.quote-new__express.is-on .quote-new__switch-ui i { transform: translateX(16px); }
 .quote-express { padding: 14px 16px; display: grid; grid-template-columns: 40px 1fr auto; gap: 12px; align-items: center; border: 1px solid #f5d9a0; border-radius: 16px; background: linear-gradient(120deg, #fff8e8, #ffffff); }
 .quote-express > span { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 12px; background: #f59e0b; color: white; }
 .quote-express strong { font-size: 14px; }
