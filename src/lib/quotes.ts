@@ -14,7 +14,7 @@ export type QuoteItem = {productId: string; variantId: string; productTitle: str
 export type QuoteReceipt = {messageId: string; name: string; uploadedAt: string};
 export type QuoteExpress = {requestedAt: string; credits: number; included: number; extra: number; refundedAt?: string | null};
 export type QuoteOffer = {receipt?: QuoteReceipt | null; express?: QuoteExpress | null; lines: Array<{variantId: string; title: string; quantity: number; unitPrice: number; properties?: Array<{name: string; value: string}>}>; shipping: number; note: string; validUntil: string | null};
-export type QuoteSummary = {id: string; publicId: string; kind: 'quote' | 'order'; status: QuoteStatus; companyName: string; requesterName: string; items: QuoteItem[]; notes: string; neededBy: string | null; offer: QuoteOffer | null; invoiceUrl: string | null; awaitingPayment: boolean; expired: boolean; validUntil: string | null; total: number | null; currency: string; createdAt: string; quotedAt: string | null; paidAt: string | null; orderName: string | null};
+export type QuoteSummary = {id: string; publicId: string; kind: 'quote' | 'order'; status: QuoteStatus; companyName: string; requesterName: string; items: QuoteItem[]; notes: string; neededBy: string | null; offer: QuoteOffer | null; express: QuoteExpress | null; invoiceUrl: string | null; awaitingPayment: boolean; expired: boolean; validUntil: string | null; total: number | null; currency: string; createdAt: string; quotedAt: string | null; paidAt: string | null; orderName: string | null};
 export type QuoteMessage = {id: string; kind: 'comment' | 'event'; body: string; createdAt: string; authorName: string; fromClient: boolean; mine: boolean; file: {name: string; size: number} | null};
 
 type Row = {id: string; public_id: string; company_id: string; kind: 'quote' | 'order'; status: QuoteStatus; items: QuoteItem[]; notes: string; needed_by: string | null; offer: QuoteOffer | null; invoice_url: string | null; draft_order_id?: string | null; quote_total: number | null; currency: string; created_at: string; quoted_at: string | null; paid_at: string | null; order_name: string | null; companies?: {name: string} | {name: string}[] | null; requester?: {full_name: string | null; email: string} | {full_name: string | null; email: string}[] | null};
@@ -33,7 +33,7 @@ export function toSummary(row: Row): QuoteSummary {
   const requester = one(row.requester);
   return {
     id: row.id, publicId: row.public_id, kind: row.kind, status: row.status, companyName: one(row.companies)?.name || 'Cliente', requesterName: requester?.full_name || requester?.email || 'Cliente',
-    items: row.items || [], notes: row.notes, neededBy: row.needed_by, offer: row.offer, invoiceUrl: row.status === 'quoted' && !isExpired(row) ? row.invoice_url : null, awaitingPayment: row.status === 'quoted' && !!row.order_name, expired: isExpired(row), validUntil: row.offer?.validUntil || null,
+    items: row.items || [], notes: row.notes, neededBy: row.needed_by, offer: row.offer?.lines?.length ? row.offer : null, express: row.offer?.express && !row.offer.express.refundedAt ? row.offer.express : null, invoiceUrl: row.status === 'quoted' && !isExpired(row) ? row.invoice_url : null, awaitingPayment: row.status === 'quoted' && !!row.order_name, expired: isExpired(row), validUntil: row.offer?.validUntil || null,
     total: row.quote_total === null ? null : Number(row.quote_total), currency: row.currency, createdAt: row.created_at, quotedAt: row.quoted_at, paidAt: row.paid_at, orderName: row.order_name,
   };
 }
@@ -58,6 +58,7 @@ export async function syncQuoteWithShopify<T extends Row>(row: T, {includePaid =
       const {data} = await admin.from('quote_requests').update({status: 'cancelled', order_name: state.orderName, updated_at: now}).eq('id', row.id).in('status', ['quoted', 'paid']).select(QUOTE_COLUMNS).maybeSingle<T>();
       if (!data) return row;
       await addQuoteEvent(row.id, null, `L’ordine ${state.orderName} è stato annullato.`);
+      await (await import('@/lib/express')).refundExpressOnClose(row.id, 'L’ordine è stato annullato.');
       await notifyQuote({quote: row, actor: {id: '', role: 'admin'} as CurrentProfile, subject: 'Ordine annullato', message: `L’ordine ${state.orderName} legato a questo preventivo è stato annullato. Per qualsiasi dubbio scrivi al tuo account manager dal portale.`}).catch((error) => console.error('[Quote notify]', error));
       return data;
     }
@@ -226,6 +227,7 @@ export async function runQuoteReminders() {
       if (row.draft_order_id) await deleteDraftOrder(row.draft_order_id);
       await admin.from('quote_requests').update({invoice_url: null, draft_order_id: null, updated_at: new Date().toISOString()}).eq('id', row.id);
       await addQuoteEvent(row.id, null, 'Preventivo scaduto: non è più pagabile. Chiedi un aggiornamento al tuo account manager.');
+      await (await import('@/lib/express')).refundExpressOnClose(row.id, 'Il preventivo è scaduto.');
       await notifyQuote({quote: row, actor: {id: '', role: 'client'} as CurrentProfile, subject: 'Preventivo scaduto', message: `Il preventivo ${row.public_id} è scaduto senza pagamento. Se il cliente è ancora interessato, aggiorna i prezzi e reinvialo.`}).catch((error) => console.error('[Quote notify]', error));
       expired += 1;
       continue;

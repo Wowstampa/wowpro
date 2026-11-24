@@ -51,7 +51,7 @@ async function withFileProperties(quoteId: string, lines: Line[]) {
 }
 
 // Creates (or replaces) the Shopify draft order of a quote, with the file links on its lines.
-export async function publishQuoteDraft({quote, lines, shipping, note}: {quote: {id: string; public_id: string; company_id: string}; lines: Line[]; shipping: number; note: string}) {
+export async function publishQuoteDraft({quote, lines, shipping, note, express = false}: {quote: {id: string; public_id: string; company_id: string}; lines: Line[]; shipping: number; note: string; express?: boolean}) {
   const admin = createAdminClient();
   const {data: company} = await admin.from('companies').select('airtable_record_id,shopify_customer_id').eq('id', quote.company_id).maybeSingle();
   const {data: row} = await admin.from('quote_requests').select('draft_order_id,requester:requested_by(email)').eq('id', quote.id).maybeSingle();
@@ -60,7 +60,7 @@ export async function publishQuoteDraft({quote, lines, shipping, note}: {quote: 
   if (company?.airtable_record_id) {
     try { const client = await getWowproClient(company.airtable_record_id); email = client.fields.email_login || email; customerId = client.fields.shopify_customer_id || customerId; } catch { /* CRM optional. */ }
   }
-  const draft = await createQuoteDraftOrder({quoteId: quote.id, publicId: quote.public_id, email, customerId, lines: await withFileProperties(quote.id, lines), shipping, note});
+  const draft = await createQuoteDraftOrder({quoteId: quote.id, publicId: quote.public_id, email, customerId, lines: await withFileProperties(quote.id, lines), shipping, note, express});
   if (row?.draft_order_id) await deleteDraftOrder(row.draft_order_id);
   return {...draft, replaced: !!row?.draft_order_id};
 }
@@ -69,9 +69,9 @@ export async function publishQuoteDraft({quote, lines, shipping, note}: {quote: 
 export async function refreshQuoteDraftFiles(quoteId: string) {
   const admin = createAdminClient();
   const {data: quote} = await admin.from('quote_requests').select('id,public_id,company_id,status,order_name,offer,draft_order_id').eq('id', quoteId).maybeSingle();
-  const offer = quote?.offer as {lines: Line[]; shipping: number; note: string; validUntil: string | null} | null;
+  const offer = quote?.offer as {lines: Line[]; shipping: number; note: string; validUntil: string | null; express?: {refundedAt?: string | null} | null} | null;
   if (!quote || quote.status !== 'quoted' || quote.order_name || !quote.draft_order_id || !offer?.lines?.length) return;
   if (offer.validUntil && offer.validUntil < new Date().toISOString().slice(0, 10)) return;
-  const draft = await publishQuoteDraft({quote, lines: offer.lines, shipping: offer.shipping || 0, note: offer.note || ''});
+  const draft = await publishQuoteDraft({quote, lines: offer.lines, shipping: offer.shipping || 0, note: offer.note || '', express: !!offer.express && !offer.express.refundedAt});
   await admin.from('quote_requests').update({draft_order_id: draft.id, invoice_url: draft.invoiceUrl, quote_total: draft.total, currency: draft.currency, updated_at: new Date().toISOString()}).eq('id', quote.id);
 }
