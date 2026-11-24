@@ -402,11 +402,11 @@ async function findExistingCustomer(customerId?: string | null, email?: string |
 export type QuoteOfferLine = {variantId: string; title?: string; quantity: number; unitPrice: number; properties?: Array<{name: string; value: string}>};
 
 // Creates the draft order for an accepted quote: the client pays it through its invoice URL.
-export async function createQuoteDraftOrder({quoteId, publicId, email, customerId, lines, shipping, note}: {quoteId: string; publicId: string; email: string; customerId?: string | null; lines: QuoteOfferLine[]; shipping: number; note: string}) {
+export async function createQuoteDraftOrder({quoteId, publicId, email, customerId, lines, shipping, note, express = false}: {quoteId: string; publicId: string; email: string; customerId?: string | null; lines: QuoteOfferLine[]; shipping: number; note: string; express?: boolean}) {
   const input: Record<string, unknown> = {
     email,
-    note: `Preventivo WOWPRO ${publicId}${note ? `\n${note}` : ''}`,
-    tags: ['WOWPRO', 'preventivo'],
+    note: `${express ? '⚡ SPEDIZIONE EXPRESS richiesta dal cliente (crediti WOWPRO)\n' : ''}Preventivo WOWPRO ${publicId}${note ? `\n${note}` : ''}`,
+    tags: ['WOWPRO', 'preventivo', ...(express ? ['SPEDIZIONE EXPRESS'] : [])],
     customAttributes: [{key: 'wowpro_quote', value: quoteId}, {key: 'wowpro_quote_code', value: publicId}],
     lineItems: lines.map((line) => ({
       ...(line.variantId ? {variantId: line.variantId, priceOverride: {amount: line.unitPrice.toFixed(2), currencyCode: 'EUR'}} : {title: (line.title || 'Prodotto personalizzato').slice(0, 255), originalUnitPriceWithCurrency: {amount: line.unitPrice.toFixed(2), currencyCode: 'EUR'}, requiresShipping: true, taxable: true}),
