@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import {ArrowRight, BadgeCheck, BadgePercent, Box, Coins, CreditCard, Gift, Headphones, History, Lightbulb, MessageSquareText, PackageCheck, Palette, Pencil, Printer, ScanSearch, Sparkles, UserRound, UsersRound} from 'lucide-react';
+import {ArrowRight, BadgeCheck, BadgePercent, Box, Coins, CreditCard, Gift, Headphones, History, Lightbulb, MessageSquareText, PackageCheck, Palette, Pencil, Printer, ScanSearch, Sparkles, UserRound, UsersRound, Zap} from 'lucide-react';
 import {useState} from 'react';
 
 type Feature = {icon: typeof Palette; title: string; text: string; tag?: string};
@@ -27,6 +27,7 @@ const AREAS: Area[] = [
     features: [
       {icon: BadgePercent, title: 'Listino riservato', text: 'Prezzi dedicati su tutto il catalogo, applicati in automatico al checkout.'},
       {icon: Sparkles, title: 'Produzione prioritaria', tag: 'FAST LANE', text: 'I tuoi ordini passano in testa alla coda di stampa.'},
+      {icon: Zap, title: 'Spedizione express', tag: '2.000 CREDITI', text: 'Ti serve prima? Sugli ordini dai preventivi richiedi il corriere express con i tuoi crediti.'},
       {icon: Box, title: 'Spedizione white label', text: 'Pacco anonimo e mittente personalizzato: spedisci ai tuoi clienti a tuo nome.'},
       {icon: ScanSearch, title: 'Preventivi rapidi', text: 'Quotazioni su misura per lavori speciali, in tempi brevi.'},
       {icon: Gift, title: 'Promo in anteprima', tag: 'RISERVATO', text: 'Accedi per primo alle offerte dedicate ai clienti WOWPRO.'},
@@ -55,6 +56,7 @@ const AREAS: Area[] = [
     features: [
       {icon: Coins, title: 'Crediti inclusi', text: 'Si rinnovano ogni mese e vengono usati per primi. Non sono cumulabili.'},
       {icon: CreditCard, title: 'Crediti extra', text: 'Ti servono più lavori? Acquistali con carta in pochi secondi: non scadono mai.'},
+      {icon: Zap, title: 'Non solo grafica', text: 'Usa i crediti anche per la spedizione express dei tuoi ordini: 2.000 crediti a ordine.'},
       {icon: History, title: 'Storico trasparente', text: 'Ogni movimento, richiesta e ricarica è registrato nello storico crediti.'},
     ],
     cta: {href: '/dashboard/crediti', label: 'Vai ai tuoi crediti'},

@@ -1,7 +1,8 @@
 'use client';
 /* eslint-disable @next/next/no-img-element -- Shopify CDN thumbnails are already resized. */
 
-import {ArrowRight, CheckCircle2, Palette, Receipt, Upload, CreditCard, LayoutGrid, PenLine, ExternalLink, FileText, Loader2, Package, Paperclip, Plus, Search, Send, ShoppingBag, Trash2, X} from 'lucide-react';
+import {ArrowRight, CheckCircle2, Zap, Palette, Receipt, Upload, CreditCard, LayoutGrid, PenLine, ExternalLink, FileText, Loader2, Package, Paperclip, Plus, Search, Send, ShoppingBag, Trash2, X} from 'lucide-react';
+import Link from 'next/link';
 import {FormEvent, useCallback, useEffect, useMemo, useRef, useState} from 'react';
 
 import {ACCEPTED_FILES, formatBytes, putWithProgress, validateFiles} from '@/components/request-files';
@@ -13,7 +14,7 @@ type Status = 'new' | 'in_review' | 'quoted' | 'paid' | 'cancelled';
 type Item = {productId: string; variantId: string; productTitle: string; variantTitle: string; imageUrl: string | null; quantity: number; note: string; listPrice: number | null; options?: Array<{name: string; value: string}>; graphicRequest?: LinkedGraphic | null};
 export type LinkedGraphic = {id: string; publicId: string; title: string};
 type OfferLine = {variantId: string; title: string; quantity: number; unitPrice: number; properties?: Array<{name: string; value: string}>};
-export type QuoteView = {id: string; publicId: string; kind: 'quote' | 'order'; status: Status; companyName: string; requesterName: string; items: Item[]; notes: string; neededBy: string | null; offer: {lines: OfferLine[]; shipping: number; note: string; receipt?: {messageId: string; name: string; uploadedAt: string} | null} | null; invoiceUrl: string | null; awaitingPayment?: boolean; expired?: boolean; validUntil?: string | null; total: number | null; currency: string; createdAt: string; quotedAt: string | null; paidAt: string | null; orderName: string | null};
+export type QuoteView = {id: string; publicId: string; kind: 'quote' | 'order'; status: Status; companyName: string; requesterName: string; items: Item[]; notes: string; neededBy: string | null; offer: {lines: OfferLine[]; shipping: number; note: string; receipt?: {messageId: string; name: string; uploadedAt: string} | null; express?: {requestedAt: string; credits: number; refundedAt?: string | null} | null} | null; invoiceUrl: string | null; awaitingPayment?: boolean; expired?: boolean; validUntil?: string | null; total: number | null; currency: string; createdAt: string; quotedAt: string | null; paidAt: string | null; orderName: string | null};
 type Message = {id: string; kind: 'comment' | 'event'; body: string; createdAt: string; authorName: string; fromClient: boolean; mine: boolean; file: {name: string; size: number} | null};
 type Product = CatalogPick;
 const itemDetails = (item: Item) => [item.variantTitle, ...(item.options || []).filter((option) => !item.variantTitle.includes(option.value)).map((option) => `${option.name}: ${option.value}`), (item.options || []).some((option) => /quantit/i.test(option.name)) || item.productId === 'custom' ? '' : `${item.quantity} pz`].filter(Boolean);
@@ -74,7 +75,7 @@ export function QuotesWorkspace({viewer, initialQuotes, embedded = false, create
       : <div className="quotes__list">
         {visible.map((quote) => <button className="quote-card" key={quote.id} onClick={() => setOpenId(quote.id)} type="button">
           <span className="quote-card__thumbs">{quote.items.slice(0, 3).map((item, index) => item.imageUrl ? <img alt="" key={index} src={item.imageUrl} /> : <i key={index}><Package size={16} /></i>)}</span>
-          <span className="quote-card__main"><small>{quote.publicId} · {quote.kind === 'order' ? 'Ordine' : 'Preventivo'}{viewer === 'team' ? ` · ${quote.companyName}` : ''}</small><strong>{quote.items.map((item) => item.productTitle).join(', ')}</strong><em>{quote.items.length} {quote.items.length === 1 ? 'prodotto' : 'prodotti'} · {shortDate(quote.createdAt)}</em></span>
+          <span className="quote-card__main"><small>{quote.publicId} · {quote.kind === 'order' ? 'Ordine' : 'Preventivo'}{viewer === 'team' ? ` · ${quote.companyName}` : ''}</small><strong>{quote.items.map((item) => item.productTitle).join(', ')}</strong><em>{quote.items.length} {quote.items.length === 1 ? 'prodotto' : 'prodotti'} · {shortDate(quote.createdAt)}{quote.offer?.express && !quote.offer.express.refundedAt ? <b className="quote-express-tag"><Zap size={11} /> Express</b> : null}</em></span>
           <span className="quote-card__side"><b className={`quote-status quote-status--${statusOf(quote).tone}`}>{statusOf(quote).label}</b>{quote.total !== null && quote.status !== 'cancelled' ? <strong>{euro(quote.total, quote.currency)}</strong> : null}</span>
         </button>)}
         {!visible.length ? <p className="quotes__none">Nessuna richiesta in questa sezione.</p> : null}
@@ -173,6 +174,25 @@ function NewQuoteModal({onClose, onCreated, linked}: {onClose: () => void; onCre
       </div>
     </form>
   </section></div>;
+}
+
+const EXPRESS_COST = 2_000;
+
+// Express shipping paid with credits, for orders born from a quote.
+function ExpressShipping({quote, viewer, onChange}: {quote: QuoteView; viewer: 'client' | 'team'; onChange: (quote: QuoteView) => void}) {
+  const express = quote.offer?.express && !quote.offer.express.refundedAt ? quote.offer.express : null;
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  async function act(action: 'request' | 'refund') {
+    let reason = '';
+    if (action === 'request' && !window.confirm(`Richiedi la spedizione express per l’ordine ${quote.orderName}? Ti verranno scalati ${EXPRESS_COST.toLocaleString('it-IT')} crediti.`)) return;
+    if (action === 'refund') { const answer = window.prompt('Motivo del rimborso (lo vede il cliente):', 'La spedizione express non è disponibile per questo ordine.'); if (answer === null) return; reason = answer; }
+    setBusy(true); setError('');
+    try { const result = await api<{quote: QuoteView}>(`/api/quotes/${quote.id}/express`, {method: 'POST', body: JSON.stringify({action, reason})}); onChange(result.quote); } catch (caught) { setError(caught instanceof Error ? caught.message : 'Operazione non riuscita.'); } finally { setBusy(false); }
+  }
+  if (express) return <section className="quote-express is-active"><span><Zap size={18} /></span><div><strong>Spedizione express richiesta</strong><p>{viewer === 'client' ? `Il tuo ordine ${quote.orderName || ''} partirà con spedizione express. ${express.credits.toLocaleString('it-IT')} crediti scalati il ${shortDate(express.requestedAt)}.` : `Il cliente ha usato ${express.credits.toLocaleString('it-IT')} crediti il ${shortDate(express.requestedAt)}: l’ordine su Shopify ha il tag «SPEDIZIONE EXPRESS».`}</p>{error ? <p className="form-error">{error}</p> : null}</div>{viewer === 'team' ? <button className="client-action" disabled={busy} onClick={() => void act('refund')} type="button">{busy ? <Loader2 className="spin" size={14} /> : null}Rimborsa crediti</button> : null}</section>;
+  if (viewer !== 'client') return null;
+  return <section className="quote-express"><span><Zap size={18} /></span><div><strong>Ti serve prima? Spedizione express</strong><p>Con {EXPRESS_COST.toLocaleString('it-IT')} crediti il tuo ordine parte con corriere express. I crediti si scalano subito; se non fosse possibile te li restituiamo.</p>{error ? <p className="form-error">{error}{/insufficienti/i.test(error) ? <> <Link href="/dashboard/crediti">Ricarica crediti</Link></> : null}</p> : null}</div><button className="client-action client-action--primary" disabled={busy} onClick={() => void act('request')} type="button">{busy ? <Loader2 className="spin" size={14} /> : <Zap size={14} />}Richiedi express</button></section>;
 }
 
 // Writes the file links (client files and approved designs) on the Shopify draft or order.
@@ -333,6 +353,8 @@ function QuoteDetail({quoteId, viewer, onChange}: {quoteId: string; viewer: 'cli
       <h2>{quote.kind === 'order' ? 'Richiesta d’ordine' : 'Richiesta di preventivo'}{viewer === 'team' ? ` · ${quote.companyName}` : ''}</h2>
       <div className="rt-meta"><span>Inviata il {shortDate(quote.createdAt)}{viewer === 'team' ? ` da ${quote.requesterName}` : ''}</span>{quote.neededBy ? <span>Serve entro il {shortDate(quote.neededBy)}</span> : null}{quote.orderName ? <span>Ordine {quote.orderName}</span> : null}</div>
     </header>
+
+    {(quote.status === 'paid' || quote.awaitingPayment) ? <ExpressShipping onChange={(next) => { onChange(next); void load(); }} quote={quote} viewer={viewer} /> : null}
 
     {quote.status === 'paid' ? <section className="quote-paid"><CheckCircle2 size={22} /><div><strong>Pagamento ricevuto</strong><p>Ordine {quote.orderName || ''} in lavorazione: lo trovi anche nella pagina Ordini con stato e tracking.</p></div></section> : null}
 
