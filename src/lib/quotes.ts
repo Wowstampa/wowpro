@@ -12,7 +12,8 @@ export const QUOTE_STATUS_LABELS: Record<QuoteStatus, string> = {new: 'Inviata',
 
 export type QuoteItem = {productId: string; variantId: string; productTitle: string; variantTitle: string; imageUrl: string | null; quantity: number; note: string; listPrice: number | null; options?: Array<{name: string; value: string}>; graphicRequest?: {id: string; publicId: string; title: string} | null};
 export type QuoteReceipt = {messageId: string; name: string; uploadedAt: string};
-export type QuoteOffer = {receipt?: QuoteReceipt | null; lines: Array<{variantId: string; title: string; quantity: number; unitPrice: number; properties?: Array<{name: string; value: string}>}>; shipping: number; note: string; validUntil: string | null};
+export type QuoteExpress = {requestedAt: string; credits: number; included: number; extra: number; refundedAt?: string | null};
+export type QuoteOffer = {receipt?: QuoteReceipt | null; express?: QuoteExpress | null; lines: Array<{variantId: string; title: string; quantity: number; unitPrice: number; properties?: Array<{name: string; value: string}>}>; shipping: number; note: string; validUntil: string | null};
 export type QuoteSummary = {id: string; publicId: string; kind: 'quote' | 'order'; status: QuoteStatus; companyName: string; requesterName: string; items: QuoteItem[]; notes: string; neededBy: string | null; offer: QuoteOffer | null; invoiceUrl: string | null; awaitingPayment: boolean; expired: boolean; validUntil: string | null; total: number | null; currency: string; createdAt: string; quotedAt: string | null; paidAt: string | null; orderName: string | null};
 export type QuoteMessage = {id: string; kind: 'comment' | 'event'; body: string; createdAt: string; authorName: string; fromClient: boolean; mine: boolean; file: {name: string; size: number} | null};
 
