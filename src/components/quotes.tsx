@@ -14,7 +14,7 @@ type Status = 'new' | 'in_review' | 'quoted' | 'paid' | 'cancelled';
 type Item = {productId: string; variantId: string; productTitle: string; variantTitle: string; imageUrl: string | null; quantity: number; note: string; listPrice: number | null; options?: Array<{name: string; value: string}>; graphicRequest?: LinkedGraphic | null};
 export type LinkedGraphic = {id: string; publicId: string; title: string};
 type OfferLine = {variantId: string; title: string; quantity: number; unitPrice: number; properties?: Array<{name: string; value: string}>};
-export type QuoteView = {id: string; publicId: string; kind: 'quote' | 'order'; status: Status; companyName: string; requesterName: string; items: Item[]; notes: string; neededBy: string | null; offer: {lines: OfferLine[]; shipping: number; note: string; receipt?: {messageId: string; name: string; uploadedAt: string} | null; express?: {requestedAt: string; credits: number; refundedAt?: string | null} | null} | null; invoiceUrl: string | null; awaitingPayment?: boolean; expired?: boolean; validUntil?: string | null; total: number | null; currency: string; createdAt: string; quotedAt: string | null; paidAt: string | null; orderName: string | null};
+export type QuoteView = {id: string; publicId: string; kind: 'quote' | 'order'; status: Status; companyName: string; requesterName: string; items: Item[]; notes: string; neededBy: string | null; offer: {lines: OfferLine[]; shipping: number; note: string; receipt?: {messageId: string; name: string; uploadedAt: string} | null; express?: {requestedAt: string; credits: number; refundedAt?: string | null} | null} | null; invoiceUrl: string | null; express?: {requestedAt: string; credits: number} | null; awaitingPayment?: boolean; expired?: boolean; validUntil?: string | null; total: number | null; currency: string; createdAt: string; quotedAt: string | null; paidAt: string | null; orderName: string | null};
 type Message = {id: string; kind: 'comment' | 'event'; body: string; createdAt: string; authorName: string; fromClient: boolean; mine: boolean; file: {name: string; size: number} | null};
 type Product = CatalogPick;
 const itemDetails = (item: Item) => [item.variantTitle, ...(item.options || []).filter((option) => !item.variantTitle.includes(option.value)).map((option) => `${option.name}: ${option.value}`), (item.options || []).some((option) => /quantit/i.test(option.name)) || item.productId === 'custom' ? '' : `${item.quantity} pz`].filter(Boolean);
@@ -75,7 +75,7 @@ export function QuotesWorkspace({viewer, initialQuotes, embedded = false, create
       : <div className="quotes__list">
         {visible.map((quote) => <button className="quote-card" key={quote.id} onClick={() => setOpenId(quote.id)} type="button">
           <span className="quote-card__thumbs">{quote.items.slice(0, 3).map((item, index) => item.imageUrl ? <img alt="" key={index} src={item.imageUrl} /> : <i key={index}><Package size={16} /></i>)}</span>
-          <span className="quote-card__main"><small>{quote.publicId} · {quote.kind === 'order' ? 'Ordine' : 'Preventivo'}{viewer === 'team' ? ` · ${quote.companyName}` : ''}</small><strong>{quote.items.map((item) => item.productTitle).join(', ')}</strong><em>{quote.items.length} {quote.items.length === 1 ? 'prodotto' : 'prodotti'} · {shortDate(quote.createdAt)}{quote.offer?.express && !quote.offer.express.refundedAt ? <b className="quote-express-tag"><Zap size={11} /> Express</b> : null}</em></span>
+          <span className="quote-card__main"><small>{quote.publicId} · {quote.kind === 'order' ? 'Ordine' : 'Preventivo'}{viewer === 'team' ? ` · ${quote.companyName}` : ''}</small><strong>{quote.items.map((item) => item.productTitle).join(', ')}</strong><em>{quote.items.length} {quote.items.length === 1 ? 'prodotto' : 'prodotti'} · {shortDate(quote.createdAt)}{quote.express ? <b className="quote-express-tag"><Zap size={11} /> Express</b> : null}</em></span>
           <span className="quote-card__side"><b className={`quote-status quote-status--${statusOf(quote).tone}`}>{statusOf(quote).label}</b>{quote.total !== null && quote.status !== 'cancelled' ? <strong>{euro(quote.total, quote.currency)}</strong> : null}</span>
         </button>)}
         {!visible.length ? <p className="quotes__none">Nessuna richiesta in questa sezione.</p> : null}
@@ -96,6 +96,7 @@ function NewQuoteModal({onClose, onCreated, linked}: {onClose: () => void; onCre
   const [mode, setMode] = useState<'choose' | 'catalog' | 'custom'>('choose');
   const [items, setItems] = useState<Item[]>([]);
   const [notes, setNotes] = useState('');
+  const [express, setExpress] = useState(false);
   const [neededBy, setNeededBy] = useState('');
   const [files, setFiles] = useState<File[]>([]);
   const [error, setError] = useState('');
@@ -120,7 +121,7 @@ function NewQuoteModal({onClose, onCreated, linked}: {onClose: () => void; onCre
     if (fileError) { setError(fileError); return; }
     setIsSaving(true); setError('');
     try {
-      const {quote} = await api<{quote: QuoteView}>('/api/quotes', {method: 'POST', body: JSON.stringify({kind, items: items.map((item) => (linked ? {...item, graphicRequest: linked} : item)), notes, neededBy})});
+      const {quote} = await api<{quote: QuoteView}>('/api/quotes', {method: 'POST', body: JSON.stringify({kind, express, items: items.map((item) => (linked ? {...item, graphicRequest: linked} : item)), notes, neededBy})});
       for (const [index, file] of files.entries()) {
         setProgress(`Caricamento file ${index + 1} di ${files.length}…`);
         const ticket = await api<{uploadUrl: string; path: string}>(`/api/quotes/${quote.id}/files`, {method: 'POST', body: JSON.stringify({fileName: file.name, size: file.size})});
@@ -166,11 +167,12 @@ function NewQuoteModal({onClose, onCreated, linked}: {onClose: () => void; onCre
           {items.map((item, index) => <li key={`${item.variantId}-${index}`}>{item.imageUrl ? <img alt="" src={item.imageUrl} /> : <i>{item.productId === 'custom' ? <PenLine size={16} /> : <Package size={16} />}</i>}<div><strong>{item.productTitle}</strong><small>{[...itemDetails(item), item.note].filter(Boolean).join(' · ')}</small>{linked ? <em className="quote-graphic-chip"><Palette size={11} /> Grafica {linked.publicId}</em> : null}</div><button aria-label="Rimuovi" onClick={() => setItems((current) => current.filter((_, position) => position !== index))} type="button"><Trash2 size={15} /></button></li>)}
           {!items.length ? <li className="quote-new__placeholder">Scegli un prodotto dal catalogo o descrivi una richiesta personalizzata.</li> : null}
         </ul>
+        <button aria-pressed={express} className={express ? 'quote-new__express is-on' : 'quote-new__express'} onClick={() => setExpress((value) => !value)} type="button"><span className="quote-new__switch-ui"><i /></span><Zap size={16} /><span><b>Spedizione express</b><small>{EXPRESS_COST.toLocaleString('it-IT')} crediti, scalati all’invio. Se annulli o il preventivo scade, te li restituiamo.</small></span></button>
         <label className="buy-field is-wide"><span>Note per l’account manager <small>facoltativo</small></span><textarea maxLength={4000} onChange={(event) => setNotes(event.target.value)} placeholder="Tempi, indirizzo di consegna, richieste particolari…" rows={3} value={notes} /></label>
         <label className="buy-field is-wide"><span>Ti serve entro <small>facoltativo</small></span><input onChange={(event) => setNeededBy(event.target.value)} type="date" value={neededBy} /></label>
         <div className="quote-new__files"><input accept={ACCEPTED_FILES} hidden multiple onChange={(event) => setFiles((current) => [...current, ...Array.from(event.target.files || [])])} ref={fileInput} type="file" /><button onClick={() => fileInput.current?.click()} type="button"><Paperclip size={15} /> Allega file grafici</button>{files.map((file, index) => <span key={index}>{file.name} <small>{formatBytes(file.size)}</small><button aria-label="Rimuovi file" onClick={() => setFiles((current) => current.filter((_, position) => position !== index))} type="button"><X size={12} /></button></span>)}</div>
         {error ? <p className="form-error">{error}</p> : null}
-        <button className="buy-form__pay" disabled={isSaving || !items.length} type="submit">{isSaving ? <Loader2 className="spin" size={17} /> : <Send size={17} />}{progress || (kind === 'quote' ? 'Chiedi il preventivo' : 'Invia la richiesta d’ordine')}</button>
+        <button className="buy-form__pay" disabled={isSaving || !items.length} type="submit">{isSaving ? <Loader2 className="spin" size={17} /> : <Send size={17} />}{progress || (kind === 'quote' ? 'Chiedi il preventivo' : 'Invia la richiesta d’ordine')}{express && !progress ? ' · express' : ''}</button>
       </div>
     </form>
   </section></div>;
@@ -180,7 +182,7 @@ const EXPRESS_COST = 2_000;
 
 // Express shipping paid with credits, for orders born from a quote.
 function ExpressShipping({quote, viewer, onChange}: {quote: QuoteView; viewer: 'client' | 'team'; onChange: (quote: QuoteView) => void}) {
-  const express = quote.offer?.express && !quote.offer.express.refundedAt ? quote.offer.express : null;
+  const express = quote.express || null;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   async function act(action: 'request' | 'refund') {
@@ -190,7 +192,7 @@ function ExpressShipping({quote, viewer, onChange}: {quote: QuoteView; viewer: '
     setBusy(true); setError('');
     try { const result = await api<{quote: QuoteView}>(`/api/quotes/${quote.id}/express`, {method: 'POST', body: JSON.stringify({action, reason})}); onChange(result.quote); } catch (caught) { setError(caught instanceof Error ? caught.message : 'Operazione non riuscita.'); } finally { setBusy(false); }
   }
-  if (express) return <section className="quote-express is-active"><span><Zap size={18} /></span><div><strong>Spedizione express richiesta</strong><p>{viewer === 'client' ? `Il tuo ordine ${quote.orderName || ''} partirà con spedizione express. ${express.credits.toLocaleString('it-IT')} crediti scalati il ${shortDate(express.requestedAt)}.` : `Il cliente ha usato ${express.credits.toLocaleString('it-IT')} crediti il ${shortDate(express.requestedAt)}: l’ordine su Shopify ha il tag «SPEDIZIONE EXPRESS».`}</p>{error ? <p className="form-error">{error}</p> : null}</div>{viewer === 'team' ? <button className="client-action" disabled={busy} onClick={() => void act('refund')} type="button">{busy ? <Loader2 className="spin" size={14} /> : null}Rimborsa crediti</button> : null}</section>;
+  if (express) return <section className="quote-express is-active"><span><Zap size={18} /></span><div><strong>Spedizione express richiesta</strong><p>{viewer === 'client' ? `${quote.orderName ? `Il tuo ordine ${quote.orderName}` : 'Il tuo ordine'} partirà con spedizione express. ${express.credits.toLocaleString('it-IT')} crediti scalati il ${shortDate(express.requestedAt)}${quote.orderName ? '' : ': se il preventivo viene annullato o scade, te li restituiamo'}.` : `Il cliente ha usato ${express.credits.toLocaleString('it-IT')} crediti il ${shortDate(express.requestedAt)}${quote.orderName ? ': l’ordine su Shopify ha il tag «SPEDIZIONE EXPRESS».' : '. Considera il corriere express nel prezzo della spedizione: l’ordine avrà il tag «SPEDIZIONE EXPRESS».'}`}</p>{error ? <p className="form-error">{error}</p> : null}</div>{viewer === 'team' ? <button className="client-action" disabled={busy} onClick={() => void act('refund')} type="button">{busy ? <Loader2 className="spin" size={14} /> : null}Rimborsa crediti</button> : null}</section>;
   if (viewer !== 'client') return null;
   return <section className="quote-express"><span><Zap size={18} /></span><div><strong>Ti serve prima? Spedizione express</strong><p>Con {EXPRESS_COST.toLocaleString('it-IT')} crediti il tuo ordine parte con corriere express. I crediti si scalano subito; se non fosse possibile te li restituiamo.</p>{error ? <p className="form-error">{error}{/insufficienti/i.test(error) ? <> <Link href="/dashboard/crediti">Ricarica crediti</Link></> : null}</p> : null}</div><button className="client-action client-action--primary" disabled={busy} onClick={() => void act('request')} type="button">{busy ? <Loader2 className="spin" size={14} /> : <Zap size={14} />}Richiedi express</button></section>;
 }
@@ -354,7 +356,7 @@ function QuoteDetail({quoteId, viewer, onChange}: {quoteId: string; viewer: 'cli
       <div className="rt-meta"><span>Inviata il {shortDate(quote.createdAt)}{viewer === 'team' ? ` da ${quote.requesterName}` : ''}</span>{quote.neededBy ? <span>Serve entro il {shortDate(quote.neededBy)}</span> : null}{quote.orderName ? <span>Ordine {quote.orderName}</span> : null}</div>
     </header>
 
-    {(quote.status === 'paid' || quote.awaitingPayment) ? <ExpressShipping onChange={(next) => { onChange(next); void load(); }} quote={quote} viewer={viewer} /> : null}
+    {quote.status !== 'cancelled' && (quote.express || quote.status === 'paid' || quote.awaitingPayment) ? <ExpressShipping onChange={(next) => { onChange(next); void load(); }} quote={quote} viewer={viewer} /> : null}
 
     {quote.status === 'paid' ? <section className="quote-paid"><CheckCircle2 size={22} /><div><strong>Pagamento ricevuto</strong><p>Ordine {quote.orderName || ''} in lavorazione: lo trovi anche nella pagina Ordini con stato e tracking.</p></div></section> : null}
 
