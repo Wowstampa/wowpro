@@ -5,6 +5,7 @@ import {createClient} from '@/lib/supabase/server';
 import {SupportWidget} from '@/components/support-widget';
 import {countUnread, getConversationCompany} from '@/lib/support';
 import {countSubscriptionPayments} from '@/lib/subscription';
+import {hasActiveSubscription} from '@/lib/access';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,6 +31,6 @@ export default async function DashboardLayout({children}: {children: React.React
       };
     } catch { /* The portal remains available if the Airtable subscription cannot be read. */ }
   }
-  const [support, managerName] = await Promise.all([supportPromise, managerPromise]);
-  return <AppShell mode="client" notificationCounts={{requests: count || 0, feedback: 0, support}} operatorName={company?.name || profile.full_name || profile.email} subscription={subscription}>{children}<SupportWidget initialUnread={support} managerName={managerName} /></AppShell>;
+  const [support, managerName, active] = await Promise.all([supportPromise, managerPromise, hasActiveSubscription(profile.company_id)]);
+  return <AppShell locked={!active} mode="client" notificationCounts={{requests: count || 0, feedback: 0, support}} operatorName={company?.name || profile.full_name || profile.email} subscription={subscription}>{children}<SupportWidget initialUnread={support} managerName={managerName} /></AppShell>;
 }
