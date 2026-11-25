@@ -39,9 +39,21 @@ export async function getWorkspaceData(companyId: string, recordId: string | nul
   const requests = requestsResult.data || [];
   const quotes = (quotesResult.data || []) as QuoteRow[];
 
-  let orders: CustomerOrder[] = [];
+  // Shopify orders (the slowest source) load while the activity queries run.
   let ordersAvailable = true;
-  try { orders = (await listCustomerOrders({customerId: clientResult?.fields.shopify_customer_id || null, email: clientResult?.fields.email_login || fallbackEmail})).filter(isPrintOrder); } catch (error) { console.error('[Dashboard orders]', error); ordersAvailable = false; }
+  const ordersPromise: Promise<CustomerOrder[]> = listCustomerOrders({customerId: clientResult?.fields.shopify_customer_id || null, email: clientResult?.fields.email_login || fallbackEmail}).then((list) => list.filter(isPrintOrder)).catch((error) => { console.error('[Dashboard orders]', error); ordersAvailable = false; return []; });
+  // Recent activity from the team: request updates, messages and files, quote events.
+  const requestIds = requests.map((request) => request.id);
+  const quoteIds = quotes.map((quote) => quote.id);
+  const titleOf = new Map(requests.map((request) => [request.id, request.public_id]));
+  const quoteOf = new Map(quotes.map((quote) => [quote.id, quote.public_id]));
+  const activityPromise = Promise.all([
+    requestIds.length ? admin.from('request_events').select('id,request_id,public_message,created_at').in('request_id', requestIds).not('public_message', 'is', null).gt('created_at', since).order('created_at', {ascending: false}).limit(15) : Promise.resolve({data: []}),
+    requestIds.length ? admin.from('request_messages').select('id,request_id,created_at,author:author_id(full_name,role)').in('request_id', requestIds).eq('customer_visible', true).gt('created_at', since).order('created_at', {ascending: false}).limit(15) : Promise.resolve({data: []}),
+    requestIds.length ? admin.from('request_files').select('id,request_id,file_name,created_at,uploader:uploaded_by(full_name,role)').in('request_id', requestIds).eq('customer_visible', true).gt('created_at', since).order('created_at', {ascending: false}).limit(15) : Promise.resolve({data: []}),
+    quoteIds.length ? admin.from('quote_messages').select('id,quote_id,body,created_at').in('quote_id', quoteIds).eq('kind', 'event').gt('created_at', since).order('created_at', {ascending: false}).limit(15) : Promise.resolve({data: []}),
+  ]);
+  const [orders, [events, messages, files, quoteEvents]] = await Promise.all([ordersPromise, activityPromise]);
   const orderByName = new Map(orders.map((order) => [order.name, order]));
 
   // Jobs in progress: open design requests and print quotes until the order ships.
@@ -81,17 +93,6 @@ export async function getWorkspaceData(companyId: string, recordId: string | nul
     };
   });
 
-  // Recent activity from the team: request updates, messages and files, quote events.
-  const requestIds = requests.map((request) => request.id);
-  const quoteIds = quotes.map((quote) => quote.id);
-  const titleOf = new Map(requests.map((request) => [request.id, request.public_id]));
-  const quoteOf = new Map(quotes.map((quote) => [quote.id, quote.public_id]));
-  const [events, messages, files, quoteEvents] = await Promise.all([
-    requestIds.length ? admin.from('request_events').select('id,request_id,public_message,created_at').in('request_id', requestIds).not('public_message', 'is', null).gt('created_at', since).order('created_at', {ascending: false}).limit(15) : Promise.resolve({data: []}),
-    requestIds.length ? admin.from('request_messages').select('id,request_id,created_at,author:author_id(full_name,role)').in('request_id', requestIds).eq('customer_visible', true).gt('created_at', since).order('created_at', {ascending: false}).limit(15) : Promise.resolve({data: []}),
-    requestIds.length ? admin.from('request_files').select('id,request_id,file_name,created_at,uploader:uploaded_by(full_name,role)').in('request_id', requestIds).eq('customer_visible', true).gt('created_at', since).order('created_at', {ascending: false}).limit(15) : Promise.resolve({data: []}),
-    quoteIds.length ? admin.from('quote_messages').select('id,quote_id,body,created_at').in('quote_id', quoteIds).eq('kind', 'event').gt('created_at', since).order('created_at', {ascending: false}).limit(15) : Promise.resolve({data: []}),
-  ]);
   type Person = {full_name?: string | null; role?: string} | null;
   const activity: DashboardActivity[] = [
     ...((events.data || []) as Array<{id: string; request_id: string; public_message: string; created_at: string}>).map((event) => ({id: `e${event.id}`, at: event.created_at, text: `${titleOf.get(event.request_id)} · ${event.public_message}`, href: `/dashboard/richieste?r=${event.request_id}`, kind: 'grafica' as const})),

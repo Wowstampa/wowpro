@@ -4,7 +4,6 @@ import {cache} from 'react';
 import {NextResponse} from 'next/server';
 
 import {getWowproClient} from '@/lib/integrations/airtable';
-import {countSubscriptionPayments} from '@/lib/subscription';
 import {createAdminClient} from '@/lib/supabase/admin.server';
 
 // Client workspace access: active when the subscription was paid on Shopify OR the team set "Attivo" in Airtable
@@ -13,10 +12,15 @@ import {createAdminClient} from '@/lib/supabase/admin.server';
 export const hasActiveSubscription = cache(async (companyId: string | null | undefined) => {
   if (!companyId) return false;
   try {
-    const {data, error} = await createAdminClient().from('companies').select('airtable_record_id').eq('id', companyId).maybeSingle();
+    // Company record and Shopify subscription payments are read together (one round trip instead of three).
+    const admin = createAdminClient();
+    const [{data, error}, {count}] = await Promise.all([
+      admin.from('companies').select('airtable_record_id').eq('id', companyId).maybeSingle(),
+      admin.from('credit_transactions').select('id', {count: 'exact', head: true}).eq('company_id', companyId).like('idempotency_key', 'shopify-sub-%'),
+    ]);
+    if ((count || 0) > 0) return true;
     if (error) return true;
     if (!data?.airtable_record_id) return false;
-    if ((await countSubscriptionPayments(data.airtable_record_id)) > 0) return true;
     const client = await getWowproClient(data.airtable_record_id);
     return isActiveStatus(client.fields.stato_abbonamento);
   } catch {

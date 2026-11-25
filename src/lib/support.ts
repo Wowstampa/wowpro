@@ -1,5 +1,7 @@
 import 'server-only';
 
+import {cache} from 'react';
+
 import type {CurrentProfile} from '@/lib/auth';
 import {escapeHtml, sendEmail} from '@/lib/email';
 import {listWowproClients} from '@/lib/integrations/airtable';
@@ -39,12 +41,13 @@ async function resolveManagers(companies: CompanyRow[]) {
   }));
 }
 
-export async function getConversationCompany(companyId: string) {
+// Memoised per request: the layout and the page both need the client's account manager.
+export const getConversationCompany = cache(async (companyId: string) => {
   const {data} = await createAdminClient().from('companies').select('id,name,airtable_record_id,account_manager_id').eq('id', companyId).maybeSingle<CompanyRow>();
   if (!data) return null;
   const manager = (await resolveManagers([data])).get(data.id) || null;
   return {...data, manager};
-}
+});
 
 // Clients reach only their own company; staff their own clients (or unassigned ones); admins everything.
 export async function canAccessConversation(profile: CurrentProfile, companyId: string) {
