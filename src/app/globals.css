@@ -1403,6 +1403,9 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .dash-btn--light { background: white; color: var(--green-dark); box-shadow: 0 8px 20px -10px rgba(4,40,20,.6); }
 .dash-btn--light:hover { transform: translateY(-1px); }
 
+html { scroll-behavior: smooth; }
+.dash-anchor { scroll-margin-top: 110px; }
+
 /* Hero */
 .dash-hero { position: relative; isolation: isolate; overflow: hidden; min-height: 320px; padding: 44px 48px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(320px, 460px); gap: 24px; align-items: center; border-radius: 24px; color: white;
   background: radial-gradient(520px 340px at 82% 45%, rgba(14,147,69,.55), transparent 70%), radial-gradient(420px 260px at 8% 120%, rgba(14,147,69,.28), transparent 70%), linear-gradient(135deg, #0c1119 0%, #0f1a16 60%, #0d2418 100%); }
