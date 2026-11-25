@@ -328,20 +328,22 @@ function initials(value: string) { return value.split(' ').filter(Boolean).slice
 async function RequestsPage() {
   const profile = await requireProfile(['client']);
   const supabase = await createClient();
-  const {data: requests} = await supabase.from('graphic_requests').select('id,public_id,title,brief,status,type,credit_cost,created_at').order('created_at', {ascending: false});
-  let includedCredits = 0; let extraCredits = 0;
-  const {data: company} = await supabase.from('companies').select('airtable_record_id').eq('id', profile.company_id || '').maybeSingle();
-  if (company?.airtable_record_id) { try { const record = await getWowproClient(company.airtable_record_id, {fresh: true}); includedCredits = Number(record.fields.crediti_inclusi_residui || 0); extraCredits = Number(record.fields.crediti_extra_residui || 0); } catch { /* The request form will show an unavailable balance. */ } }
+  // Requests, company, balance and quotes are independent: read them in parallel.
+  const [{data: requests}, {data: company}, quotes] = await Promise.all([
+    supabase.from('graphic_requests').select('id,public_id,title,brief,status,type,credit_cost,created_at').order('created_at', {ascending: false}),
+    supabase.from('companies').select('airtable_record_id').eq('id', profile.company_id || '').maybeSingle(),
+    listQuotes(profile).catch((error) => { console.error('[Quotes]', error); return []; }),
+  ]);
   const requestIds = (requests || []).map((request) => request.id);
-  const filesByRequest = await listRequestFiles(requestIds, {customerVisibleOnly: true});
+  const [balance, filesByRequest, messagesResult] = await Promise.all([
+    company?.airtable_record_id ? getWowproClient(company.airtable_record_id, {fresh: true}).then((record) => ({included: Number(record.fields.crediti_inclusi_residui || 0), extra: Number(record.fields.crediti_extra_residui || 0)})).catch(() => ({included: 0, extra: 0})) : Promise.resolve({included: 0, extra: 0}),
+    listRequestFiles(requestIds, {customerVisibleOnly: true}),
+    requestIds.length ? supabase.from('request_messages').select('id,request_id,body,created_at').in('request_id', requestIds).order('created_at', {ascending: true}) : Promise.resolve({data: [], error: null}),
+  ]);
+  const includedCredits = balance.included; const extraCredits = balance.extra;
   const messagesByRequest = new Map<string, Array<{id: string; body: string; created_at: string}>>();
-  if (requestIds.length) {
-    // The message log is optional until the graphic-workspace migration is applied.
-    const {data: messages, error} = await supabase.from('request_messages').select('id,request_id,body,created_at').in('request_id', requestIds).order('created_at', {ascending: true});
-    if (!error) for (const message of messages || []) messagesByRequest.set(message.request_id, [...(messagesByRequest.get(message.request_id) || []), message]);
-  }
+  if (!messagesResult.error) for (const message of (messagesResult.data || []) as Array<{id: string; request_id: string; body: string; created_at: string}>) messagesByRequest.set(message.request_id, [...(messagesByRequest.get(message.request_id) || []), message]);
   const workspaceRequests = (requests || []).map((request) => ({id: request.id, publicId: request.public_id, title: request.title, brief: request.brief, status: request.status, type: request.type, creditCost: request.credit_cost, createdAt: request.created_at, messages: (messagesByRequest.get(request.id) || []).map((message) => ({id: message.id, body: message.body, createdAt: message.created_at})), files: filesByRequest.get(request.id) || []}));
-  const quotes = await listQuotes(profile).catch((error) => { console.error('[Quotes]', error); return []; });
   return <><PageHeader eyebrow="WOWPRO · Area cliente" title="Richieste" action={<div className="credit-chip"><i /> <strong>{number(includedCredits + extraCredits)}</strong> crediti disponibili</div>} /><main className="page-content"><RequestsHub extraCredits={extraCredits} includedCredits={includedCredits} quotes={quotes} requests={workspaceRequests} /></main></>;
 }
 
