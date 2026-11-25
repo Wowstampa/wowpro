@@ -55,7 +55,7 @@ function getClientLinks(notificationCounts: AdminNotificationCounts, locked: boo
   {href: '/dashboard/file', label: 'File', icon: FolderOpen},
   {href: locked ? '/dashboard/abbonamento' : '/dashboard/crediti', label: 'Piano e crediti', icon: Crown, section: 'ACCOUNT', match: ['/dashboard/crediti', '/dashboard/abbonamento']},
   {href: '/dashboard/supporto', label: 'Messaggi', icon: MessagesSquare, count: notificationCounts.support || undefined, section: 'AIUTO'},
-  {href: '/dashboard/feedback', label: 'Feedback & idee', icon: Lightbulb, section: 'COMMUNITY'},
+  {href: '/dashboard/feedback', label: 'Feedback & idee', icon: Lightbulb},
   ];
 }
 
