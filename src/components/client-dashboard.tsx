@@ -26,8 +26,8 @@ export function ClientDashboard({name, active, todos, requests, orders, credits,
 
   const hero = <section className="dash-hero">
     <div className="dash-hero__copy">
-      <span className="dash-pill"><i /> {active ? 'WOWPRO attivo' : 'Il tuo workspace WOWPRO'}</span>
-      <h2>Bentornati,<br /><span className="dash-hero__name">{name}</span></h2>
+      <span className="dash-pill"><i /> {active ? 'WOWPRO attivo' : 'Benvenuto in WOWPRO'}</span>
+      <h2>{active ? 'Bentornati,' : 'Benvenuti,'}<br /><span className="dash-hero__name">{name}</span></h2>
       <p>{active ? 'Grafica, stampa e supporto dedicato. Tutto in un solo posto.' : 'Attiva WOWPRO: grafica, stampa e supporto dedicato in un solo posto.'}</p>
       <div className="dash-hero__actions">
         {active ? <>
@@ -93,6 +93,6 @@ export function ClientDashboard({name, active, todos, requests, orders, credits,
 
   return <main className="page-content dash">
     {hero}
-    {active ? <>{todoList}{cards}{managerCard}<VideoIntro compact /></> : <><div className="dash-anchor" id="come-funziona"><VideoIntro /></div>{activate}{todoList}{cards}{managerCard}</>}
+    {active ? <>{todoList}{cards}{managerCard}<VideoIntro compact /></> : <><div className="dash-anchor" id="come-funziona"><VideoIntro /></div>{activate}</>}
   </main>;
 }

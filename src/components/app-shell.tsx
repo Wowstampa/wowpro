@@ -14,6 +14,7 @@ import {
   Headphones,
   Home,
   Lightbulb,
+  Lock,
   LayoutGrid,
   LogOut,
   Menu,
@@ -72,18 +73,20 @@ const TAB_LABELS: Record<string, string> = {'/dashboard': 'Home', '/dashboard/ri
 
 export type AdminNotificationCounts = {requests: number; feedback: number; support?: number};
 
-export function AppShell({mode, children, notificationCounts = {requests: 0, feedback: 0}, operatorName, isAdministrator = false, subscription}: {mode: ShellMode; children: React.ReactNode; notificationCounts?: AdminNotificationCounts; operatorName?: string; isAdministrator?: boolean; subscription?: {plan: string; monthlyCredits: number; renewalDate: string; status: string}}) {
+export function AppShell({mode, children, notificationCounts = {requests: 0, feedback: 0}, operatorName, isAdministrator = false, subscription, locked = false}: {mode: ShellMode; locked?: boolean; children: React.ReactNode; notificationCounts?: AdminNotificationCounts; operatorName?: string; isAdministrator?: boolean; subscription?: {plan: string; monthlyCredits: number; renewalDate: string; status: string}}) {
   const pathname = usePathname();
   const router = useRouter();
   const links = mode === 'admin' ? getAdminLinks(notificationCounts, isAdministrator) : mode === 'graphic' ? graphicLinks.map((link) => link.href === '/operatore/richieste' ? {...link, count: notificationCounts.requests || undefined} : link) : getClientLinks(notificationCounts);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  // Without an active subscription only the home and Abbonamento stay open for clients.
+  const isLocked = (href: string) => mode === 'client' && locked && href !== '/dashboard' && href !== '/dashboard/abbonamento';
   const activeLink = links.find(({href, children}) => children?.some((child) => pathname.startsWith(child.href)) || href === pathname || (href !== '/admin' && href !== '/dashboard' && pathname.startsWith(href)));
   const totalBadges = links.reduce((total, link) => total + (link.count || 0), 0);
   // Mobile bottom bar: the most used sections, everything else stays in the "Altro" drawer.
   const tabHrefs = mode === 'admin' ? ['/admin', '/admin/richieste', '/admin/messaggi', '/admin/clienti'] : mode === 'graphic' ? ['/operatore', '/operatore/richieste'] : ['/dashboard', '/dashboard/richieste', '/dashboard/crediti', '/dashboard/supporto'];
   const tabItems = tabHrefs.map((href) => links.find((link) => link.href === href)).filter((link): link is NavigationLink => Boolean(link)).map((link) => ({...link, label: TAB_LABELS[link.href] || link.label, icon: link.href === '/dashboard' ? Home : link.icon}));
-  const moreBadges = links.filter((link) => !tabHrefs.includes(link.href)).reduce((total, link) => total + (link.count || 0), 0);
+  const moreBadges = links.filter((link) => !tabHrefs.includes(link.href) && !isLocked(link.href)).reduce((total, link) => total + (link.count || 0), 0);
 
   // Mobile menu: lock page scroll while it is open.
   useEffect(() => {
@@ -120,10 +123,10 @@ export function AppShell({mode, children, notificationCounts = {requests: 0, fee
             return (
               <div className={separated ? 'nav-group nav-group--separated' : 'nav-group'} key={href}>
                 {section ? <span className="nav-label nav-label--section">{section}</span> : null}
-                <Link href={href} className={active ? 'nav-link nav-link--active' : 'nav-link'} onClick={() => setMenuOpen(false)}>
+                <Link aria-label={isLocked(href) ? `${label} (riservato agli abbonati)` : undefined} href={href} className={`nav-link${active ? ' nav-link--active' : ''}${isLocked(href) ? ' nav-link--locked' : ''}`} onClick={() => setMenuOpen(false)}>
                   <Icon size={18} />
                   <span>{label}</span>
-                  {count ? <b>{count}</b> : null}
+                  {isLocked(href) ? <Lock className="nav-lock" size={14} /> : count ? <b>{count}</b> : null}
                 </Link>
                 {children ? <div className="nav-sublist">{children.map(({href: childHref, label: childLabel, icon: ChildIcon}) => {
                   const childActive = pathname === childHref || pathname.startsWith(`${childHref}/`);
@@ -155,7 +158,7 @@ export function AppShell({mode, children, notificationCounts = {requests: 0, fee
       <nav aria-label="Navigazione principale" className="tabbar">
         {tabItems.map(({href, label, icon: Icon, count}) => {
           const active = !menuOpen && activeLink?.href === href;
-          return <Link aria-current={active ? 'page' : undefined} className={active ? 'tabbar__item is-active' : 'tabbar__item'} href={href} key={href} onClick={() => setMenuOpen(false)}><span><Icon size={21} />{count ? <b>{count > 9 ? '9+' : count}</b> : null}</span>{label}</Link>;
+          return <Link aria-current={active ? 'page' : undefined} className={`tabbar__item${active ? ' is-active' : ''}${isLocked(href) ? ' is-locked' : ''}`} href={href} key={href} onClick={() => setMenuOpen(false)}><span><Icon size={21} />{isLocked(href) ? <i className="tab-lock"><Lock size={9} strokeWidth={3} /></i> : count ? <b>{count > 9 ? '9+' : count}</b> : null}</span>{label}</Link>;
         })}
         <button aria-expanded={menuOpen} className={menuOpen || (activeLink && !tabItems.some((item) => item.href === activeLink.href)) ? 'tabbar__item is-active' : 'tabbar__item'} onClick={() => setMenuOpen((value) => !value)} type="button"><span><LayoutGrid size={21} />{moreBadges ? <b>{moreBadges > 9 ? '9+' : moreBadges}</b> : null}</span>Altro</button>
       </nav>
