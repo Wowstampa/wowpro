@@ -22,7 +22,7 @@ import {billingFromClient} from '@/lib/billing';
 import {countSubscriptionPayments} from '@/lib/subscription';
 import {listRequestFiles} from '@/lib/request-files';
 import {createClient} from '@/lib/supabase/server';
-import {hasActiveSubscription, OPEN_CLIENT_SECTIONS} from '@/lib/access';
+import {hasActiveSubscription, isActiveStatus, OPEN_CLIENT_SECTIONS} from '@/lib/access';
 import {LockedSection} from '@/components/locked-section';
 
 const titles: Record<string, string> = {workspace: 'Dashboard', crediti: 'Crediti', richieste: 'Richieste grafiche', ordini: 'Ordini', abbonamento: 'Abbonamento', preventivi: 'Preventivi', supporto: 'Supporto', feedback: 'Feedback & idee'};
@@ -104,8 +104,8 @@ async function SubscriptionPage() {
   if (!billing && latestOrder) { try { billing = await getLatestBillingDetails(latestOrder.id); } catch (error) { console.error('[Subscription billing]', error); } }
 
   // Shopify (via Flow) is the source of truth; the CRM fills in until the first sync.
-  // A subscription counts as active only when paid through Shopify; the CRM status fills in until Flow syncs.
-  const statusKey = subscription.status || (paidCount ? (/attiv/i.test(crmStatus) ? 'ACTIVE' : /disd|cessat|annull/i.test(crmStatus) ? 'CANCELLED' : /paus|sospes/i.test(crmStatus) ? 'PAUSED' : '') : '');
+  // Active when paid through Shopify or set "Attivo" by the team in Airtable; the CRM status fills in until Flow syncs.
+  const statusKey = subscription.status || (paidCount || isActiveStatus(crmStatus) ? (/attiv/i.test(crmStatus) ? 'ACTIVE' : /disd|cessat|annull/i.test(crmStatus) ? 'CANCELLED' : /paus|sospes/i.test(crmStatus) ? 'PAUSED' : '') : '');
   const status = SUBSCRIPTION_STATUS[statusKey] || {label: 'Non attivo', tone: 'off'};
   const nextBilling = statusKey ? subscription.nextBillingDate || crmRenewal : '';
   const planName = subscriptionPlanLabel(subscription.plan) || subscriptionPlanLabel(payments[0]?.subscriptionPlan) || plan || 'WOWPRO';
