@@ -38,9 +38,11 @@ type NavigationLink = {
   children?: Array<{href: string; label: string; icon: typeof Home}>;
 };
 
-function getClientLinks(notificationCounts: AdminNotificationCounts): NavigationLink[] {
+function getClientLinks(notificationCounts: AdminNotificationCounts, locked: boolean): NavigationLink[] {
+  // Without a subscription the home is the welcome page and the workspace dashboard is a separate, locked entry.
+  const home: NavigationLink[] = locked ? [{href: '/dashboard', label: 'Benvenuto', icon: Home}, {href: '/dashboard/workspace', label: 'Dashboard', icon: ChartNoAxesCombined}] : [{href: '/dashboard', label: 'Dashboard', icon: ChartNoAxesCombined}];
   return [
-  {href: '/dashboard', label: 'Dashboard', icon: ChartNoAxesCombined},
+  ...home,
   {href: '/dashboard/richieste', label: 'Richieste', icon: MessageSquareText, count: notificationCounts.requests || undefined, section: 'GESTIONE'},
   {href: '/dashboard/ordini', label: 'Ordini', icon: PackageCheck},
   {href: '/dashboard/crediti', label: 'Crediti', icon: CreditCard},
@@ -76,7 +78,7 @@ export type AdminNotificationCounts = {requests: number; feedback: number; suppo
 export function AppShell({mode, children, notificationCounts = {requests: 0, feedback: 0}, operatorName, isAdministrator = false, subscription, locked = false}: {mode: ShellMode; locked?: boolean; children: React.ReactNode; notificationCounts?: AdminNotificationCounts; operatorName?: string; isAdministrator?: boolean; subscription?: {plan: string; monthlyCredits: number; renewalDate: string; status: string}}) {
   const pathname = usePathname();
   const router = useRouter();
-  const links = mode === 'admin' ? getAdminLinks(notificationCounts, isAdministrator) : mode === 'graphic' ? graphicLinks.map((link) => link.href === '/operatore/richieste' ? {...link, count: notificationCounts.requests || undefined} : link) : getClientLinks(notificationCounts);
+  const links = mode === 'admin' ? getAdminLinks(notificationCounts, isAdministrator) : mode === 'graphic' ? graphicLinks.map((link) => link.href === '/operatore/richieste' ? {...link, count: notificationCounts.requests || undefined} : link) : getClientLinks(notificationCounts, mode === 'client' && locked);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   // Without an active subscription only the home and Abbonamento stay open for clients.

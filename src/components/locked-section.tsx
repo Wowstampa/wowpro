@@ -1,7 +1,8 @@
 import Link from 'next/link';
-import {ArrowLeft, ArrowRight, Coins, Headphones, Lightbulb, Lock, MessageSquareText, Package} from 'lucide-react';
+import {ArrowLeft, ArrowRight, Coins, Headphones, LayoutDashboard, Lightbulb, Lock, MessageSquareText, Package} from 'lucide-react';
 
 const SECTIONS: Record<string, {label: string; text: string; icon: typeof Lock}> = {
+  workspace: {label: 'La tua Dashboard', text: 'Il workspace con richieste in corso, ordini, crediti e il tuo account manager dedicato.', icon: LayoutDashboard},
   richieste: {label: 'Richieste', text: 'Richieste grafiche e preventivi di stampa, con il team WowStampa che segue ogni lavoro.', icon: MessageSquareText},
   ordini: {label: 'Ordini', text: 'Lo storico dei tuoi ordini, i pagamenti e le spedizioni in un unico posto.', icon: Package},
   crediti: {label: 'Crediti', text: 'I crediti grafici inclusi ogni mese, quelli extra e tutti i movimenti.', icon: Coins},
