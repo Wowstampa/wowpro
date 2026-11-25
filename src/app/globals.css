@@ -1831,3 +1831,11 @@ textarea.bk-input { resize: vertical; line-height: 1.5; }
   .plan-tabs { width: 100%; }
   .plan-tabs a { flex: 1; justify-content: center; }
 }
+/* Taller client menu: compact rows and a scrollable sidebar on short screens */
+@media (min-width: 761px) {
+  .sidebar { overflow-y: auto; scrollbar-width: thin; scrollbar-color: #2b3445 transparent; }
+  .sidebar .nav-link { min-height: 40px; }
+  .sidebar .nav-label--section { margin: 12px 12px 4px; }
+  .sidebar .nav-list { gap: 3px; }
+  .sidebar-bottom { padding-top: 14px; }
+}
