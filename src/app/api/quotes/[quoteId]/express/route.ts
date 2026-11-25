@@ -4,6 +4,7 @@ import {z} from 'zod';
 import {getCurrentProfile} from '@/lib/auth';
 import {refundExpress, requestExpress} from '@/lib/express';
 import {getAccessibleQuote, isQuoteTeam, toSummary} from '@/lib/quotes';
+import {hasActiveSubscription, subscriptionRequired} from '@/lib/access';
 
 const schema = z.object({action: z.enum(['request', 'refund']), reason: z.string().trim().max(500).default('')});
 
@@ -17,6 +18,7 @@ export async function POST(request: Request, {params}: {params: Promise<{quoteId
   const parsed = schema.safeParse(await request.json().catch(() => ({})));
   if (!parsed.success) return NextResponse.json({error: 'Azione non valida.'}, {status: 400});
   if (parsed.data.action === 'request' && profile.role !== 'client') return NextResponse.json({error: 'Solo il cliente può richiederla.'}, {status: 403});
+  if (parsed.data.action === 'request' && !(await hasActiveSubscription(profile.company_id))) return subscriptionRequired();
   if (parsed.data.action === 'refund' && !isQuoteTeam(profile)) return NextResponse.json({error: 'Accesso non autorizzato.'}, {status: 403});
   try {
     const updated = parsed.data.action === 'request' ? await requestExpress(profile, quote) : await refundExpress(profile, quote, parsed.data.reason);
