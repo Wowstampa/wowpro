@@ -4,6 +4,7 @@ import {z} from 'zod';
 import {getCurrentProfile} from '@/lib/auth';
 import {getWowproClient, updateWowproClient} from '@/lib/integrations/airtable';
 import {createAdminClient} from '@/lib/supabase/admin.server';
+import {hasActiveSubscription, subscriptionRequired} from '@/lib/access';
 
 const requestSchema = z.object({
   type: z.enum(['revision', 'modification', 'creation']),
@@ -16,6 +17,7 @@ export async function POST(request: Request) {
   const profile = await getCurrentProfile();
   if (!profile) return NextResponse.json({error: 'Non autenticato.'}, {status: 401});
   if (profile.role !== 'client' || profile.status !== 'active' || !profile.company_id) return NextResponse.json({error: 'Accesso non autorizzato.'}, {status: 403});
+  if (!(await hasActiveSubscription(profile.company_id))) return subscriptionRequired();
 
   const parsed = requestSchema.safeParse(await request.json());
   if (!parsed.success) return NextResponse.json({error: 'La descrizione della richiesta deve contenere almeno 10 caratteri.'}, {status: 400});
