@@ -24,10 +24,14 @@ import {listRequestFiles} from '@/lib/request-files';
 import {createClient} from '@/lib/supabase/server';
 import {hasActiveSubscription, isActiveStatus, OPEN_CLIENT_SECTIONS} from '@/lib/access';
 import {LockedSection} from '@/components/locked-section';
+import {PlanTabs} from '@/components/plan-tabs';
+import {ClientFiles} from '@/components/client-files';
+import {ClientSettings} from '@/components/client-settings';
+import {listClientFiles} from '@/lib/client-files';
 import {BrandKitEditor} from '@/components/brand-kit';
 import {readBrandKit, toBrandKitView} from '@/lib/brand-kit';
 
-const titles: Record<string, string> = {workspace: 'Dashboard', 'brand-kit': 'Brand kit', crediti: 'Crediti', richieste: 'Richieste grafiche', ordini: 'Ordini', abbonamento: 'Abbonamento', preventivi: 'Preventivi', supporto: 'Supporto', feedback: 'Feedback & idee'};
+const titles: Record<string, string> = {workspace: 'Dashboard', 'brand-kit': 'Brand kit', crediti: 'Piano e crediti', file: 'File', impostazioni: 'Impostazioni', richieste: 'Richieste grafiche', ordini: 'Ordini', abbonamento: 'Abbonamento', preventivi: 'Preventivi', supporto: 'Messaggi', feedback: 'Feedback & idee'};
 
 export default async function ClientSectionPage({params, searchParams}: {params: Promise<{section: string}>; searchParams: Promise<Record<string, string | string[] | undefined>>}) {
   const {section} = await params;
@@ -41,6 +45,8 @@ export default async function ClientSectionPage({params, searchParams}: {params:
   if (section === 'richieste') return <RequestsPage />;
   if (section === 'ordini') return <OrdersPage />;
   if (section === 'brand-kit') return <BrandKitPage />;
+  if (section === 'file') return <FilesPage />;
+  if (section === 'impostazioni') return <SettingsPage />;
   if (section === 'abbonamento') return <SubscriptionPage />;
   if (section === 'preventivi') return redirectQuotes(await searchParams);
   if (section === 'supporto') return <SupportPage />;
@@ -60,7 +66,7 @@ async function CreditsPage() {
     runningBalance: state.runningBalance - transaction.amount,
   }), {rows: [], runningBalance: included + extra}).rows;
   const used = Math.max(monthly - included, 0);
-  return <><PageHeader eyebrow="WOWPRO · Area cliente" title="Crediti" action={<div className="credit-chip"><i /> <strong>{number(included + extra)}</strong> crediti disponibili</div>} /><main className="page-content credits-page"><MobileTabs tabs={[{id: 'saldo', label: 'Saldo', content: <section className="credits-hero"><article className="credits-hero__included"><span className="credits-hero__label"><i /> CREDITI INCLUSI</span><div><strong>{number(included)}</strong><b>{monthly ? ` / ${number(monthly)}` : ''}</b></div><p>{renewal ? `Rinnovo automatico il ${date(renewal)}` : 'Rinnovo mensile del piano'}</p><div className="credits-progress"><i style={{width: monthly ? `${Math.min(included / monthly, 1) * 100}%` : '0%'}} /></div><div className="credits-hero__summary"><span>Consumati: <b>{number(used)}</b></span><span>{monthly ? `${Math.round(included / monthly * 100)}% disponibile` : 'Piano da configurare'}</span></div><div className="credits-hero__note"><Info size={15} /><p>I crediti inclusi <b>si resettano ogni mese e non sono cumulabili</b>: vengono sempre consumati per primi.</p></div></article><article className="credits-hero__extra"><span className="credits-hero__label"><i /> CREDITI EXTRA</span><strong>{number(extra)}</strong><p>I crediti extra <b>non scadono e non si azzerano</b> al reset mensile. Vengono usati solo dopo aver esaurito quelli inclusi.</p><CreditPurchase /></article></section>}, {id: 'listino', label: 'Listino', content: <section><div className="credits-section-title"><h2>Listino servizi grafici</h2><p>Costo in crediti per ogni tipo di richiesta</p></div><div className="service-price-grid"><Service icon={<BadgeCheck size={18} />} title="Revisione" text="Controllo file e piccole correzioni su un progetto esistente." credits="1.000" /><Service icon={<Pencil size={18} />} title="Modifica" text="Interventi sostanziali su grafica, testi o impaginazione." credits="2.000" /><Service icon={<Sparkles size={18} />} title="Creazione" text="Progettazione di una grafica nuova partendo da zero." credits="3.000" /></div></section>}, {id: 'movimenti', label: 'Movimenti', content: <section><div className="credits-section-title"><h2>Storico movimenti</h2></div><div className="credits-ledger"><div className="credits-ledger__head"><span>Data</span><span>Descrizione</span><span>Tipo</span><span>Crediti</span><span>Saldo</span></div>{ledger.map((transaction) => <div className="credits-ledger__row" key={transaction.id}><strong>{date(transaction.created_at)}</strong><span>{transaction.description}</span><span><i className={transaction.bucket === 'extra' ? 'ledger-tag ledger-tag--extra' : 'ledger-tag'}>{transaction.bucket === 'extra' ? 'Extra' : 'Inclusi'}</i></span><b className={transaction.amount > 0 ? 'positive' : 'negative'}>{transaction.amount > 0 ? '+' : ''}{number(transaction.amount)}</b><strong>{number(transaction.balance)}</strong></div>)}{!ledger.length ? <div className="credits-ledger__empty"><CreditCard size={20} /><strong>Nessun movimento</strong><p>Gli accrediti registrati dal team compariranno qui.</p></div> : null}</div></section>}]} />
+  return <><PageHeader eyebrow="WOWPRO · Area cliente" title="Piano e crediti" action={<div className="credit-chip"><i /> <strong>{number(included + extra)}</strong> crediti disponibili</div>} /><main className="page-content credits-page"><PlanTabs current="crediti" /><MobileTabs tabs={[{id: 'saldo', label: 'Saldo', content: <section className="credits-hero"><article className="credits-hero__included"><span className="credits-hero__label"><i /> CREDITI INCLUSI</span><div><strong>{number(included)}</strong><b>{monthly ? ` / ${number(monthly)}` : ''}</b></div><p>{renewal ? `Rinnovo automatico il ${date(renewal)}` : 'Rinnovo mensile del piano'}</p><div className="credits-progress"><i style={{width: monthly ? `${Math.min(included / monthly, 1) * 100}%` : '0%'}} /></div><div className="credits-hero__summary"><span>Consumati: <b>{number(used)}</b></span><span>{monthly ? `${Math.round(included / monthly * 100)}% disponibile` : 'Piano da configurare'}</span></div><div className="credits-hero__note"><Info size={15} /><p>I crediti inclusi <b>si resettano ogni mese e non sono cumulabili</b>: vengono sempre consumati per primi.</p></div></article><article className="credits-hero__extra"><span className="credits-hero__label"><i /> CREDITI EXTRA</span><strong>{number(extra)}</strong><p>I crediti extra <b>non scadono e non si azzerano</b> al reset mensile. Vengono usati solo dopo aver esaurito quelli inclusi.</p><CreditPurchase /></article></section>}, {id: 'listino', label: 'Listino', content: <section><div className="credits-section-title"><h2>Listino servizi grafici</h2><p>Costo in crediti per ogni tipo di richiesta</p></div><div className="service-price-grid"><Service icon={<BadgeCheck size={18} />} title="Revisione" text="Controllo file e piccole correzioni su un progetto esistente." credits="1.000" /><Service icon={<Pencil size={18} />} title="Modifica" text="Interventi sostanziali su grafica, testi o impaginazione." credits="2.000" /><Service icon={<Sparkles size={18} />} title="Creazione" text="Progettazione di una grafica nuova partendo da zero." credits="3.000" /></div></section>}, {id: 'movimenti', label: 'Movimenti', content: <section><div className="credits-section-title"><h2>Storico movimenti</h2></div><div className="credits-ledger"><div className="credits-ledger__head"><span>Data</span><span>Descrizione</span><span>Tipo</span><span>Crediti</span><span>Saldo</span></div>{ledger.map((transaction) => <div className="credits-ledger__row" key={transaction.id}><strong>{date(transaction.created_at)}</strong><span>{transaction.description}</span><span><i className={transaction.bucket === 'extra' ? 'ledger-tag ledger-tag--extra' : 'ledger-tag'}>{transaction.bucket === 'extra' ? 'Extra' : 'Inclusi'}</i></span><b className={transaction.amount > 0 ? 'positive' : 'negative'}>{transaction.amount > 0 ? '+' : ''}{number(transaction.amount)}</b><strong>{number(transaction.balance)}</strong></div>)}{!ledger.length ? <div className="credits-ledger__empty"><CreditCard size={20} /><strong>Nessun movimento</strong><p>Gli accrediti registrati dal team compariranno qui.</p></div> : null}</div></section>}]} />
   </main></>;
 }
 
@@ -150,10 +156,10 @@ async function SubscriptionPage() {
 
   // Never subscribed: a sales page instead of an empty account summary.
   if (!paidCount && !subscription.status) {
-    return <><PageHeader eyebrow="WOWPRO · Area cliente" title="Abbonamento" /><main className="page-content subscription-page"><SubscriptionLanding billing={billingDraft} managerName={managerName} options={getSubscriptionOptions()} payments={paidCount} /></main></>;
+    return <><PageHeader eyebrow="WOWPRO · Area cliente" title="Piano e crediti" /><main className="page-content subscription-page"><PlanTabs current="abbonamento" locked={!(await hasActiveSubscription(profile.company_id))} /><SubscriptionLanding billing={billingDraft} managerName={managerName} options={getSubscriptionOptions()} payments={paidCount} /></main></>;
   }
 
-  return <><PageHeader eyebrow="WOWPRO · Area cliente" title="Abbonamento" /><main className="page-content subscription-page">
+  return <><PageHeader eyebrow="WOWPRO · Area cliente" title="Piano e crediti" /><main className="page-content subscription-page"><PlanTabs current="abbonamento" locked={!(await hasActiveSubscription(profile.company_id))} />
     <MobileTabs tabs={[{id: 'piano', label: 'Piano', content: overview}, {id: 'pagamenti', label: 'Pagamenti', content: paymentsList}, {id: 'fatturazione', label: 'Fatturazione', content: billingCard}]} />
   </main></>;
 }
@@ -173,6 +179,31 @@ async function BrandKitPage() {
   return <><PageHeader eyebrow="WOWPRO · Area cliente" title="Brand kit" /><main className="page-content brand-kit-page">
     <section className="bk-intro"><div><h2>Il tuo brand, sempre a portata del team</h2><p>Carica una volta logo, colori, font e file aziendali: il tuo grafico li trova già pronti in ogni richiesta, senza doverteli chiedere.</p></div></section>
     <BrandKitEditor canEdit initial={kit} />
+  </main></>;
+}
+
+async function FilesPage() {
+  const profile = await requireProfile(['client']);
+  const groups = await listClientFiles(profile.company_id || '');
+  return <><PageHeader eyebrow="WOWPRO · Area cliente" title="File" /><main className="page-content files-page">
+    <div className="credits-section-title"><h2>Le tue grafiche</h2><p>Bozze e file definitivi consegnati dal team: scaricali quando vuoi o mandali in stampa.</p></div>
+    <ClientFiles groups={groups} />
+  </main></>;
+}
+
+async function SettingsPage() {
+  const profile = await requireProfile(['client']);
+  const admin = createAdminClient();
+  const [{data: me}, {data: people}, {data: company}] = await Promise.all([
+    admin.from('profiles').select('full_name,email,phone').eq('id', profile.id).maybeSingle(),
+    admin.from('profiles').select('id,full_name,email,status,last_login_at').eq('company_id', profile.company_id || '').eq('role', 'client').in('status', ['active', 'invited', 'suspended']).order('full_name'),
+    admin.from('companies').select('airtable_record_id').eq('id', profile.company_id || '').maybeSingle(),
+  ]);
+  let billing: BillingDraft = {company: '', vatNumber: '', taxCode: '', sdi: '', pec: '', address: '', zip: '', city: '', province: ''};
+  if (company?.airtable_record_id) { try { billing = billingFromClient((await getWowproClient(company.airtable_record_id, {fresh: true})).fields); } catch { /* Empty form when Airtable is unreachable. */ } }
+  const colleagues = (people || []).map((person) => ({id: person.id, name: person.full_name || '', email: person.email, status: person.status, lastLogin: person.last_login_at, me: person.id === profile.id}));
+  return <><PageHeader eyebrow="WOWPRO · Area cliente" title="Impostazioni" /><main className="page-content settings-page">
+    <ClientSettings billing={billing} colleagues={colleagues} profile={{fullName: me?.full_name || '', email: me?.email || profile.email, phone: me?.phone || ''}} />
   </main></>;
 }
 
@@ -262,8 +293,8 @@ async function SupportPage() {
       }
     } catch (error) { console.error('[Support contacts]', error); }
   }
-  return <><PageHeader eyebrow="WOWPRO · Area cliente" title="Supporto" action={credits !== null ? <div className="credit-chip"><i /> <strong>{number(credits)}</strong> crediti disponibili</div> : undefined} /><main className="page-content"><MobileTabs tabs={[{id: 'chat', label: 'Chat', content: <MobileOnly><SupportChat emptyHint={`Scrivi a ${manager?.name || 'il tuo account manager'}: ti risponderà qui e riceverai un avviso via email.`} variant="popup" viewer="client" /></MobileOnly>}, {id: 'contatti', label: 'Contatti', content: <section>
-      <div className="credits-section-title"><h2>Supporto WOWPRO</h2><p>Hai una linea diretta con il tuo team dedicato: account manager e grafico</p></div>
+  return <><PageHeader eyebrow="WOWPRO · Area cliente" title="Messaggi" action={credits !== null ? <div className="credit-chip"><i /> <strong>{number(credits)}</strong> crediti disponibili</div> : undefined} /><main className="page-content"><MobileTabs tabs={[{id: 'chat', label: 'Chat', content: <MobileOnly><SupportChat emptyHint={`Scrivi a ${manager?.name || 'il tuo account manager'}: ti risponderà qui e riceverai un avviso via email.`} variant="popup" viewer="client" /></MobileOnly>}, {id: 'contatti', label: 'Contatti', content: <section>
+      <div className="credits-section-title"><h2>Messaggi con il tuo team</h2><p>Hai una linea diretta con il tuo team dedicato: account manager e grafico</p></div>
       <div className="support-contacts">
         <article className="support-card">
           <span className="support-card__label">IL TUO ACCOUNT MANAGER</span>
