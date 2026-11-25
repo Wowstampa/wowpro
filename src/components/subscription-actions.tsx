@@ -29,7 +29,7 @@ export function SubscriptionActions({active, options, accountUrl, managerName, b
   </div>;
 }
 
-const FIELDS: Array<{name: keyof BillingDraft; label: string; placeholder?: string; wide?: boolean; optional?: boolean; maxLength?: number}> = [
+export const BILLING_FIELDS: Array<{name: keyof BillingDraft; label: string; placeholder?: string; wide?: boolean; optional?: boolean; maxLength?: number}> = [
   {name: 'company', label: 'Ragione sociale', wide: true},
   {name: 'vatNumber', label: 'Partita IVA', placeholder: '11 cifre', maxLength: 13},
   {name: 'taxCode', label: 'Codice fiscale', placeholder: 'Se diverso dalla P.IVA', optional: true, maxLength: 16},
@@ -101,7 +101,7 @@ export function PurchaseModal({billing, options, payments, onClose, initialPlan}
   }
 
   const field = (name: keyof BillingDraft) => {
-    const config = FIELDS.find((item) => item.name === name)!;
+    const config = BILLING_FIELDS.find((item) => item.name === name)!;
     return <label className={`buy-field${config.wide ? ' is-wide' : ''}${errorField === name ? ' has-error' : ''}`} key={name}>
       <span>{config.label}{config.optional ? <small>facoltativo</small> : null}</span>
       <input autoComplete="off" maxLength={config.maxLength} onChange={(event) => setForm((current) => ({...current, [name]: event.target.value}))} placeholder={config.placeholder} required={!config.optional && name !== 'sdi'} value={form[name]} />
