@@ -1,8 +1,9 @@
 'use client';
 
 import {useCallback, useEffect, useRef, useState, type FormEvent, type KeyboardEvent} from 'react';
-import {CalendarDays, CheckCircle2, Printer, CircleDot, Eye, FileText, Loader2, Lock, Play, RotateCcw, Send, ThumbsUp, Upload, User, Wrench, X, XCircle} from 'lucide-react';
+import {CalendarDays, CheckCircle2, Printer, CircleDot, Eye, FileText, Loader2, Lock, Palette, Play, RotateCcw, Send, ThumbsUp, Upload, User, Wrench, X, XCircle} from 'lucide-react';
 
+import {BrandKitModal} from '@/components/brand-kit';
 import {AddFilesButton, FileList, formatBytes, type RequestFileItem} from '@/components/request-files';
 
 type Status = 'new' | 'in_progress' | 'review' | 'completed' | 'rejected';
@@ -11,7 +12,7 @@ type Item =
   | {kind: 'event'; id: string; at: string; text: string; tone: string; authorName: string}
   | {kind: 'file'; id: string; at: string; name: string; size: number; authorName: string; fromClient: boolean};
 type Thread = {
-  request: {id: string; publicId: string; title: string; brief: string; type: string; status: Status; creditCost: number; createdAt: string; completedAt: string | null; dueDate: string | null; priority: string; awaitingClient: boolean; companyName: string; requesterName: string; designerName: string | null; designerId: string | null};
+  request: {id: string; publicId: string; title: string; brief: string; type: string; status: Status; creditCost: number; createdAt: string; completedAt: string | null; dueDate: string | null; priority: string; awaitingClient: boolean; companyId: string; companyName: string; requesterName: string; designerName: string | null; designerId: string | null};
   designers: Array<{id: string; name: string}>;
   files: RequestFileItem[];
   timeline: Item[];
@@ -28,6 +29,7 @@ export function RequestThread({requestId, viewer, canReject = false, onStatusCha
   const [isSending, setIsSending] = useState(false);
   const [isActing, setIsActing] = useState(false);
   const [changesOpen, setChangesOpen] = useState(false);
+  const [brandKitOpen, setBrandKitOpen] = useState(false);
   const [mobileTab, setMobileTab] = useState<'activity' | 'files' | 'details'>('activity');
   const timelineEnd = useRef<HTMLDivElement>(null);
   const lastLength = useRef(0);
@@ -100,13 +102,14 @@ export function RequestThread({requestId, viewer, canReject = false, onStatusCha
 
   const mobileTabs = [{id: 'activity', label: 'Attività', count: thread.timeline.length}, {id: 'files', label: 'File', count: thread.files.length}, {id: 'details', label: 'Dettagli', count: 0}] as const;
 
-  return <div className={`rt rt--tab-${mobileTab}`}>
+  return <div className={`rt rt--tab-${mobileTab}`}>{brandKitOpen ? <BrandKitModal companyId={request.companyId} companyName={request.companyName} onClose={() => setBrandKitOpen(false)} /> : null}
     <header className="rt-head">
       <div className="rt-head__top"><span className="rt-id">{request.publicId}</span><span className={`rt-status rt-status--${request.status}`}>{REQUEST_STATUS_LABELS[request.status]}</span></div>
       <h2>{request.title}</h2>
       <div className="rt-meta">
         <span><CircleDot size={14} />{request.type} · {request.creditCost.toLocaleString('it-IT')} crediti</span>
         {viewer === 'team' ? <span><User size={14} />{request.companyName} · {request.requesterName}</span> : null}
+        {viewer === 'team' ? <button className="rt-brandkit" onClick={() => setBrandKitOpen(true)} type="button"><Palette size={14} /> Brand kit cliente</button> : null}
         {thread.designers.length ? <label className="rt-assign"><Wrench size={14} />Grafico<select disabled={isActing} onChange={(event) => void assign(event.target.value)} value={request.designerId || ''}><option value="">Da assegnare</option>{thread.designers.map((designer) => <option key={designer.id} value={designer.id}>{designer.name}</option>)}</select></label> : <span><Wrench size={14} />{request.designerName ? `Grafico: ${request.designerName}` : 'Grafico da assegnare'}</span>}
         <span><CalendarDays size={14} />Inviata il {longDate(request.createdAt)}</span>
         {request.dueDate ? <span><CalendarDays size={14} />Scadenza {longDate(request.dueDate)}</span> : null}

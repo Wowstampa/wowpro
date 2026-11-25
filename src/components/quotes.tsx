@@ -1,7 +1,7 @@
 'use client';
 /* eslint-disable @next/next/no-img-element -- Shopify CDN thumbnails are already resized. */
 
-import {ArrowRight, CheckCircle2, Zap, Palette, Receipt, Upload, CreditCard, LayoutGrid, PenLine, ExternalLink, FileText, Loader2, Package, Paperclip, Plus, Search, Send, ShoppingBag, Trash2, X} from 'lucide-react';
+import {ArrowRight, CheckCircle2, Zap, Palette, Receipt, RotateCcw, Upload, CreditCard, LayoutGrid, PenLine, ExternalLink, FileText, Loader2, Package, Paperclip, Plus, Search, Send, ShoppingBag, Trash2, X} from 'lucide-react';
 import Link from 'next/link';
 import {FormEvent, useCallback, useEffect, useMemo, useRef, useState} from 'react';
 
@@ -10,6 +10,7 @@ import {useConfirm} from '@/components/confirm-dialog';
 import {QuoteConfigurator, type CatalogPick, type PendingResult} from '@/components/quote-configurator';
 import {BankTransferModal} from '@/components/quote-transfer';
 import {RequestDrawer} from '@/components/request-thread';
+import type {ReorderDraft} from '@/lib/reorder';
 
 type Status = 'new' | 'in_review' | 'quoted' | 'paid' | 'cancelled';
 type Item = {productId: string; variantId: string; productTitle: string; variantTitle: string; imageUrl: string | null; quantity: number; note: string; listPrice: number | null; options?: Array<{name: string; value: string}>; graphicRequest?: LinkedGraphic | null};
@@ -40,17 +41,18 @@ async function api<T>(url: string, init?: RequestInit) {
 }
 
 // Quote and order requests for WowStampa products: list, new request and detail drawer.
-export function QuotesWorkspace({viewer, initialQuotes, embedded = false, createSignal, onCreateClosed}: {viewer: 'client' | 'team'; initialQuotes: QuoteView[]; embedded?: boolean; createSignal?: {nonce: number; linked: LinkedGraphic | null} | null; onCreateClosed?: () => void}) {
+export function QuotesWorkspace({viewer, initialQuotes, embedded = false, createSignal, onCreateClosed}: {viewer: 'client' | 'team'; initialQuotes: QuoteView[]; embedded?: boolean; createSignal?: {nonce: number; linked: LinkedGraphic | null; draft?: ReorderDraft | null} | null; onCreateClosed?: () => void}) {
   const [quotes, setQuotes] = useState(initialQuotes);
   const [filter, setFilter] = useState<keyof typeof FILTERS>('all');
   const [openId, setOpenId] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [linked, setLinked] = useState<LinkedGraphic | null>(null);
+  const [draft, setDraft] = useState<ReorderDraft | null>(null);
 
   useEffect(() => {
     if (!createSignal) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- the requests hub asks this workspace to open its creation modal
-    setLinked(createSignal.linked); setIsCreating(true);
+    setLinked(createSignal.linked); setDraft(createSignal.draft || null); setIsCreating(true);
   }, [createSignal]);
 
   useEffect(() => {
@@ -67,12 +69,12 @@ export function QuotesWorkspace({viewer, initialQuotes, embedded = false, create
   return <section className="quotes">
     {!embedded ? <header className="quotes__toolbar">
       <div><h2>{viewer === 'client' ? 'Preventivi e ordini' : 'Richieste di preventivo'}</h2><p>{viewer === 'client' ? 'Chiedi un preventivo sui prodotti WowStampa con i tuoi prezzi riservati e paga online quando sei pronto.' : 'Prezza le richieste dei clienti: il preventivo diventa un ordine Shopify che il cliente paga dal portale.'}</p></div>
-      {viewer === 'client' ? <button className="button button--primary" onClick={() => { setLinked(null); setIsCreating(true); }} type="button"><Plus size={17} /> Nuova richiesta</button> : null}
+      {viewer === 'client' ? <button className="button button--primary" onClick={() => { setLinked(null); setDraft(null); setIsCreating(true); }} type="button"><Plus size={17} /> Nuova richiesta</button> : null}
     </header> : null}
     {toPay && viewer === 'client' ? <button className="quotes__alert" onClick={() => setFilter('quoted')} type="button"><CreditCard size={18} /><span><b>{toPay === 1 ? 'Hai un preventivo pronto' : `Hai ${toPay} preventivi pronti`}</b> da confermare e pagare.</span></button> : null}
     <div className="quotes__filters" role="tablist">{(Object.keys(FILTERS) as Array<keyof typeof FILTERS>).map((key) => { const statuses = FILTERS[key].statuses as readonly string[] | null; const count = statuses ? quotes.filter((quote) => statuses.includes(quote.status)).length : quotes.length; return <button aria-selected={filter === key} className={filter === key ? 'is-active' : ''} key={key} onClick={() => setFilter(key)} role="tab" type="button">{FILTERS[key].label}{count ? <small>{count}</small> : null}</button>; })}</div>
 
-    {!quotes.length ? <div className="quotes__empty"><span><ShoppingBag size={26} /></span><h3>{viewer === 'client' ? 'Nessuna richiesta, per ora' : 'Nessuna richiesta di preventivo'}</h3><p>{viewer === 'client' ? 'Scegli i prodotti dal catalogo WowStampa, indica quantità e dettagli: il tuo account manager ti manda il preventivo con i prezzi WOWPRO.' : 'Le richieste dei clienti compariranno qui.'}</p>{viewer === 'client' ? <button className="button button--primary" onClick={() => { setLinked(null); setIsCreating(true); }} type="button"><Plus size={17} /> Chiedi un preventivo</button> : null}</div>
+    {!quotes.length ? <div className="quotes__empty"><span><ShoppingBag size={26} /></span><h3>{viewer === 'client' ? 'Nessuna richiesta, per ora' : 'Nessuna richiesta di preventivo'}</h3><p>{viewer === 'client' ? 'Scegli i prodotti dal catalogo WowStampa, indica quantità e dettagli: il tuo account manager ti manda il preventivo con i prezzi WOWPRO.' : 'Le richieste dei clienti compariranno qui.'}</p>{viewer === 'client' ? <button className="button button--primary" onClick={() => { setLinked(null); setDraft(null); setIsCreating(true); }} type="button"><Plus size={17} /> Chiedi un preventivo</button> : null}</div>
       : <div className="quotes__list">
         {visible.map((quote) => <button className="quote-card" key={quote.id} onClick={() => setOpenId(quote.id)} type="button">
           <span className="quote-card__thumbs">{quote.items.slice(0, 3).map((item, index) => item.imageUrl ? <img alt="" key={index} src={item.imageUrl} /> : <i key={index}><Package size={16} /></i>)}</span>
@@ -82,24 +84,24 @@ export function QuotesWorkspace({viewer, initialQuotes, embedded = false, create
         {!visible.length ? <p className="quotes__none">Nessuna richiesta in questa sezione.</p> : null}
       </div>}
 
-    {viewer === 'client' && !embedded ? <button className="fab" onClick={() => { setLinked(null); setIsCreating(true); }} type="button"><Plus size={20} /> Preventivo</button> : null}
-    {openId ? <RequestDrawer onClose={closeDrawer}><QuoteDetail onChange={replace} quoteId={openId} viewer={viewer} /></RequestDrawer> : null}
-    {isCreating ? <NewQuoteModal linked={linked} onClose={() => { setIsCreating(false); onCreateClosed?.(); }} onCreated={(quote) => { replace(quote); setIsCreating(false); onCreateClosed?.(); setOpenId(quote.id); }} /> : null}
+    {viewer === 'client' && !embedded ? <button className="fab" onClick={() => { setLinked(null); setDraft(null); setIsCreating(true); }} type="button"><Plus size={20} /> Preventivo</button> : null}
+    {openId ? <RequestDrawer onClose={closeDrawer}><QuoteDetail onChange={replace} onReorder={viewer === 'client' ? (next) => { closeDrawer(); setLinked(null); setDraft(next); setIsCreating(true); } : undefined} quoteId={openId} viewer={viewer} /></RequestDrawer> : null}
+    {isCreating ? <NewQuoteModal initial={draft} linked={linked} onClose={() => { setIsCreating(false); onCreateClosed?.(); }} onCreated={(quote) => { replace(quote); setIsCreating(false); onCreateClosed?.(); setOpenId(quote.id); }} /> : null}
   </section>;
 }
 
-function NewQuoteModal({onClose, onCreated, linked}: {onClose: () => void; onCreated: (quote: QuoteView) => void; linked: LinkedGraphic | null}) {
+function NewQuoteModal({onClose, onCreated, linked, initial}: {onClose: () => void; onCreated: (quote: QuoteView) => void; linked: LinkedGraphic | null; initial?: ReorderDraft | null}) {
   const [kind, setKind] = useState<'quote' | 'order'>('quote');
   const [term, setTerm] = useState('');
   const [products, setProducts] = useState<Product[] | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const [picked, setPicked] = useState<Product | null>(null);
   const [mode, setMode] = useState<'choose' | 'catalog' | 'custom'>('choose');
-  const [items, setItems] = useState<Item[]>([]);
+  const [items, setItems] = useState<Item[]>(() => (initial?.items || []) as Item[]);
   const pendingRef = useRef<(() => PendingResult) | null>(null);
   const [hasPending, setHasPending] = useState(false);
   const registerPending = useCallback((build: (() => PendingResult) | null) => { pendingRef.current = build; setHasPending(!!build); }, []);
-  const [notes, setNotes] = useState('');
+  const [notes, setNotes] = useState(initial?.notes || '');
   const [express, setExpress] = useState(false);
   const [neededBy, setNeededBy] = useState('');
   const [files, setFiles] = useState<File[]>([]);
@@ -145,6 +147,7 @@ function NewQuoteModal({onClose, onCreated, linked}: {onClose: () => void; onCre
     <button aria-label="Chiudi" className="subscription-buy__close" onClick={onClose} type="button"><X size={18} /></button>
     <form className="quote-new__layout" onSubmit={submit}>
       <div className="quote-new__catalog">
+        {initial && !linked ? <div className="quote-linked"><RotateCcw size={16} /><span><b>Riordino {initial.source}</b>Abbiamo aggiunto gli stessi prodotti a destra: controlla quantità e note, puoi anche aggiungerne altri.</span></div> : null}
         {linked ? <div className="quote-linked"><Palette size={16} /><span><b>Grafica {linked.publicId} collegata · ora la stampa</b>{linked.title}. Scegli il prodotto su cui stamparla o descrivilo: i file della grafica restano collegati al preventivo.</span></div> : null}
         {mode === 'choose' ? <>
           <header><span className="buy-form__step">{linked ? 'Ordina la stampa' : 'Preventivo o ordine'}</span><h3>{linked ? 'Su cosa vuoi stamparla?' : 'Come vuoi procedere?'}</h3></header>
@@ -312,7 +315,7 @@ function CustomRequest({onAdd, onSwitch, registerPending}: {onAdd: (item: Item) 
   </div>;
 }
 
-function QuoteDetail({quoteId, viewer, onChange}: {quoteId: string; viewer: 'client' | 'team'; onChange: (quote: QuoteView) => void}) {
+function QuoteDetail({quoteId, viewer, onChange, onReorder}: {quoteId: string; viewer: 'client' | 'team'; onChange: (quote: QuoteView) => void; onReorder?: (draft: ReorderDraft) => void}) {
   const [quote, setQuote] = useState<QuoteView | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [confirmUi, ask] = useConfirm();
@@ -379,6 +382,7 @@ function QuoteDetail({quoteId, viewer, onChange}: {quoteId: string; viewer: 'cli
       <div className="rt-head__top"><span className="rt-id">{quote.publicId}</span><span className={`quote-status quote-status--${statusOf(quote).tone}`}>{statusOf(quote).label}</span></div>
       <h2>{quote.kind === 'order' ? 'Richiesta d’ordine' : 'Richiesta di preventivo'}{viewer === 'team' ? ` · ${quote.companyName}` : ''}</h2>
       <div className="rt-meta"><span>Inviata il {shortDate(quote.createdAt)}{viewer === 'team' ? ` da ${quote.requesterName}` : ''}</span>{quote.neededBy ? <span>Serve entro il {shortDate(quote.neededBy)}</span> : null}{quote.orderName ? <span>Ordine {quote.orderName}</span> : null}</div>
+      {onReorder && (quote.status === 'paid' || quote.status === 'cancelled' || quote.expired) ? <button className="client-action quote-reorder" onClick={() => onReorder({source: quote.publicId, notes: `Riordino di ${quote.publicId}.`, items: quote.items})} type="button"><RotateCcw size={14} /> Riordina gli stessi prodotti</button> : null}
     </header>
 
     {quote.status !== 'cancelled' && (quote.express || quote.status === 'paid' || quote.awaitingPayment) ? <ExpressShipping onChange={(next) => { onChange(next); void load(); }} quote={quote} viewer={viewer} /> : null}

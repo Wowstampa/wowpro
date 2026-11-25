@@ -6,6 +6,7 @@ import {useCallback, useEffect, useState} from 'react';
 
 import {ClientRequestsWorkspace, type ClientWorkspaceRequest} from '@/components/client-requests-workspace';
 import {QuotesWorkspace, type LinkedGraphic, type QuoteView} from '@/components/quotes';
+import {takeReorder, type ReorderDraft} from '@/lib/reorder';
 
 type Tab = 'grafica' | 'preventivi';
 
@@ -16,7 +17,7 @@ export function RequestsHub({requests, quotes, includedCredits, extraCredits}: {
   const [lowCredits, setLowCredits] = useState(false);
   const credits = includedCredits + extraCredits;
   const [graphicSignal, setGraphicSignal] = useState<{nonce: number; withPrint: boolean} | null>(null);
-  const [quoteSignal, setQuoteSignal] = useState<{nonce: number; linked: LinkedGraphic | null} | null>(null);
+  const [quoteSignal, setQuoteSignal] = useState<{nonce: number; linked: LinkedGraphic | null; draft?: ReorderDraft | null} | null>(null);
 
   const select = useCallback((next: Tab) => {
     setTab(next);
@@ -47,6 +48,7 @@ export function RequestsHub({requests, quotes, includedCredits, extraCredits}: {
     const printFor = params.get('stampa');
     const pending = printFor ? requests.find((request) => request.id === printFor) : null;
     if (pending) startQuote({id: pending.id, publicId: pending.publicId, title: pending.title});
+    else if (intent === 'reorder') { const draft = takeReorder(); select('preventivi'); setQuoteSignal({nonce: Date.now(), linked: null, draft}); }
     else if (intent === 'quote') startQuote(null);
     else if (intent === 'grafica') startGraphic(false);
     else if (intent) setChoosing(true);

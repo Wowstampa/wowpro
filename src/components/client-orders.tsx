@@ -1,6 +1,9 @@
 import {ChevronDown, ExternalLink, Package, Truck} from 'lucide-react';
 
+import {ReorderButton} from '@/components/reorder-button';
 import type {CustomerOrder} from '@/lib/integrations/shopify';
+import {isPrintOrder} from '@/lib/order-status';
+import {draftFromOrder} from '@/lib/reorder';
 
 const financialLabels: Record<string, {label: string; tone: string}> = {
   PAID: {label: 'Pagato', tone: 'ok'},
@@ -81,7 +84,10 @@ function OrderCard({order}: {order: CustomerOrder}) {
         <div><strong>{shipmentLabels[shipment.status || ''] || 'Spedito'}</strong><small>{[shipment.company, shipment.number].filter(Boolean).join(' · ') || 'Tracking disponibile'}</small></div>
         {shipment.url ? <a className="client-action" href={shipment.url} rel="noreferrer" target="_blank">Traccia spedizione <ExternalLink size={14} /></a> : null}
       </div>)}</div> : null}
-      {order.statusPageUrl ? <a className="order-card__link" href={order.statusPageUrl} rel="noreferrer" target="_blank">Vedi dettaglio su wowstampa.it <ExternalLink size={13} /></a> : null}
+      <div className="order-card__foot">
+        {order.statusPageUrl ? <a className="order-card__link" href={order.statusPageUrl} rel="noreferrer" target="_blank">Vedi dettaglio su wowstampa.it <ExternalLink size={13} /></a> : <span />}
+        {isPrintOrder(order) ? <ReorderButton draft={draftFromOrder(order)} label="Riordina" /> : null}
+      </div>
     </div>
   </details>;
 }
