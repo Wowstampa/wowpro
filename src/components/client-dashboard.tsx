@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import Image from 'next/image';
-import {ArrowRight, ArrowUpRight, Coins, Crown, MessageCircle, MessageSquareText, Package, Sparkles} from 'lucide-react';
+import {ArrowRight, ArrowUpRight, Coins, Crown, MessageCircle, MessageSquareText, Package, Play, Sparkles} from 'lucide-react';
 
 import {Avatar} from '@/components/avatar';
 import {OpenChatButton} from '@/components/support-widget';
@@ -28,10 +28,15 @@ export function ClientDashboard({name, active, todos, requests, orders, credits,
     <div className="dash-hero__copy">
       <span className="dash-pill"><i /> {active ? 'WOWPRO attivo' : 'Il tuo workspace WOWPRO'}</span>
       <h2>Bentornati,<br /><span className="dash-hero__name">{name}</span></h2>
-      <p>Grafica, stampa e supporto dedicato. Tutto in un solo posto.</p>
+      <p>{active ? 'Grafica, stampa e supporto dedicato. Tutto in un solo posto.' : 'Attiva WOWPRO: grafica, stampa e supporto dedicato in un solo posto.'}</p>
       <div className="dash-hero__actions">
-        <Link className="dash-btn dash-btn--primary" href="/dashboard/richieste?new=1">Nuova richiesta <ArrowRight size={17} /></Link>
-        <Link className="dash-btn dash-btn--glass" href="/dashboard/richieste?tab=preventivi&new=quote">Chiedi un preventivo</Link>
+        {active ? <>
+          <Link className="dash-btn dash-btn--primary" href="/dashboard/richieste?new=1">Nuova richiesta <ArrowRight size={17} /></Link>
+          <Link className="dash-btn dash-btn--glass" href="/dashboard/richieste?tab=preventivi&new=quote">Chiedi un preventivo</Link>
+        </> : <>
+          <Link className="dash-btn dash-btn--primary" href="/dashboard/abbonamento">Attiva l’abbonamento <ArrowRight size={17} /></Link>
+          <a className="dash-btn dash-btn--glass" href="#come-funziona"><Play size={15} fill="currentColor" /> Guarda come funziona</a>
+        </>}
       </div>
     </div>
     <div aria-hidden="true" className="dash-hero__art"><Image alt="" fill priority sizes="(max-width: 760px) 0px, 460px" src="/images/wowpro-hero.png" /></div>
@@ -88,6 +93,6 @@ export function ClientDashboard({name, active, todos, requests, orders, credits,
 
   return <main className="page-content dash">
     {hero}
-    {active ? <>{todoList}{cards}{managerCard}<VideoIntro compact /></> : <><VideoIntro />{activate}{todoList}{cards}{managerCard}</>}
+    {active ? <>{todoList}{cards}{managerCard}<VideoIntro compact /></> : <><div className="dash-anchor" id="come-funziona"><VideoIntro /></div>{activate}{todoList}{cards}{managerCard}</>}
   </main>;
 }
