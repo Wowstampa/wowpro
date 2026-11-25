@@ -1,19 +1,11 @@
-import Link from 'next/link';
-import Image from 'next/image';
-import {ArrowRight, ArrowUpRight, Coins, MessageSquareText, Package} from 'lucide-react';
-
 import {PageHeader} from '@/components/app-shell';
-import {Avatar} from '@/components/avatar';
-import {OpenChatButton} from '@/components/support-widget';
-import {VideoIntro} from '@/components/video-intro';
+import {ClientDashboard, type DashboardTodo} from '@/components/client-dashboard';
 import {requireProfile} from '@/lib/auth';
 import {getWowproClient} from '@/lib/integrations/airtable';
 import {countSubscriptionPayments} from '@/lib/subscription';
 import {getConversationCompany} from '@/lib/support';
 import {createAdminClient} from '@/lib/supabase/admin.server';
 import {createClient} from '@/lib/supabase/server';
-
-type Todo = {href: string; tag: string; title: string; label: string};
 
 // Client workspace: compact welcome, what needs attention, requests/orders/credits, guide and account manager.
 export default async function DashboardPage() {
@@ -45,58 +37,16 @@ export default async function DashboardPage() {
   const toPay = (quotes || []).filter((quote) => quote.status === 'quoted' && !quote.order_name && !((quote.offer as {validUntil?: string} | null)?.validUntil && (quote.offer as {validUntil: string}).validUntil < today));
   const awaitingTransfer = (quotes || []).filter((quote) => quote.status === 'quoted' && quote.order_name);
   const quoteTitle = (quote: {items: unknown}) => ((quote.items as Array<{productTitle?: string}> | null) || []).map((item) => item.productTitle).filter(Boolean).join(', ') || 'Preventivo';
-  const todos: Todo[] = [
+  const todos: DashboardTodo[] = [
     ...toApprove.map((request) => ({href: `/dashboard/richieste?r=${request.id}`, tag: 'Bozza da approvare', title: request.title, label: request.public_id})),
     ...toPay.map((quote) => ({href: `/dashboard/richieste?tab=preventivi&q=${quote.id}`, tag: 'Preventivo da pagare', title: quoteTitle(quote), label: quote.public_id})),
   ].slice(0, 4);
 
-  const managerId = team?.manager?.id || null;
   const orders = toPay.length ? {value: toPay.length, label: toPay.length === 1 ? 'Preventivo da pagare' : 'Preventivi da pagare', alert: true} : awaitingTransfer.length ? {value: awaitingTransfer.length, label: 'In attesa di bonifico', alert: false} : {value: 0, label: 'Pagamenti in sospeso', alert: false};
 
-  const cards = <section className="ws-section">
-    <header className="ws-section__head"><h3>Il tuo workspace</h3></header>
-    <div className="ws-cards">
-      <Link className="ws-card" href="/dashboard/richieste"><header><span className="ws-card__icon"><MessageSquareText size={22} /></span><ArrowUpRight className="ws-card__arrow" size={18} /></header><small>Le tue richieste</small><b>{working.length + openQuotes.length}</b><span>Richieste in corso{toApprove.length ? <em> · {toApprove.length} da approvare</em> : null}</span><i>Vedi richieste →</i></Link>
-      <Link className="ws-card" href="/dashboard/ordini"><header><span className="ws-card__icon"><Package size={22} /></span><ArrowUpRight className="ws-card__arrow" size={18} /></header><small>I tuoi ordini</small><b className={orders.alert ? 'is-alert' : ''}>{orders.value}</b><span>{orders.label}</span><i>Vedi ordini →</i></Link>
-      <Link className="ws-card" href="/dashboard/crediti"><header><span className="ws-card__icon"><Coins size={22} /></span><ArrowUpRight className="ws-card__arrow" size={18} /></header><small>I tuoi crediti</small><b>{number(credits)}</b><span>Crediti disponibili · {number(included)} inclusi, {number(extra)} extra</span><i>Gestisci crediti →</i></Link>
-    </div>
-  </section>;
-
-  const managerCard = <section className="ws-manager">
-    <Avatar name={manager || 'WowStampa'} profileId={managerId} size={64} />
-    <div><small>Il tuo account manager</small><strong>{manager || 'Il team WowStampa'}</strong><span>Ordini, preventivi, crediti e abbonamento: scrivimi quando vuoi.</span></div>
-    <OpenChatButton className="button button--ghost ws-manager__cta">Contatta</OpenChatButton>
-  </section>;
-
-  const todoList = todos.length ? <section className="ws-section">
-    <header className="ws-section__head"><h3>Da fare</h3><small>{todos.length === 1 ? '1 elemento' : `${todos.length} elementi`}</small></header>
-    <ul className="ws-todo">{todos.map((todo) => <li key={todo.href}><Link href={todo.href}><b>{todo.tag}</b><span>{todo.title}</span><small>{todo.label}</small><ArrowRight size={15} /></Link></li>)}</ul>
-  </section> : null;
-
-  return <><PageHeader eyebrow={`WOWPRO · ${name}`} title="Dashboard" action={<div className="credit-chip"><i /> <strong>{number(credits)}</strong> crediti</div>} /><main className="page-content ws">
-    <section className="ws-hero">
-      <div className="ws-hero__copy">
-        <span className="ws-eyebrow">Il tuo workspace WOWPRO</span>
-        <h2>Bentornati, {name}.</h2>
-        <p>Grafica, stampa e supporto dedicato. Tutto in un solo posto.</p>
-        <div className="ws-hero__actions"><Link className="button button--primary" href="/dashboard/richieste?new=1">Nuova richiesta <ArrowRight size={17} /></Link><Link className="button button--ghost" href="/dashboard/richieste?tab=preventivi&new=quote">Chiedi un preventivo</Link></div>
-      </div>
-      <div aria-hidden="true" className="ws-hero__art"><Image alt="" fill priority sizes="(max-width: 760px) 0px, 440px" src="/images/wowpro-hero.png" /></div>
-    </section>
-
-    {active ? <>
-      {todoList}
-      {cards}
-      {managerCard}
-      <VideoIntro compact />
-    </> : <>
-      <VideoIntro />
-      <section className="ws-activate"><div><span className="ws-eyebrow">Abbonamento non attivo</span><h3>Attiva WOWPRO e lavora con il tuo team dedicato</h3><p>12.000 crediti grafici ogni mese, listino riservato, ordini prioritari e un account manager tutto tuo.</p></div><Link className="button button--primary" href="/dashboard/abbonamento">Scopri l’abbonamento <ArrowRight size={17} /></Link></section>
-      {todoList}
-      {cards}
-      {managerCard}
-    </>}
-  </main></>;
+  return <><PageHeader eyebrow={`WOWPRO · ${name}`} title="Dashboard" action={<div className="credit-chip"><i /> <strong>{number(credits)}</strong> crediti</div>} />
+    <ClientDashboard active={active} credits={{included, extra}} manager={{id: team?.manager?.id || null, name: manager}} name={name} orders={orders} requests={{open: working.length + openQuotes.length, toApprove: toApprove.length}} todos={todos} />
+  </>;
 }
 
 function number(value: number) { return new Intl.NumberFormat('it-IT').format(value); }
