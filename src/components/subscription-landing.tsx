@@ -4,6 +4,7 @@ import Link from 'next/link';
 import {ArrowRight, BadgeCheck, CalendarCheck, Check, Lock, Receipt, Send} from 'lucide-react';
 import {useState} from 'react';
 
+import {ProgramShowcase} from '@/components/program-showcase';
 import {PurchaseModal, type BillingDraft, type SubscriptionPlanOption} from '@/components/subscription-actions';
 import {OpenChatButton} from '@/components/support-widget';
 
@@ -70,10 +71,12 @@ export function SubscriptionLanding({options, billing, payments, managerName}: {
         <p>che equivalgono, per esempio, a</p>
         <ul>{USES.map((use) => <li key={use.label}><b>{use.count}</b><span>{use.label}<small>{use.cost}</small></span></li>)}</ul>
         <p className="sub-landing__credits-foot">oppure combinali come preferisci.</p>
-        <Link className="sub-landing__discover" href="/dashboard#programma">Scopri cosa puoi fare con WOWPRO →</Link>
+        <Link className="sub-landing__discover" href="#programma">Scopri cosa puoi fare con WOWPRO →</Link>
       </aside>
     </section>
 
+
+    <ProgramShowcase />
 
     <section className="sub-landing__block">
       <div className="sub-landing__heading"><h3>Come funziona</h3></div>
