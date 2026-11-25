@@ -1364,8 +1364,9 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .ws-manager { padding: 20px 24px; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 18px; align-items: center; border-radius: 16px; }
 .ws-manager small { color: #6b7686; font-size: 12px; font-weight: 700; }
 .ws-manager strong { display: block; margin: 2px 0; font-size: 18px; letter-spacing: -.02em; }
-.ws-manager span:not(.avatar) { color: #5b6575; font-size: 13px; }
-.avatar { flex: 0 0 auto; display: grid; place-items: center; border-radius: 50%; background: var(--nav); color: white; font-weight: 800; object-fit: cover; box-shadow: 0 0 0 3px #fff, 0 0 0 4px var(--line); }
+.ws-manager div > span { color: #5b6575; font-size: 13px; }
+.person-avatar { position: relative; flex: 0 0 auto; display: grid; place-items: center; overflow: hidden; border-radius: 50%; background: var(--nav); color: white; font-weight: 800; box-shadow: 0 0 0 3px #fff, 0 0 0 4px var(--line); }
+.person-avatar img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .team-avatar-field { padding: 12px; display: flex; align-items: center; gap: 14px; border: 1px dashed #d6dde6; border-radius: 12px; }
 .team-avatar-field strong { display: block; font-size: 13px; }
 .team-avatar-field small { display: block; margin: 2px 0 8px; color: var(--muted); font-size: 11px; font-weight: 500; }
