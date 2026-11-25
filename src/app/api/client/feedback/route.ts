@@ -4,6 +4,7 @@ import {z} from 'zod';
 import {getCurrentProfile} from '@/lib/auth';
 import {FEEDBACK_CATEGORIES} from '@/lib/feedback-categories';
 import {createAdminClient} from '@/lib/supabase/admin.server';
+import {hasActiveSubscription, subscriptionRequired} from '@/lib/access';
 
 const schema = z.object({
   category: z.enum(FEEDBACK_CATEGORIES),
@@ -14,6 +15,7 @@ const schema = z.object({
 export async function POST(request: Request) {
   const profile = await getCurrentProfile();
   if (!profile || profile.status !== 'active' || profile.role !== 'client' || !profile.company_id) return NextResponse.json({error: 'Accesso non autorizzato.'}, {status: 403});
+  if (!(await hasActiveSubscription(profile.company_id))) return subscriptionRequired();
   const parsed = schema.safeParse(await request.json());
   if (!parsed.success) return NextResponse.json({error: 'Inserisci un titolo (almeno 5 caratteri) e una descrizione (almeno 10).'}, {status: 400});
 
