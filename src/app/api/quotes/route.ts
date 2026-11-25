@@ -6,6 +6,7 @@ import {requestExpress} from '@/lib/express';
 import {getAccessibleRequest} from '@/lib/request-files';
 import {QUOTE_COLUMNS, addQuoteEvent, attachGraphicFiles, listQuotes, newQuotePublicId, notifyQuote, toSummary} from '@/lib/quotes';
 import {createAdminClient} from '@/lib/supabase/admin.server';
+import {hasActiveSubscription, subscriptionRequired} from '@/lib/access';
 
 export async function GET() {
   const profile = await getCurrentProfile();
@@ -29,6 +30,7 @@ const createSchema = z.object({
 export async function POST(request: Request) {
   const profile = await getCurrentProfile();
   if (!profile || profile.status !== 'active' || profile.role !== 'client' || !profile.company_id) return NextResponse.json({error: 'Accesso non autorizzato.'}, {status: 403});
+  if (!(await hasActiveSubscription(profile.company_id))) return subscriptionRequired();
   const parsed = createSchema.safeParse(await request.json().catch(() => ({})));
   if (!parsed.success) return NextResponse.json({error: parsed.error.issues[0]?.message || 'Richiesta non valida.'}, {status: 400});
   const {kind, items, notes, neededBy, express} = parsed.data;
