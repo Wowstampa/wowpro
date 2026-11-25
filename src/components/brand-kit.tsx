@@ -81,7 +81,7 @@ export function BrandKitEditor({initial, canEdit, companyId, compact = false}: {
         <a className="bk-logo__preview" href={fileUrl(file.id)} rel="noreferrer" target="_blank">{file.previewable ? <img alt={file.name} loading="lazy" src={fileUrl(file.id)} /> : <span><FileText size={26} /><b>{file.name.split('.').pop()?.toUpperCase()}</b></span>}</a>
         <div><strong title={file.name}>{file.name}</strong><small>{formatBytes(file.size)}</small></div>
         <span className="bk-file__actions"><a aria-label="Scarica" href={fileUrl(file.id, true)}><Download size={15} /></a>{canEdit ? <button aria-label="Elimina" onClick={() => void remove(file)} type="button"><Trash2 size={15} /></button> : null}</span>
-      </li>)}</ul> : <button className="bk-empty" disabled={!canEdit || Boolean(uploading)} onClick={() => logoInput.current?.click()} type="button"><ImageIcon size={22} /><strong>{canEdit ? 'Carica il tuo logo' : 'Nessun logo caricato'}</strong>{canEdit ? <small>Trascina qui o scegli i file · max 50 MB</small> : null}</button>}
+      </li>)}</ul> : <button className="bk-empty" disabled={!canEdit || Boolean(uploading)} onClick={() => logoInput.current?.click()} type="button"><ImageIcon size={22} /><strong>{canEdit ? 'Carica il tuo logo' : 'Nessun logo caricato'}</strong>{canEdit ? <small>Scegli uno o più file · max 50 MB</small> : null}</button>}
     </section>
 
     <div className="bk-grid">
