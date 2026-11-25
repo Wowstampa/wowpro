@@ -24,8 +24,10 @@ import {listRequestFiles} from '@/lib/request-files';
 import {createClient} from '@/lib/supabase/server';
 import {hasActiveSubscription, isActiveStatus, OPEN_CLIENT_SECTIONS} from '@/lib/access';
 import {LockedSection} from '@/components/locked-section';
+import {BrandKitEditor} from '@/components/brand-kit';
+import {readBrandKit, toBrandKitView} from '@/lib/brand-kit';
 
-const titles: Record<string, string> = {workspace: 'Dashboard', crediti: 'Crediti', richieste: 'Richieste grafiche', ordini: 'Ordini', abbonamento: 'Abbonamento', preventivi: 'Preventivi', supporto: 'Supporto', feedback: 'Feedback & idee'};
+const titles: Record<string, string> = {workspace: 'Dashboard', 'brand-kit': 'Brand kit', crediti: 'Crediti', richieste: 'Richieste grafiche', ordini: 'Ordini', abbonamento: 'Abbonamento', preventivi: 'Preventivi', supporto: 'Supporto', feedback: 'Feedback & idee'};
 
 export default async function ClientSectionPage({params, searchParams}: {params: Promise<{section: string}>; searchParams: Promise<Record<string, string | string[] | undefined>>}) {
   const {section} = await params;
@@ -38,6 +40,7 @@ export default async function ClientSectionPage({params, searchParams}: {params:
   if (section === 'crediti') return <CreditsPage />;
   if (section === 'richieste') return <RequestsPage />;
   if (section === 'ordini') return <OrdersPage />;
+  if (section === 'brand-kit') return <BrandKitPage />;
   if (section === 'abbonamento') return <SubscriptionPage />;
   if (section === 'preventivi') return redirectQuotes(await searchParams);
   if (section === 'supporto') return <SupportPage />;
@@ -162,6 +165,15 @@ async function redirectQuotes(search: Record<string, string | string[] | undefin
   await requireProfile(['client']);
   const q = typeof search.q === 'string' ? search.q : '';
   redirect(`/dashboard/richieste?tab=preventivi${q ? `&q=${encodeURIComponent(q)}` : ''}`);
+}
+
+async function BrandKitPage() {
+  const profile = await requireProfile(['client']);
+  const kit = toBrandKitView(await readBrandKit(profile.company_id || ''));
+  return <><PageHeader eyebrow="WOWPRO · Area cliente" title="Brand kit" /><main className="page-content brand-kit-page">
+    <section className="bk-intro"><div><h2>Il tuo brand, sempre a portata del team</h2><p>Carica una volta logo, colori, font e file aziendali: il tuo grafico li trova già pronti in ogni richiesta, senza doverteli chiedere.</p></div></section>
+    <BrandKitEditor canEdit initial={kit} />
+  </main></>;
 }
 
 async function OrdersPage() {
