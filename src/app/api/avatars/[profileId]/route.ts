@@ -6,6 +6,7 @@ import {createAdminClient} from '@/lib/supabase/admin.server';
 
 const MAX_BYTES = 3 * 1024 * 1024;
 const TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const PIXEL = Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64');
 const pathOf = (profileId: string) => `avatars/${profileId}`;
 
 // Team member photo (shown to clients as their account manager). Any signed-in user can see it.
@@ -15,7 +16,8 @@ export async function GET(_request: Request, {params}: {params: Promise<{profile
   const {profileId} = await params;
   if (!/^[0-9a-f-]{36}$/i.test(profileId)) return new NextResponse(null, {status: 404});
   const {data} = await createAdminClient().storage.from(REQUEST_FILES_BUCKET).createSignedUrl(pathOf(profileId), 3600);
-  if (!data?.signedUrl) return new NextResponse(null, {status: 404, headers: {'Cache-Control': 'private, max-age=300'}});
+  // No photo yet: a transparent pixel, so the initials underneath stay visible without a broken-image icon.
+  if (!data?.signedUrl) return new NextResponse(new Uint8Array(PIXEL), {status: 200, headers: {'Content-Type': 'image/gif', 'Cache-Control': 'private, max-age=300'}});
   return NextResponse.redirect(data.signedUrl, {headers: {'Cache-Control': 'private, max-age=300'}});
 }
 
