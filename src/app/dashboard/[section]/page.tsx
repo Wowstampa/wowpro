@@ -22,11 +22,17 @@ import {billingFromClient} from '@/lib/billing';
 import {countSubscriptionPayments} from '@/lib/subscription';
 import {listRequestFiles} from '@/lib/request-files';
 import {createClient} from '@/lib/supabase/server';
+import {hasActiveSubscription, OPEN_CLIENT_SECTIONS} from '@/lib/access';
+import {LockedSection} from '@/components/locked-section';
 
 const titles: Record<string, string> = {crediti: 'Crediti', richieste: 'Richieste grafiche', ordini: 'Ordini', abbonamento: 'Abbonamento', preventivi: 'Preventivi', supporto: 'Supporto', feedback: 'Feedback & idee'};
 
 export default async function ClientSectionPage({params, searchParams}: {params: Promise<{section: string}>; searchParams: Promise<Record<string, string | string[] | undefined>>}) {
   const {section} = await params;
+  if (!OPEN_CLIENT_SECTIONS.includes(section)) {
+    const profile = await requireProfile(['client']);
+    if (!(await hasActiveSubscription(profile.company_id))) return <><PageHeader eyebrow="WOWPRO · Area cliente" title={section === 'preventivi' ? 'Richieste' : titles[section] || 'WOWPRO'} /><LockedSection section={section === 'preventivi' ? 'richieste' : section} /></>;
+  }
   if (section === 'crediti') return <CreditsPage />;
   if (section === 'richieste') return <RequestsPage />;
   if (section === 'ordini') return <OrdersPage />;
