@@ -1,4 +1,5 @@
 import Image from 'next/image';
+import {LegalFooter} from '@/components/legal';
 import {LoginForm} from './login-form';
 
 export default function LoginPage() {
@@ -15,6 +16,7 @@ export default function LoginPage() {
           <p>Gestisci crediti, richieste grafiche e ordini da un unico spazio riservato.</p>
         </div>
         <LoginForm />
+        <LegalFooter compact />
       </section>
       <aside className="login-art" aria-hidden="true">
         <div className="login-art__orb login-art__orb--one" />
