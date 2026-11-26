@@ -316,4 +316,4 @@ type ClientMutationResponse = {
   };
 };
 
-function formatNumber(value: number) { return new Intl.NumberFormat('it-IT').format(value); }
+function formatNumber(value: number) { return new Intl.NumberFormat('it-IT', {useGrouping: 'always'} as Intl.NumberFormatOptions).format(value); }

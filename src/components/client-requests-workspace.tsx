@@ -154,7 +154,7 @@ const FILTERS = {
 function status(value: string) { return ({new: 'Nuova', in_progress: 'In lavorazione', review: 'Bozza da approvare', completed: 'Completata', rejected: 'Rifiutata'} as Record<string, string>)[value] || 'Aggiornata'; }
 function statusClass(value: string) { return value === 'in_progress' ? 'working' : value === 'review' ? 'review' : value === 'completed' ? 'completed' : value === 'rejected' ? 'rejected' : 'new'; }
 function requestType(value: string) { return ({revision: 'Revisione', modification: 'Modifica', creation: 'Creazione'} as Record<string, string>)[value] || value || 'Richiesta'; }
-function number(value: number) { return new Intl.NumberFormat('it-IT').format(value); }
+function number(value: number) { return new Intl.NumberFormat('it-IT', {useGrouping: 'always'} as Intl.NumberFormatOptions).format(value); }
 function shortDate(value: string) { return new Intl.DateTimeFormat('it-IT', {day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'}).format(new Date(value)); }
 
 async function readResponse(response: Response) {

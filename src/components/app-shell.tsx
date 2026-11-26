@@ -3,7 +3,7 @@
 import Image from 'next/image';
 
 import Link from 'next/link';
-import {Fragment, useEffect, useState} from 'react';
+import {createContext, Fragment, useContext, useEffect, useState} from 'react';
 import {usePathname, useRouter} from 'next/navigation';
 import {
   BadgeEuro,
@@ -82,6 +82,9 @@ const TAB_LABELS: Record<string, string> = {'/dashboard': 'Home', '/dashboard/ri
 
 export type AdminNotificationCounts = {requests: number; feedback: number; support?: number};
 
+// Client credits shown in every page header, from the shell (one source, same on every page).
+const ShellContext = createContext<{credits: number | null}>({credits: null});
+
 export function AppShell({mode, children, notificationCounts = {requests: 0, feedback: 0}, operatorName, isAdministrator = false, subscription, locked = false}: {mode: ShellMode; locked?: boolean; children: React.ReactNode; notificationCounts?: AdminNotificationCounts; operatorName?: string; isAdministrator?: boolean; subscription?: {plan: string; monthlyCredits: number; renewalDate: string; status: string; included?: number; extra?: number}}) {
   const pathname = usePathname();
   const router = useRouter();
@@ -116,6 +119,7 @@ export function AppShell({mode, children, notificationCounts = {requests: 0, fee
   }
 
   return (
+    <ShellContext.Provider value={{credits: mode === 'client' && subscription ? (subscription.included || 0) + (subscription.extra || 0) : null}}>
     <div className="app-frame">
       <header className="mobile-bar">
         <Link aria-label="WOWPRO" className="mobile-bar__brand" href={links[0]?.href || '/'} onClick={() => setMenuOpen(false)}><Image alt="WOWPRO" className="brand__logo" priority unoptimized height={40} src="/images/wowpro-logo.svg" width={114} /><small>{activeLink?.label || 'WowStampa'}</small></Link>
@@ -195,18 +199,20 @@ export function AppShell({mode, children, notificationCounts = {requests: 0, fee
         <button aria-expanded={menuOpen} className={menuOpen || (activeLink && !tabItems.some((item) => item.href === activeLink.href)) ? 'tabbar__item is-active' : 'tabbar__item'} onClick={() => setMenuOpen((value) => !value)} type="button"><span><LayoutGrid size={21} />{moreBadges ? <b>{moreBadges > 9 ? '9+' : moreBadges}</b> : null}</span>Altro</button>
       </nav>
     </div>
+    </ShellContext.Provider>
   );
 }
 
 function initials(value: string) { return value.split(' ').filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase(); }
-function number(value: number) { return new Intl.NumberFormat('it-IT').format(value); }
+function number(value: number) { return new Intl.NumberFormat('it-IT', {useGrouping: 'always'} as Intl.NumberFormatOptions).format(value); }
 function shortDate(value: string) { return new Intl.DateTimeFormat('it-IT', {day: 'numeric', month: 'short'}).format(new Date(`${value}T12:00:00`)); }
 
 export function PageHeader({eyebrow, title, action}: {eyebrow: string; title: string; action?: React.ReactNode}) {
+  const {credits} = useContext(ShellContext);
   return (
     <header className="page-header">
       <div><span>{eyebrow}</span><h1>{title}</h1></div>
-      {action}
+      {action ?? (credits !== null ? <Link className="credit-chip" href="/dashboard/crediti"><i /> <strong>{number(credits)}</strong> crediti disponibili</Link> : null)}
     </header>
   );
 }

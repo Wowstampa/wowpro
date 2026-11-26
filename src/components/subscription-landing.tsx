@@ -66,7 +66,7 @@ export function SubscriptionLanding({options, billing, payments, managerName}: {
       </div>
       <aside className="sub-landing__credits">
         <span className="sub-landing__credits-label">OGNI MESE HAI</span>
-        <strong>{CREDITS.toLocaleString('it-IT')}</strong>
+        <strong>{CREDITS.toLocaleString('it-IT', {useGrouping: 'always'} as Intl.NumberFormatOptions)}</strong>
         <small>crediti grafici inclusi</small>
         <p>che equivalgono, per esempio, a</p>
         <ul>{USES.map((use) => <li key={use.label}><b>{use.count}</b><span>{use.label}<small>{use.cost}</small></span></li>)}</ul>

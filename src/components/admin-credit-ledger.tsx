@@ -83,4 +83,4 @@ function sameMonth(value: string, date: Date) {
 
 function formatDate(value: string) { return new Intl.DateTimeFormat('it-IT', {day: '2-digit', month: 'short', year: 'numeric'}).format(new Date(value)); }
 function formatTime(value: string) { return new Intl.DateTimeFormat('it-IT', {hour: '2-digit', minute: '2-digit'}).format(new Date(value)); }
-function formatNumber(value: number) { return new Intl.NumberFormat('it-IT').format(value); }
+function formatNumber(value: number) { return new Intl.NumberFormat('it-IT', {useGrouping: 'always'} as Intl.NumberFormatOptions).format(value); }

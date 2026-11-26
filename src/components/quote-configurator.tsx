@@ -152,7 +152,7 @@ export function QuoteConfigurator({product, onBack, onAdd, registerPending}: {pr
           <i>×</i>
           <label><span>Altezza</span><input inputMode="numeric" onChange={(event) => setHeight(event.target.value.replace(/\D/g, '').slice(0, 5))} value={height} /><small>cm</small></label>
         </div>
-        <p className="qc__hint"><Ruler size={13} /> Minimo {config.dimensions.minWidth} × {config.dimensions.minHeight} cm{config.dimensions.minAreaM2 ? ` · fatturazione minima ${config.dimensions.minAreaM2.toLocaleString('it-IT')} m²` : ''}</p>
+        <p className="qc__hint"><Ruler size={13} /> Minimo {config.dimensions.minWidth} × {config.dimensions.minHeight} cm{config.dimensions.minAreaM2 ? ` · fatturazione minima ${config.dimensions.minAreaM2.toLocaleString('it-IT', {useGrouping: 'always'} as Intl.NumberFormatOptions)} m²` : ''}</p>
       </section> : null}
 
       {visibleFields.map((field) => {

@@ -4,6 +4,7 @@ import {useMemo, useState, type FormEvent} from 'react';
 import {useRouter} from 'next/navigation';
 import {Check, ChevronUp, Columns3, CornerDownRight, LayoutList, Lightbulb, Monitor, Package, Plus, Search, Sparkles, X} from 'lucide-react';
 
+import {PageIntro} from '@/components/page-intro';
 import {FEEDBACK_CATEGORIES, type FeedbackCategory} from '@/lib/feedback-categories';
 
 export type FeedbackItem = {
@@ -64,23 +65,9 @@ export function ClientFeedbackBoard({initialItems, now}: {initialItems: Feedback
 
   return <section className="feedback-portal">
     <button aria-label="Proponi una richiesta" className="fab" onClick={() => setIsProposing(true)} type="button"><Plus size={20} /> Proponi</button>
-    <header className="feedback-hero">
-      <div>
-        <span className="feedback-hero__eyebrow"><i /> BACHECA CONDIVISA · CLIENTI WOWSTAMPA</span>
-        <h2>Aiutaci a costruire la <em>prossima WowStampa</em></h2>
-        <p>Raccontaci cosa miglioreresti del portale, del sito e del programma WOWPRO, o suggerisci un nuovo prodotto da stampare. Le idee più votate dai clienti diventano la nostra priorità. Trovi una proposta che ti convince? Votala invece di duplicarla.</p>
-        <div className="feedback-hero__actions">
-          <button className="button button--primary" onClick={() => setIsProposing(true)} type="button"><Plus size={17} /> Proponi una richiesta</button>
-          <button className="button feedback-hero__ghost" onClick={() => setView('roadmap')} type="button">Guarda la roadmap</button>
-        </div>
-      </div>
-      <div className="feedback-hero__stats">
-        <Stat label="Richieste aperte" value={stats.open} />
-        <Stat label="In implementazione" value={stats.implementing} />
-        <Stat label="Già rilasciate" value={stats.released} />
-        <Stat label="I tuoi voti" value={stats.myVotes} />
-      </div>
-    </header>
+    <PageIntro action={<button className="button button--primary" onClick={() => setIsProposing(true)} type="button"><Plus size={17} /> Proponi un’idea</button>} text="Suggerisci miglioramenti al portale, al sito o a WOWPRO, o un nuovo prodotto da stampare. Le idee più votate dai clienti diventano la nostra priorità: se ne trovi una che ti convince, votala invece di duplicarla." title="Aiutaci a costruire la prossima WowStampa">
+      <ul className="page-intro__stats"><li><b>{stats.open}</b> aperte</li><li><b>{stats.implementing}</b> in sviluppo</li><li><b>{stats.released}</b> rilasciate</li><li><b>{stats.myVotes}</b> tuoi voti</li></ul>
+    </PageIntro>
 
     <div className="feedback-tabs" role="tablist">
       <button aria-selected={view === 'board'} className={view === 'board' ? 'is-active' : ''} onClick={() => setView('board')} role="tab" type="button"><LayoutList size={15} /> Bacheca</button>
@@ -116,8 +103,6 @@ export function ClientFeedbackBoard({initialItems, now}: {initialItems: Feedback
     {isProposing ? <ProposeModal items={items} onClose={() => setIsProposing(false)} onCreated={() => { setIsProposing(false); router.refresh(); }} onVote={(item) => { void vote(item); }} /> : null}
   </section>;
 }
-
-function Stat({label, value}: {label: string; value: number}) { return <div><strong>{value}</strong><small>{label}</small></div>; }
 
 function CategoryTag({category}: {category: string}) {
   const Icon = categoryIcons[category] || Lightbulb;

@@ -107,7 +107,7 @@ export function RequestThread({requestId, viewer, canReject = false, onStatusCha
       <div className="rt-head__top"><span className="rt-id">{request.publicId}</span><span className={`rt-status rt-status--${request.status}`}>{REQUEST_STATUS_LABELS[request.status]}</span></div>
       <h2>{request.title}</h2>
       <div className="rt-meta">
-        <span><CircleDot size={14} />{request.type} · {request.creditCost.toLocaleString('it-IT')} crediti</span>
+        <span><CircleDot size={14} />{request.type} · {request.creditCost.toLocaleString('it-IT', {useGrouping: 'always'} as Intl.NumberFormatOptions)} crediti</span>
         {viewer === 'team' ? <span><User size={14} />{request.companyName} · {request.requesterName}</span> : null}
         {viewer === 'team' ? <button className="rt-brandkit" onClick={() => setBrandKitOpen(true)} type="button"><Palette size={14} /> Brand kit cliente</button> : null}
         {thread.designers.length ? <label className="rt-assign"><Wrench size={14} />Grafico<select disabled={isActing} onChange={(event) => void assign(event.target.value)} value={request.designerId || ''}><option value="">Da assegnare</option>{thread.designers.map((designer) => <option key={designer.id} value={designer.id}>{designer.name}</option>)}</select></label> : <span><Wrench size={14} />{request.designerName ? `Grafico: ${request.designerName}` : 'Grafico da assegnare'}</span>}

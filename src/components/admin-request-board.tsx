@@ -156,7 +156,7 @@ function RequestMetric({icon, label, note, tone = 'green', value}: {icon: React.
 
 function countStatuses(requests: AdminGraphicRequest[]) { return requests.reduce<Record<RequestStatus, number>>((counts, request) => ({...counts, [request.status]: counts[request.status] + 1}), {new: 0, in_progress: 0, review: 0, completed: 0, rejected: 0}); }
 function formatDate(value: string) { return new Intl.DateTimeFormat('it-IT', {day: '2-digit', month: 'short', year: 'numeric'}).format(new Date(value)); }
-function formatNumber(value: number) { return new Intl.NumberFormat('it-IT').format(value); }
+function formatNumber(value: number) { return new Intl.NumberFormat('it-IT', {useGrouping: 'always'} as Intl.NumberFormatOptions).format(value); }
 
 async function readApiResponse(response: Response) {
   const contentType = response.headers.get('content-type') || '';

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import {useCallback, useEffect, useState} from 'react';
 
 import {ClientRequestsWorkspace, type ClientWorkspaceRequest} from '@/components/client-requests-workspace';
+import {PageIntro} from '@/components/page-intro';
 import {QuotesWorkspace, type LinkedGraphic, type QuoteView} from '@/components/quotes';
 import {takeReorder, type ReorderDraft} from '@/lib/reorder';
 
@@ -60,10 +61,7 @@ export function RequestsHub({requests, quotes, includedCredits, extraCredits}: {
   const toPay = quotes.filter((quote) => quote.status === 'quoted' && !quote.awaitingPayment).length;
 
   return <section className="hub">
-    <header className="hub__head">
-      <div><h2>Le tue richieste</h2><p>Grafiche, preventivi e ordini di stampa: tutto quello che chiedi a WowStampa, in un solo posto.</p></div>
-      <button className="button button--primary" onClick={() => setChoosing(true)} type="button"><Plus size={17} /> Nuova richiesta</button>
-    </header>
+    <PageIntro action={<button className="button button--primary" onClick={() => setChoosing(true)} type="button"><Plus size={17} /> Nuova richiesta</button>} text="Grafiche, preventivi e ordini di stampa: tutto quello che chiedi a WowStampa, in un solo posto." title="Le tue richieste" />
     <div aria-label="Tipo di richiesta" className="hub__tabs" role="tablist">
       <button aria-selected={tab === 'grafica'} className={tab === 'grafica' ? 'is-active' : ''} onClick={() => select('grafica')} role="tab" type="button"><Palette size={16} /> Grafica <small>{requests.length}</small>{toApprove ? <b title="Bozze da approvare">{toApprove}</b> : null}</button>
       <button aria-selected={tab === 'preventivi'} className={tab === 'preventivi' ? 'is-active' : ''} onClick={() => select('preventivi')} role="tab" type="button"><ShoppingBag size={16} /> Preventivi e ordini <small>{quotes.length}</small>{toPay ? <b title="Preventivi da pagare">{toPay}</b> : null}</button>
@@ -77,7 +75,7 @@ export function RequestsHub({requests, quotes, includedCredits, extraCredits}: {
         <button aria-label="Chiudi" className="subscription-buy__close" onClick={() => setLowCredits(false)} type="button"><X size={18} /></button>
         <span className="hub-block__icon"><AlertTriangle size={24} /></span>
         <h3>Crediti insufficienti per la grafica</h3>
-        <p>Hai <b>{credits.toLocaleString('it-IT')} crediti</b>: per far preparare la grafica ne servono almeno <b>1.000</b> (revisione). Come vuoi proseguire?</p>
+        <p>Hai <b>{credits.toLocaleString('it-IT', {useGrouping: 'always'} as Intl.NumberFormatOptions)} crediti</b>: per far preparare la grafica ne servono almeno <b>1.000</b> (revisione). Come vuoi proseguire?</p>
         <div className="hub-block__options">
           <Link className="hub-block__option" href="/dashboard/crediti"><span className="is-green"><CreditCard size={20} /></span><strong>Ricarica i crediti</strong><small>Acquista crediti extra e torna a chiedere grafica + stampa.</small><em>Vai ai crediti <ArrowRight size={14} /></em></Link>
           <button className="hub-block__option" onClick={() => { setLowCredits(false); startQuote(null); }} type="button"><span className="is-blue"><FileCheck2 size={20} /></span><strong>Ho già il file pronto</strong><small>Salta la grafica e chiedi subito il preventivo di stampa: allega il tuo file.</small><em>Vai al preventivo <ArrowRight size={14} /></em></button>

@@ -1,5 +1,8 @@
-import {ChevronDown, ExternalLink, Package, Receipt, Truck} from 'lucide-react';
+import {ChevronDown, ExternalLink, Package, Plus, Receipt, Truck} from 'lucide-react';
 
+import Link from 'next/link';
+
+import {PageIntro} from '@/components/page-intro';
 import {ReorderButton} from '@/components/reorder-button';
 import type {CustomerOrder} from '@/lib/integrations/shopify';
 import {isPrintOrder} from '@/lib/order-status';
@@ -50,7 +53,7 @@ export function ClientOrders({orders, invoices = {}}: {orders: CustomerOrder[]; 
     return <section className="empty-card empty-card--section"><Package size={26} className="orders-empty-icon" /><h2>Nessun ordine recente</h2><p>Gli ordini effettuati su wowstampa.it negli ultimi 60 giorni compariranno qui.</p></section>;
   }
   return <section className="orders">
-    <div className="credits-section-title"><h2>I tuoi ordini</h2><p>Ordini WowStampa degli ultimi 60 giorni</p></div>
+    <PageIntro action={<Link className="button button--primary" href="/dashboard/richieste?tab=preventivi&new=quote"><Plus size={17} /> Nuovo preventivo</Link>} text="Gli ordini WowStampa degli ultimi 60 giorni, con stato, tracking, fatture e riordino in un clic." title="I tuoi ordini" />
     <div className="orders__list">{orders.map((order) => <OrderCard invoiceId={invoices[order.name] || null} key={order.id} order={order} />)}</div>
   </section>;
 }

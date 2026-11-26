@@ -147,5 +147,5 @@ export function CreditPurchase() {
   </>;
 }
 
-function formatNumber(value: number) { return new Intl.NumberFormat('it-IT').format(value); }
+function formatNumber(value: number) { return new Intl.NumberFormat('it-IT', {useGrouping: 'always'} as Intl.NumberFormatOptions).format(value); }
 function formatPrice(value: number, currency: string) { return new Intl.NumberFormat('it-IT', {style: 'currency', currency: currency || 'EUR'}).format(value); }
