@@ -4,6 +4,7 @@ import {useCallback, useEffect, useRef, useState, type FormEvent, type KeyboardE
 import {useRouter} from 'next/navigation';
 import {CheckCheck, FileText, Loader2, Lock, MessageCircle, Paperclip, Send, X} from 'lucide-react';
 
+import {Avatar} from '@/components/avatar';
 import {ACCEPTED_FILES, formatBytes, putWithProgress, validateFiles} from '@/components/request-files';
 
 type Message = {id: string; body: string; createdAt: string; authorName: string; fromClient: boolean; file: {name: string; size: number} | null};
@@ -11,7 +12,7 @@ type Conversation = {messages: Message[]; teamReadAt: string | null; clientReadA
 
 const POLL_MS = 5_000;
 
-export function SupportChat({companyId, viewer, emptyHint, variant = 'page'}: {companyId?: string; viewer: 'client' | 'team'; emptyHint?: string; variant?: 'page' | 'popup'}) {
+export function SupportChat({companyId, viewer, emptyHint, variant = 'page', managerId, prompts = []}: {companyId?: string; viewer: 'client' | 'team'; emptyHint?: string; variant?: 'page' | 'popup'; managerId?: string | null; prompts?: string[]}) {
   const router = useRouter();
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [error, setError] = useState('');
@@ -90,11 +91,12 @@ export function SupportChat({companyId, viewer, emptyHint, variant = 'page'}: {c
 
   return <section className={variant === 'popup' ? 'support-chat support-chat--popup' : 'support-chat'}>
     <header className="support-chat__head">
-      <span className="support-chat__avatar">{initials(viewer === 'client' ? conversation?.manager || 'WowStampa' : conversation?.companyName || '…')}</span>
+      {viewer === 'client' && variant === 'page' ? <Avatar name={conversation?.manager || 'WowStampa'} profileId={managerId || null} size={42} /> : <span className="support-chat__avatar">{initials(viewer === 'client' ? conversation?.manager || 'WowStampa' : conversation?.companyName || '…')}</span>}
       <div>
         <strong>{viewer === 'client' ? conversation?.manager || 'Team WowStampa' : conversation?.companyName || 'Caricamento…'}</strong>
-        <small>{viewer === 'client' ? <><i className="support-chat__dot" />Account Manager · WOWPRO</> : conversation?.manager ? `Account manager: ${conversation.manager}` : 'Account manager non assegnato'}</small>
+        <small>{viewer === 'client' ? <><i className="support-chat__dot" />{variant === 'page' ? 'Il tuo account manager · ricevi un’email a ogni risposta' : 'Account Manager · WOWPRO'}</> : conversation?.manager ? `Account manager: ${conversation.manager}` : 'Account manager non assegnato'}</small>
       </div>
+      {viewer === 'client' && variant === 'page' ? <span className="support-chat__private"><Lock size={12} /> Conversazione privata</span> : null}
     </header>
 
     <div className="support-chat__messages" ref={listRef}>
@@ -119,6 +121,7 @@ export function SupportChat({companyId, viewer, emptyHint, variant = 'page'}: {c
     <form className="support-chat__composer" onSubmit={send}>
       {file ? <div className="support-chat__attachment"><FileText size={15} /><span>{file.name}</span><small>{formatBytes(file.size)}</small>{progress !== null ? <span className="upload-progress"><i style={{width: `${Math.round(progress * 100)}%`}} /></span> : <button aria-label="Rimuovi allegato" onClick={() => setFile(null)} type="button"><X size={14} /></button>}</div> : null}
       {error ? <p className="form-error">{error}</p> : null}
+      {prompts.length && !body ? <div className="support-chat__prompts">{prompts.map((prompt) => <button key={prompt} onClick={() => setBody(`${prompt}: `)} type="button">{prompt}</button>)}</div> : null}
       <div className="support-chat__input">
         <input accept={ACCEPTED_FILES} hidden onChange={(event) => { pickFile(event.target.files); event.target.value = ''; }} ref={fileRef} type="file" />
         <button aria-label="Allega file" className="support-chat__icon" disabled={isSending} onClick={() => fileRef.current?.click()} type="button"><Paperclip size={18} /></button>
