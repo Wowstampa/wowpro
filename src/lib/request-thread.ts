@@ -2,6 +2,7 @@ import 'server-only';
 
 import type {CurrentProfile} from '@/lib/auth';
 import {escapeHtml, sendEmail} from '@/lib/email';
+import {filterByPreference, type NotificationCategory} from '@/lib/notification-prefs';
 import {createAdminClient} from '@/lib/supabase/admin.server';
 
 export type RequestStatus = 'new' | 'in_progress' | 'review' | 'completed' | 'rejected';
@@ -78,7 +79,7 @@ export async function logRequestEvent(requestId: string, actorId: string, eventT
 }
 
 // Emails the other side of the request: the client's users, or the designer (admins when nobody is assigned).
-export async function notifyRequestUpdate({requestId, actor, subject, message, force = false}: {requestId: string; actor: CurrentProfile; subject: string; message: string; force?: boolean}) {
+export async function notifyRequestUpdate({requestId, actor, subject, message, force = false, category = 'grafica'}: {requestId: string; actor: CurrentProfile; subject: string; message: string; force?: boolean; category?: NotificationCategory}) {
   const admin = createAdminClient();
   const {data: request} = await admin.from('graphic_requests').select('id,public_id,title,company_id,assigned_to').eq('id', requestId).maybeSingle();
   if (!request) return;
@@ -97,7 +98,7 @@ export async function notifyRequestUpdate({requestId, actor, subject, message, f
     const {data} = await admin.from('profiles').select('id,email').eq('role', 'client').eq('status', 'active').eq('company_id', request.company_id);
     recipients = (data || []).map((row) => ({id: row.id, email: row.email, link: `${origin}/dashboard/richieste?r=${request.id}`}));
   }
-  recipients = recipients.filter((recipient) => recipient.id !== actor.id);
+  recipients = await filterByPreference(recipients.filter((recipient) => recipient.id !== actor.id), category);
   for (const recipient of recipients) {
     const marker = `email:${recipient.id}`;
     if (!force) {

@@ -4,6 +4,7 @@ import type {CurrentProfile} from '@/lib/auth';
 import {escapeHtml, sendEmail} from '@/lib/email';
 import {deleteDraftOrder, getDraftOrderState, setOrderFileLinks} from '@/lib/integrations/shopify';
 import {quoteFileLinks, refreshQuoteDraftFiles} from '@/lib/quote-draft';
+import {filterByPreference} from '@/lib/notification-prefs';
 import {getConversationCompany} from '@/lib/support';
 import {createAdminClient} from '@/lib/supabase/admin.server';
 
@@ -207,7 +208,7 @@ export async function notifyQuote({quote, actor, subject, message}: {quote: {id:
   } else {
     recipients = ((await admin.from('profiles').select('id,email').eq('role', 'client').eq('status', 'active').eq('company_id', quote.company_id)).data || []);
   }
-  for (const recipient of recipients.filter((item) => item.id !== actor.id)) {
+  for (const recipient of await filterByPreference(recipients.filter((item) => item.id !== actor.id), 'preventivi')) {
     const html = `<div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;color:#0a0d15"><p style="font-size:12px;letter-spacing:.08em;color:#11823f;font-weight:bold">WOWPRO · PREVENTIVO ${escapeHtml(quote.public_id)}</p><h2 style="margin:0 0 12px">${escapeHtml(subject)}</h2><blockquote style="margin:0 0 20px;padding:12px 16px;border-left:4px solid #1db65b;background:#f6f9fb;color:#3a4556">${escapeHtml(message).replace(/\n/g, '<br>')}</blockquote><a href="${link}" style="display:inline-block;padding:12px 18px;border-radius:10px;background:#1db65b;color:#fff;text-decoration:none;font-weight:bold">Apri il preventivo</a></div>`;
     try { await sendEmail({to: recipient.email, subject: `${subject} · ${quote.public_id}`, html, text: `${subject}\n\n${message}\n\nApri il preventivo: ${link}`}); } catch (error) { console.error('[Quote email]', error); }
   }

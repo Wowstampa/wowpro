@@ -5,6 +5,7 @@ import {cache} from 'react';
 import type {CurrentProfile} from '@/lib/auth';
 import {escapeHtml, sendEmail} from '@/lib/email';
 import {listWowproClients} from '@/lib/integrations/airtable';
+import {filterByPreference} from '@/lib/notification-prefs';
 import {createAdminClient} from '@/lib/supabase/admin.server';
 
 export type SupportMessage = {id: string; body: string; createdAt: string; authorName: string; fromClient: boolean; file: {name: string; size: number} | null};
@@ -139,7 +140,7 @@ export async function notifyNewMessage({company, author, body, hasFile}: {compan
     recipients = (data || []).map(person);
     link = `${origin}/dashboard/supporto`;
   }
-  recipients = recipients.filter((recipient) => recipient.id !== author.id);
+  recipients = await filterByPreference(recipients.filter((recipient) => recipient.id !== author.id), 'messaggi');
   if (!recipients.length) return;
 
   const {data: reads} = await admin.from('support_reads').select('profile_id,last_emailed_at').eq('company_id', company.id).in('profile_id', recipients.map((recipient) => recipient.id));
