@@ -15,6 +15,7 @@
     "@supabase/supabase-js": "latest",
     "lucide-react": "latest",
     "next": "latest",
+    "pdf-lib": "^1.17.1",
     "react": "latest",
     "react-dom": "latest",
     "zod": "latest"
