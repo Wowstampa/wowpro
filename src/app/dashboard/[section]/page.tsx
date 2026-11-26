@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import {redirect} from 'next/navigation';
-import {ArrowRight, ExternalLink, Info, Mail, Palette, Phone, Plus, Receipt} from 'lucide-react';
+import {BadgeCheck, Coins, Crown, ExternalLink, Headphones, Info, Mail, Package, Palette, Pencil, Phone, Plus, Receipt, Sparkles} from 'lucide-react';
 
 import {PageHeader} from '@/components/app-shell';
 import {RequestsHub} from '@/components/requests-hub';
@@ -303,22 +303,27 @@ async function SupportPage() {
       }
     } catch (error) { console.error('[Support contacts]', error); }
   }
-  const contact = (role: string, person: Contact | null, fallback: string, note: string) => <article className="team-contact">
-    <div className="team-contact__head"><Avatar name={person?.name || fallback} profileId={person?.id || null} size={52} /><div><small>{role}</small><strong>{person?.name || fallback}</strong></div></div>
-    <p>{note}</p>
-    <div className="team-contact__rows">
-      {person ? <a href={`mailto:${person.email}`}><Mail size={15} /><span>{person.email}</span></a> : null}
-      {person?.phone ? <a href={whatsappLink(person.phone)} rel="noreferrer" target="_blank"><Phone size={15} /><span>{person.phone} · WhatsApp</span></a> : null}
-    </div>
-  </article>;
+  // Graphic requests the designer is working on for this client.
+  const designerWork = designer && profile.company_id ? (await createAdminClient().from('graphic_requests').select('id', {count: 'exact', head: true}).eq('company_id', profile.company_id).eq('assigned_to', designer.id).in('status', ['new', 'in_progress', 'review'])).count || 0 : 0;
+  const actions = (person: Contact | null, main: React.ReactNode) => <div className="mx-actions">{main}{person ? <a href={`mailto:${person.email}`}><Mail size={15} /> Email</a> : null}</div>;
   return <><PageHeader eyebrow="WOWPRO · Area cliente" title="Messaggi" /><main className="page-content messages-page">
-    <PageIntro text={`Una linea diretta con il tuo team: scrivi qui a ${manager?.name || 'il tuo account manager'}, ti risponde in chat e ricevi un avviso via email.`} title="Messaggi con il tuo team" />
+    <PageIntro text={`Una linea diretta con chi segue la tua azienda: scrivi qui a ${manager?.name?.split(' ')[0] || 'il tuo account manager'}, ti risponde in chat e ricevi un avviso via email.`} title="Messaggi con il tuo team" />
     <div className="messages-layout">
-      <SupportChat emptyHint={`Scrivi a ${manager?.name || 'il tuo account manager'}: ti risponderà qui e riceverai un avviso via email.`} viewer="client" />
-      <aside className="messages-team">
-        {contact('Il tuo account manager', manager, 'Team WowStampa', 'Il tuo riferimento per crediti, abbonamento, preventivi e ordini.')}
-        {contact('Il tuo grafico dedicato', designer, 'In assegnazione', designer ? 'Segue le tue richieste grafiche: revisioni, modifiche e creazioni.' : 'Ti assegneremo un grafico dedicato con la tua prima richiesta grafica.')}
-        <Link className="team-contact__link" href="/dashboard/richieste?new=grafica"><Palette size={15} /> Per brief e revisioni usa le richieste grafiche <ArrowRight size={14} /></Link>
+      <SupportChat emptyHint={`Scrivi a ${manager?.name || 'il tuo account manager'}: ti risponderà qui e riceverai un avviso via email.`} managerId={manager?.id || null} prompts={['Domanda su un ordine', 'Vorrei un preventivo', 'Info su crediti e abbonamento', 'Problema con un file']} viewer="client" />
+      <aside className="mx-side">
+        <article className="mx-card mx-card--manager">
+          <span className="mx-card__role"><Headphones size={12} /> Account manager</span>
+          <div className="mx-card__person"><Avatar name={manager?.name || 'Team WowStampa'} profileId={manager?.id || null} size={58} /><div><strong>{manager?.name || 'Team WowStampa'}</strong><small>Il tuo riferimento in WowStampa</small></div></div>
+          <div><h4>Scrivi per</h4><div className="mx-topics"><span><Package size={12} /> Ordini</span><span><Receipt size={12} /> Preventivi</span><span><Coins size={12} /> Crediti</span><span><Crown size={12} /> Abbonamento</span></div></div>
+          {actions(manager, manager?.phone ? <a className="is-main" href={whatsappLink(manager.phone)} rel="noreferrer" target="_blank"><Phone size={15} /> WhatsApp</a> : null)}
+        </article>
+        <article className="mx-card mx-card--designer">
+          <span className="mx-card__role"><Palette size={12} /> Grafico dedicato</span>
+          <div className="mx-card__person"><Avatar name={designer?.name || 'In assegnazione'} profileId={designer?.id || null} size={58} /><div><strong>{designer?.name || 'In assegnazione'}</strong><small>{designer ? 'Segue le tue grafiche' : 'Ti assegneremo un grafico con la tua prima richiesta'}</small></div></div>
+          <div><h4>Si occupa di</h4><div className="mx-topics"><span><BadgeCheck size={12} /> Revisioni</span><span><Pencil size={12} /> Modifiche</span><span><Sparkles size={12} /> Creazioni</span></div></div>
+          {designer ? <div className="mx-work"><span>Richieste grafiche in lavorazione</span><b>{designerWork}</b></div> : null}
+          {actions(designer, <Link className="is-main" href="/dashboard/richieste?new=grafica"><Plus size={15} /> Nuova grafica</Link>)}
+        </article>
       </aside>
     </div>
   </main></>;
