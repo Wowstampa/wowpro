@@ -74,10 +74,9 @@ export function CreditsOverview({included, extra, monthly, renewal, moves}: {inc
           <div className="cr-facts">
             <div><span>Usati questo mese</span><b>{n(Math.max(monthly - included, 0))}</b></div>
             <div><span>Ancora disponibili</span><b>{monthly ? `${share}%` : '—'}</b></div>
-            <div><span>Si usano</span><b>per primi</b></div>
           </div>
         </div>
-        {reset ? <div className="cr-renew"><CalendarClock size={17} /><span>Tornano a {n(monthly)} {reset.days === 0 ? <b>oggi</b> : reset.days === 1 ? <b>domani</b> : <>tra <b>{reset.days} giorni</b></>} · {longDay(reset.date)}</span></div> : <div className="cr-renew"><CalendarClock size={17} /><span>Si ricaricano ogni mese alla data di attivazione del piano</span></div>}
+        {reset ? <div className="cr-renew"><CalendarClock size={17} /><span>Si esauriscono per primi e tornano a {n(monthly)} {reset.days === 0 ? <b>oggi</b> : reset.days === 1 ? <b>domani</b> : <>tra <b>{reset.days} giorni</b></>} · {longDay(reset.date)}</span></div> : <div className="cr-renew"><CalendarClock size={17} /><span>Si esauriscono per primi e si ricaricano ogni mese alla data di attivazione del piano</span></div>}
       </article>
       <article className="cr-card cr-card--ext">
         <div className="cr-card__top"><div className="cr-card__title"><span><PiggyBank size={19} /></span><div><strong>Crediti extra</strong><small>La tua riserva</small></div></div><b className="cr-tag"><Forever size={11} /> Non scadono</b></div>
