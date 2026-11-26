@@ -2,7 +2,7 @@
 
 import {useMemo, useState, type FormEvent} from 'react';
 import {useRouter} from 'next/navigation';
-import {Check, ChevronUp, Columns3, CornerDownRight, LayoutList, Lightbulb, Monitor, Package, Plus, Search, Sparkles, X} from 'lucide-react';
+import {ArrowRight, Check, CheckCircle2, ChevronUp, Columns3, Flame, Hourglass, LayoutList, Lightbulb, MessageSquareReply, Monitor, Package, Plus, Rocket, Search, Sparkles, X} from 'lucide-react';
 
 import {PageIntro} from '@/components/page-intro';
 import {FEEDBACK_CATEGORIES, type FeedbackCategory} from '@/lib/feedback-categories';
@@ -21,9 +21,17 @@ export type FeedbackItem = {
   updatedAt: string;
 };
 
-const statusLabels: Record<FeedbackItem['status'], string> = {new: 'Nuova', evaluating: 'In valutazione', implementing: 'In implementazione', completed: 'Completata', rejected: 'Rifiutata'};
+const statusLabels: Record<FeedbackItem['status'], string> = {new: 'Proposta', evaluating: 'In valutazione', implementing: 'In sviluppo', completed: 'Rilasciata', rejected: 'Non in programma'};
 const categoryIcons: Record<string, typeof Package> = {'Nuovo prodotto': Package, 'Sito web': Monitor, WOWPRO: Sparkles, 'Funzionalità': Lightbulb};
 const categoryFilters: Array<{label: string; value: string}> = [{label: 'Prodotti', value: 'Nuovo prodotto'}, {label: 'Sito web', value: 'Sito web'}, {label: 'WOWPRO', value: 'WOWPRO'}, {label: 'Funzioni', value: 'Funzionalità'}];
+const STEPS = ['Proposta', 'In valutazione', 'In sviluppo', 'Rilasciata'];
+const STEP_OF: Record<FeedbackItem['status'], number> = {new: 0, evaluating: 1, implementing: 2, completed: 3, rejected: -1};
+const PROMPTS: Array<{category: FeedbackCategory; title: string; text: string}> = [
+  {category: 'Nuovo prodotto', title: 'Un prodotto da stampare', text: 'Che oggi non trovi su WowStampa'},
+  {category: 'WOWPRO', title: 'Migliora il portale', text: 'Qualcosa che ti farebbe risparmiare tempo'},
+  {category: 'Sito web', title: 'Un’idea per il sito', text: 'Ordinare, scegliere, personalizzare'},
+];
+const categoryLabel = (value: string) => categoryFilters.find((filter) => filter.value === value)?.label || value;
 const roadmapColumns: Array<FeedbackItem['status']> = ['evaluating', 'implementing', 'completed'];
 
 export function ClientFeedbackBoard({initialItems, now}: {initialItems: FeedbackItem[]; now: number}) {
@@ -34,13 +42,13 @@ export function ClientFeedbackBoard({initialItems, now}: {initialItems: Feedback
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState<'votes' | 'recent'>('votes');
   const [isProposing, setIsProposing] = useState(false);
+  const [proposeCategory, setProposeCategory] = useState<FeedbackCategory>('WOWPRO');
   const [voting, setVoting] = useState<string | null>(null);
 
   const stats = useMemo(() => ({
     open: items.filter((item) => item.status === 'new' || item.status === 'evaluating').length,
     implementing: items.filter((item) => item.status === 'implementing').length,
     released: items.filter((item) => item.status === 'completed').length,
-    myVotes: items.filter((item) => item.voted).length,
   }), [items]);
 
   const term = query.trim().toLocaleLowerCase('it-IT');
@@ -63,31 +71,57 @@ export function ClientFeedbackBoard({initialItems, now}: {initialItems: Feedback
     } finally { setVoting(null); }
   }
 
-  return <section className="feedback-portal">
-    <button aria-label="Proponi una richiesta" className="fab" onClick={() => setIsProposing(true)} type="button"><Plus size={20} /> Proponi</button>
-    <PageIntro action={<button className="button button--primary" onClick={() => setIsProposing(true)} type="button"><Plus size={17} /> Proponi un’idea</button>} text="Suggerisci miglioramenti al portale, al sito o a WOWPRO, o un nuovo prodotto da stampare. Le idee più votate dai clienti diventano la nostra priorità: se ne trovi una che ti convince, votala invece di duplicarla." title="Aiutaci a costruire la prossima WowStampa">
-      <ul className="page-intro__stats"><li><b>{stats.open}</b> aperte</li><li><b>{stats.implementing}</b> in sviluppo</li><li><b>{stats.released}</b> rilasciate</li><li><b>{stats.myVotes}</b> tuoi voti</li></ul>
-    </PageIntro>
+  // The most voted idea still open gets the spotlight.
+  const hot = [...items].filter((item) => item.status !== 'completed' && item.status !== 'rejected' && item.votes > 0).sort((a, b) => b.votes - a.votes || b.createdAt.localeCompare(a.createdAt))[0] || null;
+  const propose = (value: FeedbackCategory) => { setProposeCategory(value); setIsProposing(true); };
 
-    <div className="feedback-tabs" role="tablist">
-      <button aria-selected={view === 'board'} className={view === 'board' ? 'is-active' : ''} onClick={() => setView('board')} role="tab" type="button"><LayoutList size={15} /> Bacheca</button>
-      <button aria-selected={view === 'roadmap'} className={view === 'roadmap' ? 'is-active' : ''} onClick={() => setView('roadmap')} role="tab" type="button"><Columns3 size={15} /> Roadmap</button>
+  return <section className="feedback-portal fx">
+    <button aria-label="Proponi un’idea" className="fab" onClick={() => propose('WOWPRO')} type="button"><Plus size={20} /> Proponi</button>
+    <PageIntro action={<button className="button button--primary" onClick={() => propose('WOWPRO')} type="button"><Plus size={17} /> Proponi un’idea</button>} text="Proponi miglioramenti al portale, al sito o a WOWPRO, o un nuovo prodotto da stampare. Le idee più votate dai clienti diventano la nostra priorità." title="Aiutaci a costruire la prossima WowStampa" />
+
+    <div className={hot ? 'fx-top' : 'fx-top fx-top--solo'}>
+      {hot ? <article className="fx-hot">
+        <span className="fx-hot__label"><Flame size={12} /> L’idea più votata</span>
+        <h3>{hot.title}</h3>
+        <p>{hot.description}</p>
+        <div className="fx-hot__foot">
+          <div className="fx-hot__votes"><b>{hot.votes}</b><small>{hot.votes === 1 ? 'voto dei clienti' : 'voti dei clienti'}</small></div>
+          <CategoryTag category={hot.category} />
+          <button aria-pressed={hot.voted} className={hot.voted ? 'fx-vote-big is-voted' : 'fx-vote-big'} disabled={voting === hot.id} onClick={() => vote(hot)} type="button">{hot.voted ? <><Check size={18} /> Hai votato</> : <><ChevronUp size={18} /> Vota anche tu</>}</button>
+        </div>
+        <Lightbulb aria-hidden="true" className="fx-hot__ghost" size={170} strokeWidth={1.1} />
+      </article> : null}
+      <aside className="fx-stats"><h4>A che punto sono le idee</h4>
+        <div className="fx-stat is-eval"><span><Hourglass size={17} /></span><strong>In valutazione</strong><b>{stats.open}</b></div>
+        <div className="fx-stat is-dev"><span><Rocket size={17} /></span><strong>In sviluppo</strong><b>{stats.implementing}</b></div>
+        <div className="fx-stat is-done"><span><CheckCircle2 size={17} /></span><strong>Già rilasciate</strong><b>{stats.released}</b></div>
+      </aside>
+    </div>
+
+    <p className="fx-section-title">Hai un’idea? Parti da qui</p>
+    <div className="fx-prompts">
+      {PROMPTS.map((prompt) => { const Icon = categoryIcons[prompt.category]; return <button className="fx-prompt" key={prompt.category} onClick={() => propose(prompt.category)} type="button"><span className={`fx-cat--${slug(prompt.category)}`}><Icon size={18} /></span><div><strong>{prompt.title}</strong><small>{prompt.text}</small></div><ArrowRight size={16} /></button>; })}
+    </div>
+
+    <div className="fx-bar">
+      <div className="fx-tabs" role="tablist">
+        <button aria-selected={view === 'board'} className={view === 'board' ? 'is-on' : ''} onClick={() => setView('board')} role="tab" type="button"><LayoutList size={15} /> Bacheca</button>
+        <button aria-selected={view === 'roadmap'} className={view === 'roadmap' ? 'is-on' : ''} onClick={() => setView('roadmap')} role="tab" type="button"><Columns3 size={15} /> Roadmap</button>
+      </div>
+      {view === 'board' ? <div className="fx-cats">
+        <button className={category === 'all' ? 'is-on' : ''} onClick={() => setCategory('all')} type="button">Tutte · {items.length}</button>
+        {categoryFilters.map((filter) => <button className={category === filter.value ? 'is-on' : ''} key={filter.value} onClick={() => setCategory(filter.value)} type="button"><i className={`fx-dot--${slug(filter.value)}`} /> {filter.label}</button>)}
+      </div> : null}
     </div>
 
     {view === 'board' ? <>
-      <div className="feedback-filters">
-        <div className="feedback-chips">
-          <button className={category === 'all' ? 'is-active' : ''} onClick={() => setCategory('all')} type="button">Tutte <b>{items.length}</b></button>
-          {categoryFilters.map((filter) => { const Icon = categoryIcons[filter.value]; return <button className={category === filter.value ? 'is-active' : ''} key={filter.value} onClick={() => setCategory(filter.value)} type="button"><Icon size={14} />{filter.label} <b>{items.filter((item) => item.category === filter.value).length}</b></button>; })}
-        </div>
-        <div className="feedback-filters__right">
-          <label className="client-search"><Search size={16} /><input onChange={(event) => setQuery(event.target.value)} placeholder="Cerca tra le richieste..." value={query} /></label>
-          <label className="feedback-sort">Ordina<select onChange={(event) => setSort(event.target.value as 'votes' | 'recent')} value={sort}><option value="votes">Più votate</option><option value="recent">Più recenti</option></select></label>
-        </div>
+      <div className="fx-tools">
+        <label className="client-search"><Search size={16} /><input onChange={(event) => setQuery(event.target.value)} placeholder="Cerca tra le idee..." value={query} /></label>
+        <label className="feedback-sort">Ordina<select onChange={(event) => setSort(event.target.value as 'votes' | 'recent')} value={sort}><option value="votes">Più votate</option><option value="recent">Più recenti</option></select></label>
       </div>
-      <div className="feedback-list">
+      <div className="fx-list">
         {visible.map((item) => <FeedbackCard isVoting={voting === item.id} item={item} key={item.id} now={now} onVote={() => vote(item)} />)}
-        {!visible.length ? <div className="feedback-empty"><Search size={22} /><p>{items.length ? 'Nessuna richiesta corrisponde ai filtri.' : 'Nessuna proposta per ora.'}</p><small>{items.length ? 'Prova a cambiare categoria o proponi una nuova idea.' : 'Sii il primo a suggerire un miglioramento!'}</small></div> : null}
+        {!visible.length ? <div className="feedback-empty"><Search size={22} /><p>{items.length ? 'Nessuna idea corrisponde ai filtri.' : 'Nessuna proposta per ora.'}</p><small>{items.length ? 'Prova a cambiare categoria o proponi una nuova idea.' : 'Sii il primo a suggerire un miglioramento!'}</small></div> : null}
       </div>
     </> : <div className="feedback-roadmap">
       {roadmapColumns.map((status) => {
@@ -95,36 +129,37 @@ export function ClientFeedbackBoard({initialItems, now}: {initialItems: Feedback
         return <section className={`feedback-roadmap__col feedback-roadmap__col--${status}`} key={status}>
           <header><span className={`feedback-pill feedback-pill--${status}`}>{statusLabels[status]}</span><b>{column.length}</b></header>
           {column.map((item) => <article key={item.id}><CategoryTag category={item.category} /><strong>{item.title}</strong><small><ChevronUp size={13} /> {item.votes} voti</small></article>)}
-          {!column.length ? <p>Nessuna richiesta in questa fase.</p> : null}
+          {!column.length ? <p>Nessuna idea in questa fase.</p> : null}
         </section>;
       })}
     </div>}
 
-    {isProposing ? <ProposeModal items={items} onClose={() => setIsProposing(false)} onCreated={() => { setIsProposing(false); router.refresh(); }} onVote={(item) => { void vote(item); }} /> : null}
+    {isProposing ? <ProposeModal initialCategory={proposeCategory} items={items} onClose={() => setIsProposing(false)} onCreated={() => { setIsProposing(false); router.refresh(); }} onVote={(item) => { void vote(item); }} /> : null}
   </section>;
 }
 
 function CategoryTag({category}: {category: string}) {
   const Icon = categoryIcons[category] || Lightbulb;
-  return <span className={`feedback-tag feedback-tag--${slug(category)}`}><Icon size={12} />{category}</span>;
+  return <span className={`fx-cat fx-cat--${slug(category)}`}><Icon size={12} />{categoryLabel(category)}</span>;
 }
 
 function FeedbackCard({isVoting, item, now, onVote}: {isVoting: boolean; item: FeedbackItem; now: number; onVote: () => void}) {
-  return <article className="feedback-card">
-    <button aria-label={item.voted ? 'Rimuovi voto' : 'Vota questa richiesta'} aria-pressed={item.voted} className={item.voted ? 'feedback-vote is-voted' : 'feedback-vote'} disabled={isVoting} onClick={onVote} type="button"><ChevronUp size={18} /><strong>{item.votes}</strong><small>voti</small></button>
-    <div className="feedback-card__body">
-      <CategoryTag category={item.category} />
+  const step = STEP_OF[item.status];
+  return <article className={`fx-idea${item.status === 'rejected' ? ' is-rejected' : ''}`}>
+    <button aria-label={item.voted ? 'Rimuovi voto' : 'Vota questa idea'} aria-pressed={item.voted} className={item.voted ? 'fx-votebtn is-voted' : 'fx-votebtn'} disabled={isVoting} onClick={onVote} type="button"><ChevronUp size={18} /><b>{item.votes}</b><small>{item.voted ? 'votata' : 'vota'}</small></button>
+    <div className="fx-idea__body">
+      <div className="fx-idea__top"><CategoryTag category={item.category} />{item.status === 'rejected' ? <span className="feedback-pill feedback-pill--rejected">Non in programma</span> : null}</div>
       <h3>{item.title}</h3>
       <p>{item.description}</p>
-      <div className="feedback-card__meta"><span className="feedback-card__avatar">{initials(item.authorName)}</span>{item.authorName}<i />{item.status === 'completed' ? `completata · ${relative(item.updatedAt, now)}` : relative(item.createdAt, now)}</div>
-      {item.publicResponse ? <div className="feedback-card__response"><CornerDownRight size={14} /><b>Risposta WowStampa</b> · {item.publicResponse}</div> : null}
+      {step >= 0 ? <ol aria-label={`Stato: ${STEPS[step]}`} className="fx-track">{STEPS.map((label, index) => <li className={index < step || (index === step && step === STEPS.length - 1) ? 'is-done' : index === step ? 'is-current' : ''} key={label}><i />{label}</li>)}</ol> : null}
+      {item.publicResponse ? <div className="fx-reply"><MessageSquareReply size={16} /><span><b>WowStampa ha risposto:</b> {item.publicResponse}</span></div> : null}
+      <div className="fx-meta">{item.authorName} · {item.status === 'completed' ? `rilasciata ${relative(item.updatedAt, now)}` : relative(item.createdAt, now)}</div>
     </div>
-    <span className={`feedback-pill feedback-pill--${item.status}`}>{statusLabels[item.status]}</span>
   </article>;
 }
 
-function ProposeModal({items, onClose, onCreated, onVote}: {items: FeedbackItem[]; onClose: () => void; onCreated: () => void; onVote: (item: FeedbackItem) => void}) {
-  const [category, setCategory] = useState<FeedbackCategory>('WOWPRO');
+function ProposeModal({initialCategory, items, onClose, onCreated, onVote}: {initialCategory: FeedbackCategory; items: FeedbackItem[]; onClose: () => void; onCreated: () => void; onVote: (item: FeedbackItem) => void}) {
+  const [category, setCategory] = useState<FeedbackCategory>(initialCategory);
   const [title, setTitle] = useState('');
   const [error, setError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -142,7 +177,7 @@ function ProposeModal({items, onClose, onCreated, onVote}: {items: FeedbackItem[
     } catch (caught) { setError(caught instanceof Error ? caught.message : 'Proposta non inviata.'); } finally { setIsSaving(false); }
   }
 
-  return <div aria-modal="true" className="modal-backdrop" role="dialog"><section className="client-modal"><header><div><h2>Proponi una richiesta</h2><p>La tua idea sarà visibile agli altri clienti WOWPRO, che potranno votarla.</p></div><button aria-label="Chiudi" className="modal-close" onClick={onClose} type="button"><X size={19} /></button></header>
+  return <div aria-modal="true" className="modal-backdrop" role="dialog"><section className="client-modal"><header><div><h2>Proponi un’idea</h2><p>La tua idea sarà visibile agli altri clienti WOWPRO, che potranno votarla.</p></div><button aria-label="Chiudi" className="modal-close" onClick={onClose} type="button"><X size={19} /></button></header>
     <form className="client-form" onSubmit={submit}>
       <fieldset className="feedback-category-picker client-form__wide"><legend>Categoria</legend>{FEEDBACK_CATEGORIES.map((value) => { const Icon = categoryIcons[value]; return <button className={category === value ? 'is-selected' : ''} key={value} onClick={() => setCategory(value)} type="button"><Icon size={15} />{value}</button>; })}</fieldset>
       <label className="client-form__wide">Titolo<input maxLength={120} minLength={5} name="title" onChange={(event) => setTitle(event.target.value)} placeholder="Es. Stampa su tazze personalizzate" required value={title} /></label>
@@ -155,7 +190,6 @@ function ProposeModal({items, onClose, onCreated, onVote}: {items: FeedbackItem[
 }
 
 function slug(value: string) { return value.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z]+/g, '-'); }
-function initials(value: string) { return value.split(' ').filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase(); }
 function relative(value: string, now: number) {
   const days = Math.floor((now - new Date(value).getTime()) / 86_400_000);
   if (days < 1) return 'oggi';
