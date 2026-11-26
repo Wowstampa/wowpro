@@ -2119,3 +2119,6 @@ textarea.bk-input { resize: vertical; line-height: 1.5; }
   .cr-move { grid-template-columns: 34px minmax(0, 1fr) auto; }
   .cr-move em { display: none; }
 }
+
+.cr-pair { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; }
+@media (max-width: 1100px) { .cr-pair { grid-template-columns: 1fr; } }
