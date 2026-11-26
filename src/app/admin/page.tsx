@@ -139,7 +139,7 @@ function isOverdue(request: DataRow) { return Boolean(request.due_date) && Date.
 function greeting() { const hour = new Date().getHours(); return hour < 12 ? 'Buongiorno' : hour < 18 ? 'Buon pomeriggio' : 'Buonasera'; }
 function formatDate(value: string) { return new Intl.DateTimeFormat('it-IT', {day: '2-digit', month: 'short', year: 'numeric'}).format(new Date(value)); }
 function formatTime(value: Date) { return new Intl.DateTimeFormat('it-IT', {hour: '2-digit', minute: '2-digit'}).format(value); }
-function formatNumber(value: number) { return new Intl.NumberFormat('it-IT').format(value); }
+function formatNumber(value: number) { return new Intl.NumberFormat('it-IT', {useGrouping: 'always'} as Intl.NumberFormatOptions).format(value); }
 function formatCurrency(value: number) { return new Intl.NumberFormat('it-IT', {style: 'currency', currency: 'EUR', maximumFractionDigits: 0}).format(value / 100); }
 function initials(value: string) { return value.split(' ').filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase(); }
 function asRecord(value: unknown) { return value && typeof value === 'object' && !Array.isArray(value) ? value as DataRow : {}; }
