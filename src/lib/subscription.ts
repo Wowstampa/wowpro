@@ -31,7 +31,7 @@ export async function recordSubscriptionPayment({recordId, orderId, orderName, a
   const admin = createAdminClient();
   // The idempotency key makes repeated Shopify deliveries of the same order harmless.
   const {data: transaction, error} = await admin.from('credit_transactions')
-    .insert({company_id: companyId, bucket: 'included', amount: SUBSCRIPTION_MONTHLY_CREDITS - previous, description: `Abbonamento WOWPRO ${annual ? 'annuale' : 'mensile'} · ordine Shopify ${orderName}: crediti inclusi ripristinati a ${SUBSCRIPTION_MONTHLY_CREDITS.toLocaleString('it-IT')}`, idempotency_key: `${PAYMENT_KEY}${orderId}`})
+    .insert({company_id: companyId, bucket: 'included', amount: SUBSCRIPTION_MONTHLY_CREDITS - previous, description: `Abbonamento WOWPRO ${annual ? 'annuale' : 'mensile'} · ordine Shopify ${orderName}: crediti inclusi ripristinati a ${SUBSCRIPTION_MONTHLY_CREDITS.toLocaleString('it-IT', {useGrouping: 'always'} as Intl.NumberFormatOptions)}`, idempotency_key: `${PAYMENT_KEY}${orderId}`})
     .select('id').single();
   if (error) {
     if (error.code === '23505') return {duplicate: true};

@@ -32,7 +32,7 @@ async function charge(quote: QuoteRow, actorId: string, label: string) {
   const client = await getWowproClient(recordId, {fresh: true});
   const included = Number(client.fields.crediti_inclusi_residui || 0);
   const extra = Number(client.fields.crediti_extra_residui || 0);
-  if (included + extra < EXPRESS_COST) throw new Error(`Crediti insufficienti: la spedizione express richiede ${EXPRESS_COST.toLocaleString('it-IT')} crediti, ne hai ${(included + extra).toLocaleString('it-IT')}.`);
+  if (included + extra < EXPRESS_COST) throw new Error(`Crediti insufficienti: la spedizione express richiede ${EXPRESS_COST.toLocaleString('it-IT', {useGrouping: 'always'} as Intl.NumberFormatOptions)} crediti, ne hai ${(included + extra).toLocaleString('it-IT', {useGrouping: 'always'} as Intl.NumberFormatOptions)}.`);
   const usedIncluded = Math.min(included, EXPRESS_COST);
   const usedExtra = EXPRESS_COST - usedIncluded;
   const description = `Spedizione express · ${label}`;
@@ -67,12 +67,12 @@ export async function requestExpress(profile: CurrentProfile, quote: QuoteRow) {
   const offer = {...(quote.offer || {}), express: {requestedAt, credits: EXPRESS_COST, ...used, refundedAt: null}} as QuoteOffer;
   const {data: updated} = await admin.from('quote_requests').update({offer, updated_at: requestedAt}).eq('id', quote.id).select(QUOTE_COLUMNS).single();
   try {
-    if (order) await setOrderExpress(order.orderId, true, `⚡ SPEDIZIONE EXPRESS richiesta dal cliente il ${stampNow()} (${EXPRESS_COST.toLocaleString('it-IT')} crediti WOWPRO)`);
+    if (order) await setOrderExpress(order.orderId, true, `⚡ SPEDIZIONE EXPRESS richiesta dal cliente il ${stampNow()} (${EXPRESS_COST.toLocaleString('it-IT', {useGrouping: 'always'} as Intl.NumberFormatOptions)} crediti WOWPRO)`);
     else if (quote.status === 'quoted') await refreshQuoteDraftFiles(quote.id);
   } catch (error) { console.error('[Express tag]', error); }
   const where = order ? `l’ordine ${quote.order_name}` : `il preventivo ${quote.public_id}`;
-  await addQuoteEvent(quote.id, profile.id, `Spedizione express richiesta per ${where}: ${EXPRESS_COST.toLocaleString('it-IT')} crediti scalati.`);
-  await notifyQuote({quote, actor: profile, subject: '⚡ Spedizione express richiesta', message: `Il cliente ha richiesto la spedizione express per ${where} (${EXPRESS_COST.toLocaleString('it-IT')} crediti già scalati).${order ? ' L’ordine su Shopify ha il tag «SPEDIZIONE EXPRESS».' : ' Tienine conto nel preventivo: l’ordine avrà il tag «SPEDIZIONE EXPRESS».'} Se non è possibile, rimborsa i crediti dal portale.`}).catch((error) => console.error('[Quote notify]', error));
+  await addQuoteEvent(quote.id, profile.id, `Spedizione express richiesta per ${where}: ${EXPRESS_COST.toLocaleString('it-IT', {useGrouping: 'always'} as Intl.NumberFormatOptions)} crediti scalati.`);
+  await notifyQuote({quote, actor: profile, subject: '⚡ Spedizione express richiesta', message: `Il cliente ha richiesto la spedizione express per ${where} (${EXPRESS_COST.toLocaleString('it-IT', {useGrouping: 'always'} as Intl.NumberFormatOptions)} crediti già scalati).${order ? ' L’ordine su Shopify ha il tag «SPEDIZIONE EXPRESS».' : ' Tienine conto nel preventivo: l’ordine avrà il tag «SPEDIZIONE EXPRESS».'} Se non è possibile, rimborsa i crediti dal portale.`}).catch((error) => console.error('[Quote notify]', error));
   return updated;
 }
 
@@ -104,8 +104,8 @@ export async function refundExpress(actor: Actor, quote: QuoteRow, reason: strin
     if (order) await setOrderExpress(order.orderId, false, '');
     else if (quote.status === 'quoted') await refreshQuoteDraftFiles(quote.id);
   } catch (error) { console.error('[Express untag]', error); }
-  await addQuoteEvent(quote.id, actor.id, `Spedizione express annullata: ${express.credits.toLocaleString('it-IT')} crediti rimborsati.${reason ? ` ${reason}` : ''}`);
-  await notifyQuote({quote, actor: {...actor, id: actor.id || ''} as CurrentProfile, subject: 'Crediti della spedizione express restituiti', message: `Ti abbiamo restituito ${express.credits.toLocaleString('it-IT')} crediti della spedizione express (${quote.order_name ? `ordine ${quote.order_name}` : `preventivo ${quote.public_id}`}).${reason ? `\n\n${reason}` : ''}`}).catch((error) => console.error('[Quote notify]', error));
+  await addQuoteEvent(quote.id, actor.id, `Spedizione express annullata: ${express.credits.toLocaleString('it-IT', {useGrouping: 'always'} as Intl.NumberFormatOptions)} crediti rimborsati.${reason ? ` ${reason}` : ''}`);
+  await notifyQuote({quote, actor: {...actor, id: actor.id || ''} as CurrentProfile, subject: 'Crediti della spedizione express restituiti', message: `Ti abbiamo restituito ${express.credits.toLocaleString('it-IT', {useGrouping: 'always'} as Intl.NumberFormatOptions)} crediti della spedizione express (${quote.order_name ? `ordine ${quote.order_name}` : `preventivo ${quote.public_id}`}).${reason ? `\n\n${reason}` : ''}`}).catch((error) => console.error('[Quote notify]', error));
   return updated;
 }
 

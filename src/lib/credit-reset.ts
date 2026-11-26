@@ -63,7 +63,7 @@ export async function runMonthlyCreditResets(now = new Date()) {
         // The idempotency key makes the daily run safe: one reset per company per month.
         const {data: transaction, error: insertError} = await admin.from('credit_transactions').insert({
           company_id: companyId, bucket: 'included', amount: monthly - previous,
-          description: `Ricarica mensile abbonamento annuale: crediti inclusi ripristinati a ${monthly.toLocaleString('it-IT')}`,
+          description: `Ricarica mensile abbonamento annuale: crediti inclusi ripristinati a ${monthly.toLocaleString('it-IT', {useGrouping: 'always'} as Intl.NumberFormatOptions)}`,
           idempotency_key: `${RESET_KEY}${companyId}-${monthKey}`,
         }).select('id').single();
         if (insertError && insertError.code !== '23505') throw insertError;
