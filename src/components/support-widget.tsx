@@ -1,5 +1,7 @@
 'use client';
 
+import {usePathname} from 'next/navigation';
+
 import {useEffect, useState} from 'react';
 import {MessageCircle, X} from 'lucide-react';
 
@@ -10,6 +12,7 @@ export const OPEN_CHAT_EVENT = 'wowpro:open-chat';
 // Floating chat with the account manager, available on every client page.
 export function SupportWidget({initialUnread, managerName}: {initialUnread: number; managerName: string | null}) {
   const [isOpen, setIsOpen] = useState(false);
+  const pathname = usePathname();
   const [unread, setUnread] = useState(initialUnread);
 
   useEffect(() => {
@@ -30,6 +33,8 @@ export function SupportWidget({initialUnread, managerName}: {initialUnread: numb
     return () => clearInterval(timer);
   }, [isOpen]);
 
+  // On the Messaggi page the chat is already open in the page.
+  if (pathname === '/dashboard/supporto') return null;
   return <div className={isOpen ? 'support-widget is-open' : 'support-widget'}>
     {isOpen ? <section aria-label="Chat con il tuo account manager" className="support-widget__panel" role="dialog">
       <button aria-label="Chiudi chat" className="support-widget__close" onClick={() => setIsOpen(false)} type="button"><X size={18} /></button>
