@@ -26,7 +26,7 @@ export async function POST(request: Request, {params}: {params: Promise<{request
   }
   if (!internal) {
     await admin.from('graphic_requests').update({awaiting_client_response: profile.role !== 'client', updated_at: new Date().toISOString()}).eq('id', requestId);
-    await notifyRequestUpdate({requestId, actor: profile, subject: profile.role === 'client' ? 'Nuovo commento dal cliente' : 'Nuovo messaggio sulla tua richiesta', message: parsed.data.body}).catch((notifyError) => console.error('[Request notify]', notifyError));
+    await notifyRequestUpdate({requestId, actor: profile, subject: profile.role === 'client' ? 'Nuovo commento dal cliente' : 'Nuovo messaggio sulla tua richiesta', message: parsed.data.body, category: 'messaggi'}).catch((notifyError) => console.error('[Request notify]', notifyError));
   }
   return NextResponse.json({comment: {id: data.id, createdAt: data.created_at}}, {status: 201});
 }
