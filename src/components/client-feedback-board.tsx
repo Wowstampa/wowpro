@@ -31,6 +31,7 @@ const PROMPTS: Array<{category: FeedbackCategory; title: string; text: string}> 
   {category: 'WOWPRO', title: 'Migliora il portale', text: 'Qualcosa che ti farebbe risparmiare tempo'},
   {category: 'Sito web', title: 'Un’idea per il sito', text: 'Ordinare, scegliere, personalizzare'},
 ];
+const CATEGORY_HINTS: Record<FeedbackCategory, string> = {'Nuovo prodotto': 'Qualcosa da stampare che oggi manca', 'Sito web': 'Ordinare e personalizzare sul sito', WOWPRO: 'Il portale e il servizio in abbonamento', 'Funzionalità': 'Uno strumento che ti farebbe comodo'};
 const categoryLabel = (value: string) => categoryFilters.find((filter) => filter.value === value)?.label || value;
 const roadmapColumns: Array<FeedbackItem['status']> = ['evaluating', 'implementing', 'completed'];
 
@@ -161,6 +162,7 @@ function FeedbackCard({isVoting, item, now, onVote}: {isVoting: boolean; item: F
 function ProposeModal({initialCategory, items, onClose, onCreated, onVote}: {initialCategory: FeedbackCategory; items: FeedbackItem[]; onClose: () => void; onCreated: () => void; onVote: (item: FeedbackItem) => void}) {
   const [category, setCategory] = useState<FeedbackCategory>(initialCategory);
   const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
   const [error, setError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const words = title.toLocaleLowerCase('it-IT').split(/\W+/).filter((word) => word.length > 3);
@@ -177,14 +179,16 @@ function ProposeModal({initialCategory, items, onClose, onCreated, onVote}: {ini
     } catch (caught) { setError(caught instanceof Error ? caught.message : 'Proposta non inviata.'); } finally { setIsSaving(false); }
   }
 
-  return <div aria-modal="true" className="modal-backdrop" role="dialog"><section className="client-modal"><header><div><h2>Proponi un’idea</h2><p>La tua idea sarà visibile agli altri clienti WOWPRO, che potranno votarla.</p></div><button aria-label="Chiudi" className="modal-close" onClick={onClose} type="button"><X size={19} /></button></header>
-    <form className="client-form" onSubmit={submit}>
-      <fieldset className="feedback-category-picker client-form__wide"><legend>Categoria</legend>{FEEDBACK_CATEGORIES.map((value) => { const Icon = categoryIcons[value]; return <button className={category === value ? 'is-selected' : ''} key={value} onClick={() => setCategory(value)} type="button"><Icon size={15} />{value}</button>; })}</fieldset>
-      <label className="client-form__wide">Titolo<input maxLength={120} minLength={5} name="title" onChange={(event) => setTitle(event.target.value)} placeholder="Es. Stampa su tazze personalizzate" required value={title} /></label>
-      {similar.length ? <div className="feedback-similar client-form__wide"><small>Proposte simili già presenti: se una ti convince, votala.</small>{similar.map((item) => <div key={item.id}><span>{item.title}</span><button className={item.voted ? 'is-voted' : ''} onClick={() => onVote(item)} type="button">{item.voted ? <><Check size={13} /> Votata</> : <><ChevronUp size={13} /> Vota</>}</button></div>)}</div> : null}
-      <label className="client-form__wide">Descrizione<textarea maxLength={2000} minLength={10} name="description" placeholder="Spiega cosa ti servirebbe e perché sarebbe utile..." required rows={5} /></label>
-      {error ? <p className="form-error">{error}</p> : null}
-      <footer className="modal-actions"><button className="client-action" disabled={isSaving} onClick={onClose} type="button">Annulla</button><button className="client-action client-action--primary" disabled={isSaving} type="submit"><Plus size={16} />{isSaving ? 'Invio...' : 'Pubblica proposta'}</button></footer>
+  return <div aria-modal="true" className="modal-backdrop" onClick={(event) => { if (event.target === event.currentTarget && !isSaving) onClose(); }} role="dialog"><section aria-labelledby="ideaTitle" className="client-request-modal fx-modal"><header className="client-request-modal__head"><div><h2 id="ideaTitle">Proponi un’idea</h2><p>Gli altri clienti WOWPRO potranno vederla e votarla.</p></div><button aria-label="Chiudi" className="modal-close" onClick={onClose} type="button"><X size={19} /></button></header>
+    <form onSubmit={submit}>
+      <div className="client-request-modal__body">
+        <fieldset className="service-picker fx-modal__cats"><legend>Di cosa si tratta <b>*</b></legend>{FEEDBACK_CATEGORIES.map((value) => { const Icon = categoryIcons[value]; return <button aria-pressed={category === value} className={category === value ? 'is-selected' : ''} key={value} onClick={() => setCategory(value)} type="button"><span className={`fx-modal__icon fx-cat--${slug(value)}`}><Icon size={17} /></span><span className="fx-modal__text"><strong>{value}</strong><small>{CATEGORY_HINTS[value]}</small></span><span className="service-picker__check">{category === value ? <Check size={14} /> : null}</span></button>; })}</fieldset>
+        <label className="request-modal-field"><span className="fx-modal__label">Titolo <b>*</b><small>{title.length}/120</small></span><input className="fx-modal__input" maxLength={120} minLength={5} name="title" onChange={(event) => setTitle(event.target.value)} placeholder="Es. Stampa su tazze personalizzate" required value={title} /></label>
+        {similar.length ? <div className="fx-similar"><p><Lightbulb size={15} /> Ci sono già idee simili: se una ti convince, votala invece di duplicarla.</p>{similar.map((item) => <div key={item.id}><span>{item.title}</span><button className={item.voted ? 'is-voted' : ''} onClick={() => onVote(item)} type="button">{item.voted ? <><Check size={13} /> Votata</> : <><ChevronUp size={13} /> Vota · {item.votes}</>}</button></div>)}</div> : null}
+        <label className="request-modal-field"><span className="fx-modal__label">Descrizione <b>*</b><small>{description.length}/2000</small></span><textarea maxLength={2000} minLength={10} name="description" onChange={(event) => setDescription(event.target.value)} placeholder="Cosa ti servirebbe e in che situazione ti sarebbe utile? Più dettagli dai, più è facile valutarla." required rows={5} value={description} /></label>
+        {error ? <p className="form-error">{error}</p> : null}
+      </div>
+      <footer className="client-request-modal__foot"><small>Gli altri clienti vedono solo il tuo nome e l’iniziale del cognome.</small><span /><button className="client-action" disabled={isSaving} onClick={onClose} type="button">Annulla</button><button className="client-action client-action--primary" disabled={isSaving} type="submit"><Check size={16} />{isSaving ? 'Invio...' : 'Pubblica idea'}</button></footer>
     </form>
   </section></div>;
 }
