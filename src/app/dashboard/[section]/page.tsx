@@ -28,10 +28,13 @@ import {PlanTabs} from '@/components/plan-tabs';
 import {ClientFiles} from '@/components/client-files';
 import {ClientSettings} from '@/components/client-settings';
 import {listClientFiles} from '@/lib/client-files';
+import {listInvoices} from '@/lib/invoices';
+import {ClientInvoices} from '@/components/client-invoices';
+import {readPrefs} from '@/lib/notification-prefs';
 import {BrandKitEditor} from '@/components/brand-kit';
 import {readBrandKit, toBrandKitView} from '@/lib/brand-kit';
 
-const titles: Record<string, string> = {workspace: 'Dashboard', 'brand-kit': 'Brand kit', crediti: 'Piano e crediti', file: 'File', impostazioni: 'Impostazioni', richieste: 'Richieste grafiche', ordini: 'Ordini', abbonamento: 'Abbonamento', preventivi: 'Preventivi', supporto: 'Messaggi', feedback: 'Feedback & idee'};
+const titles: Record<string, string> = {workspace: 'Dashboard', 'brand-kit': 'Brand kit', crediti: 'Piano e crediti', file: 'File', fatture: 'Piano e crediti', impostazioni: 'Impostazioni', richieste: 'Richieste grafiche', ordini: 'Ordini', abbonamento: 'Abbonamento', preventivi: 'Preventivi', supporto: 'Messaggi', feedback: 'Feedback & idee'};
 
 export default async function ClientSectionPage({params, searchParams}: {params: Promise<{section: string}>; searchParams: Promise<Record<string, string | string[] | undefined>>}) {
   const {section} = await params;
@@ -46,6 +49,7 @@ export default async function ClientSectionPage({params, searchParams}: {params:
   if (section === 'ordini') return <OrdersPage />;
   if (section === 'brand-kit') return <BrandKitPage />;
   if (section === 'file') return <FilesPage />;
+  if (section === 'fatture') return <InvoicesPage />;
   if (section === 'impostazioni') return <SettingsPage />;
   if (section === 'abbonamento') return <SubscriptionPage />;
   if (section === 'preventivi') return redirectQuotes(await searchParams);
@@ -182,6 +186,15 @@ async function BrandKitPage() {
   </main></>;
 }
 
+async function InvoicesPage() {
+  const profile = await requireProfile(['client']);
+  const invoices = await listInvoices(profile.company_id || '').catch(() => []);
+  return <><PageHeader eyebrow="WOWPRO · Area cliente" title="Piano e crediti" /><main className="page-content invoices-page"><PlanTabs current="fatture" />
+    <div className="credits-section-title"><h2>Le tue fatture</h2><p>Abbonamento, crediti extra e ordini di stampa: scaricale quando ti servono.</p></div>
+    <ClientInvoices invoices={invoices.map(({id, name, size, orderName, postedAt}) => ({id, name, size, orderName, postedAt}))} />
+  </main></>;
+}
+
 async function FilesPage() {
   const profile = await requireProfile(['client']);
   const groups = await listClientFiles(profile.company_id || '');
@@ -195,7 +208,7 @@ async function SettingsPage() {
   const profile = await requireProfile(['client']);
   const admin = createAdminClient();
   const [{data: me}, {data: people}, {data: company}] = await Promise.all([
-    admin.from('profiles').select('full_name,email,phone').eq('id', profile.id).maybeSingle(),
+    admin.from('profiles').select('*').eq('id', profile.id).maybeSingle(),
     admin.from('profiles').select('id,full_name,email,status,last_login_at').eq('company_id', profile.company_id || '').eq('role', 'client').in('status', ['active', 'invited', 'suspended']).order('full_name'),
     admin.from('companies').select('airtable_record_id').eq('id', profile.company_id || '').maybeSingle(),
   ]);
@@ -203,7 +216,7 @@ async function SettingsPage() {
   if (company?.airtable_record_id) { try { billing = billingFromClient((await getWowproClient(company.airtable_record_id, {fresh: true})).fields); } catch { /* Empty form when Airtable is unreachable. */ } }
   const colleagues = (people || []).map((person) => ({id: person.id, name: person.full_name || '', email: person.email, status: person.status, lastLogin: person.last_login_at, me: person.id === profile.id}));
   return <><PageHeader eyebrow="WOWPRO · Area cliente" title="Impostazioni" /><main className="page-content settings-page">
-    <ClientSettings billing={billing} colleagues={colleagues} profile={{fullName: me?.full_name || '', email: me?.email || profile.email, phone: me?.phone || ''}} />
+    <ClientSettings billing={billing} colleagues={colleagues} notifications={'notification_prefs' in (me || {}) ? readPrefs(me?.notification_prefs) : null} profile={{fullName: me?.full_name || '', email: me?.email || profile.email, phone: me?.phone || ''}} />
   </main></>;
 }
 
@@ -212,6 +225,7 @@ async function OrdersPage() {
   const supabase = await createClient();
   const {data: company} = await supabase.from('companies').select('airtable_record_id,shopify_customer_id').eq('id', profile.company_id || '').maybeSingle();
   let orders: CustomerOrder[] = [];
+  let invoices: Awaited<ReturnType<typeof listInvoices>> = [];
   let hasLoadError = false;
   try {
     let customerId = company?.shopify_customer_id || '';
@@ -222,11 +236,12 @@ async function OrdersPage() {
       email = record.fields.email_login || email;
     }
     orders = await listCustomerOrders({customerId, email});
+    invoices = await listInvoices(profile.company_id || '').catch(() => []);
   } catch (error) {
     console.error('[Client orders]', error);
     hasLoadError = true;
   }
-  return <><PageHeader eyebrow="WOWPRO · Area cliente" title="Ordini" /><main className="page-content">{hasLoadError ? <section className="empty-card empty-card--section"><span className="eyebrow">COLLEGAMENTO NON DISPONIBILE</span><h2>Impossibile caricare gli ordini</h2><p>Riprova tra qualche istante. Se il problema continua, contatta il tuo account manager.</p></section> : <ClientOrders orders={orders} />}</main></>;
+  return <><PageHeader eyebrow="WOWPRO · Area cliente" title="Ordini" /><main className="page-content">{hasLoadError ? <section className="empty-card empty-card--section"><span className="eyebrow">COLLEGAMENTO NON DISPONIBILE</span><h2>Impossibile caricare gli ordini</h2><p>Riprova tra qualche istante. Se il problema continua, contatta il tuo account manager.</p></section> : <ClientOrders invoices={Object.fromEntries(invoices.filter((invoice) => invoice.orderName).map((invoice) => [invoice.orderName!, invoice.id]))} orders={orders} />}</main></>;
 }
 
 async function FeedbackPage() {
