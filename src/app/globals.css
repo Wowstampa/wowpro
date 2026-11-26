@@ -2178,7 +2178,7 @@ textarea.bk-input { resize: vertical; line-height: 1.5; }
 
 /* Feedback & idee redesign */
 .fx { display: grid; gap: 22px; }
-.fx button { font: inherit; cursor: pointer; }
+.fx :where(button:not(.button, .client-action, .fab)) { font: inherit; cursor: pointer; }
 .fx-top--solo { grid-template-columns: 1fr; }
 .fx-top--solo .fx-stats { grid-template-columns: repeat(3, 1fr); }
 .fx-top--solo .fx-stats h4 { grid-column: 1 / -1; }
