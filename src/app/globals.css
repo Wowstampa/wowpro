@@ -1902,3 +1902,26 @@ textarea.bk-input { resize: vertical; line-height: 1.5; }
 .invoices strong { display: block; overflow: hidden; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
 .invoices small { color: var(--muted); font-size: 12px; }
 .order-card__actions { display: inline-flex; gap: 6px; }
+
+/* Client sidebar fits one screen (desktop): tighter logo, rows, labels and bottom cards */
+@media (min-width: 761px) {
+  .sidebar { padding: 16px 14px 12px; }
+  .sidebar .brand { padding: 0 8px 12px; gap: 2px; }
+  .sidebar .brand .brand__logo { height: 38px; }
+  .sidebar .brand small { font-size: 8px; }
+  .sidebar-new { min-height: 38px; margin: 0 0 6px; font-size: 13px; }
+  .sidebar .nav-list { gap: 1px; }
+  .sidebar .nav-group { gap: 1px; }
+  .sidebar .nav-link { min-height: 34px; padding: 0 12px; gap: 10px; border-radius: 10px; font-size: 13px; }
+  .sidebar .nav-link svg { width: 16px; height: 16px; }
+  .sidebar .nav-link b { min-width: 20px; height: 20px; font-size: 10px; }
+  .sidebar .nav-label--section { margin: 9px 12px 3px; font-size: 9px; }
+  .sidebar-bottom { padding-top: 10px; gap: 6px; }
+  .sub-card { padding: 10px 12px; border-radius: 12px; }
+  .sub-card--wallet { gap: 5px; }
+  .sub-card__credits b { font-size: 17px; }
+  .sub-card__plan { margin: 6px 0 8px; }
+  .sidebar-profile { padding: 8px 10px; border-radius: 12px; }
+  .sidebar-profile .avatar { width: 30px; height: 30px; border-radius: 9px; font-size: 11px; }
+  .sidebar-legal { padding-top: 0; }
+}
