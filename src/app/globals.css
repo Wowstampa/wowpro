@@ -2175,3 +2175,90 @@ textarea.bk-input { resize: vertical; line-height: 1.5; }
 .messages-page .support-msg--mine time, .messages-page .support-msg--mine .support-msg__read { color: rgba(255,255,255,.85); }
 .messages-page .support-msg--mine .support-msg__file { background: rgba(255,255,255,.18); }
 .messages-page .support-msg--mine .support-msg__file span, .messages-page .support-msg--mine .support-msg__file small { color: white; }
+
+/* Feedback & idee redesign */
+.fx { display: grid; gap: 22px; }
+.fx button { font: inherit; cursor: pointer; }
+.fx-top--solo { grid-template-columns: 1fr; }
+.fx-top--solo .fx-stats { grid-template-columns: repeat(3, 1fr); }
+.fx-top--solo .fx-stats h4 { grid-column: 1 / -1; }
+.fx-top { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 16px; }
+.fx-hot { position: relative; overflow: hidden; padding: 24px 26px; display: grid; gap: 12px; border-radius: 20px; color: white; background: radial-gradient(360px 220px at 100% 0, rgba(14,147,69,.5), transparent 70%), linear-gradient(150deg, #121a26, #0c1119); }
+.fx-hot__label { width: fit-content; padding: 4px 10px; display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; background: rgba(61,220,132,.16); color: #6ff0a6; font-size: 10.5px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+.fx-hot h3 { margin: 0; font-size: 24px; letter-spacing: -.03em; }
+.fx-hot p { margin: 0; color: #aab4c3; font-size: 14px; line-height: 1.5; }
+.fx-hot__foot { margin-top: 6px; display: flex; align-items: center; gap: 14px; }
+.fx-hot__votes { display: grid; }
+.fx-hot__votes b { font-size: 32px; letter-spacing: -.04em; line-height: 1; }
+.fx-hot__votes small { color: #9aa5b6; font-size: 12px; font-weight: 700; }
+.fx-vote-big { border: 0;  margin-left: auto; min-height: 46px; padding: 0 20px; display: inline-flex; align-items: center; gap: 8px; border-radius: 12px; background: var(--green); color: white; font-size: 14px; font-weight: 800; box-shadow: 0 10px 24px -12px rgba(14,147,69,.9); }
+.fx-vote-big.is-voted { background: rgba(255,255,255,.12); color: #6ff0a6; box-shadow: none; }
+.fx-vote-big:hover:not(.is-voted) { background: var(--green-dark); }
+.fx-hot > :not(.fx-hot__ghost) { position: relative; z-index: 1; }
+.fx-hot__ghost { pointer-events: none;  position: absolute; right: -14px; top: -16px; color: rgba(255,255,255,.05); }
+.fx-stats { padding: 20px; display: grid; gap: 10px; border: 1px solid var(--line); border-radius: 20px; background: white; }
+.fx-stats h4 { margin: 0 0 2px; font-size: 13px; color: #6b7686; font-weight: 800; }
+.fx-stat { padding: 12px 14px; display: grid; grid-template-columns: 36px 1fr auto; gap: 12px; align-items: center; border-radius: 14px; background: #f6f8fa; }
+.fx-stat span { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 11px; }
+.fx-stat strong { font-size: 13.5px; }
+.fx-stat b { font-size: 20px; letter-spacing: -.03em; }
+.fx-stat.is-eval span { background: #fff4e0; color: #9a5b00; }
+.fx-stat.is-dev span { background: #eaf6ef; color: #0b7a39; }
+.fx-stat.is-done span { background: var(--green); color: white; }
+.fx-prompts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.fx-prompt { width: 100%; text-align: left; color: inherit; transition: border-color .15s, background .15s;  padding: 16px; display: grid; grid-template-columns: 40px 1fr 16px; gap: 12px; align-items: center; border: 1.5px dashed #cfe9da; border-radius: 16px; background: #f8fcf9; }
+.fx-prompt:hover { border-color: var(--green); background: #f0faf4; }
+.fx-prompt span { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 12px; }
+.fx-prompt strong { display: block; font-size: 14px; }
+.fx-prompt small { color: #6b7686; font-size: 12px; }
+.fx-prompt > svg { color: var(--green-dark); }
+.fx-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.fx-tabs { padding: 4px; display: flex; gap: 4px; border: 1px solid var(--line); border-radius: 12px; background: white; }
+.fx-tabs button { border: 0; background: transparent;  padding: 8px 14px; display: inline-flex; align-items: center; gap: 6px; border-radius: 9px; color: #5b6575; font-size: 13px; font-weight: 800; }
+.fx-tabs .is-on { background: var(--nav); color: white; }
+.fx-cats { display: flex; gap: 6px; flex-wrap: wrap; }
+.fx-cats button {  padding: 7px 12px; display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 999px; background: white; color: #3a4556; font-size: 12px; font-weight: 700; }
+.fx-cats button i { width: 8px; height: 8px; border-radius: 50%; }
+.fx-cats .is-on { border-color: var(--nav); background: var(--nav); color: white; }
+.fx-list { display: grid; gap: 12px; }
+.fx-idea { padding: 18px 20px; display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 18px; border: 1px solid var(--line); border-radius: 18px; background: white; box-shadow: 0 1px 2px rgba(16,24,40,.04); }
+.fx-votebtn { width: 76px; background: white; transition: border-color .15s;  height: 76px; display: grid; place-content: center; justify-items: center; gap: 2px; border: 1.5px solid #dfe5ec; border-radius: 16px; color: #3a4556; }
+.fx-votebtn b { font-size: 22px; letter-spacing: -.03em; line-height: 1; }
+.fx-votebtn small { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: #8a95a5; }
+.fx-votebtn:hover:not(.is-voted) { border-color: var(--green); color: var(--green-dark); }
+.fx-votebtn.is-voted { border-color: var(--green); background: var(--green); color: white; box-shadow: 0 8px 18px -10px rgba(14,147,69,.9); }
+.fx-votebtn.is-voted small { color: rgba(255,255,255,.8); }
+.fx-idea__top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.fx-cat { padding: 4px 10px; display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; font-size: 11px; font-weight: 800; }
+.fx-idea h3 { margin: 8px 0 4px; font-size: 16px; letter-spacing: -.01em; }
+.fx-idea p { margin: 0; color: #5b6575; font-size: 13.5px; line-height: 1.5; }
+.fx-track { margin: 12px 0 0; padding: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; list-style: none; }
+.fx-track li { display: grid; gap: 5px; color: #9aa4b2; font-size: 10.5px; font-weight: 700; }
+.fx-track i { height: 5px; border-radius: 999px; background: #e6eaef; }
+.fx-track .is-done i { background: var(--green); }
+.fx-track .is-done, .fx-track .is-current { color: #3a4556; }
+.fx-track .is-current i { background: linear-gradient(90deg, var(--green) 55%, #8fe0b0); }
+.fx-reply { margin-top: 12px; padding: 10px 12px; display: flex; gap: 10px; border-left: 3px solid var(--green); border-radius: 0 10px 10px 0; background: #f4faf6; font-size: 13px; color: #3a4556; }
+.fx-reply b { color: var(--green-dark); }
+.fx-meta { margin-top: 10px; color: #8a95a5; font-size: 12px; }
+.fx-cat--nuovo-prodotto { background: #fff4e0; color: #9a5b00; } .fx-cat--sito-web { background: #e8eefc; color: #2d5fd0; } .fx-cat--wowpro { background: #eaf6ef; color: #0b7a39; } .fx-cat--funzionalita { background: #f1f4f7; color: #3a4556; }
+.fx-dot--nuovo-prodotto { background: #f3a712; } .fx-dot--sito-web { background: #2d6fe0; } .fx-dot--wowpro { background: #0e9345; } .fx-dot--funzionalita { background: #5b6575; }
+.fx-cats .is-on i { box-shadow: 0 0 0 2px rgba(255,255,255,.6); }
+.fx-tools { margin-top: -8px; display: flex; gap: 10px; justify-content: flex-end; align-items: center; flex-wrap: wrap; }
+.fx-idea.is-rejected { opacity: .72; }
+.fx-idea__body { min-width: 0; }
+@media (max-width: 900px) {
+  .fx-top, .fx-prompts { grid-template-columns: 1fr; }
+  .fx-top--solo .fx-stats { grid-template-columns: 1fr; }
+}
+@media (max-width: 560px) {
+  .fx-idea { grid-template-columns: 1fr; gap: 12px; padding: 16px; }
+  .fx-votebtn { width: auto; height: 42px; grid-auto-flow: column; justify-content: start; padding: 0 14px; gap: 6px; }
+  .fx-votebtn b { font-size: 16px; }
+  .fx-track li { font-size: 9.5px; }
+  .fx-hot { padding: 20px; } .fx-hot h3 { font-size: 20px; }
+  .fx-hot__foot { flex-wrap: wrap; } .fx-vote-big { margin-left: 0; width: 100%; justify-content: center; }
+  .fx-cats { overflow-x: auto; flex-wrap: nowrap; max-width: 100%; }
+  .fx-tools { justify-content: stretch; } .fx-tools .client-search { flex: 1; }
+}
+.fx-section-title { margin: 6px 0 -6px; font-size: 13px; font-weight: 800; color: #6b7686; }
