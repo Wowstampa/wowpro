@@ -4,6 +4,7 @@ import {BadgeEuro, Check, CircleCheck, Clock3, Euro, ListTodo, MessageSquareText
 import {PageHeader} from '@/components/app-shell';
 import {requireProfile} from '@/lib/auth';
 import {listWowproClients, type AirtableWowproClient} from '@/lib/integrations/airtable';
+import {getAdminMetrics, type AdminMetrics} from '@/lib/admin-metrics';
 import {createAdminClient} from '@/lib/supabase/admin.server';
 
 type TeamMember = {id: string; name: string; role: string};
@@ -31,12 +32,13 @@ export default async function AdminPage() {
   const mrr = subscriptions.reduce((total, subscription) => total + planPrice(subscription.plans), 0);
 
   if (profile.role === 'admin') {
-    return <AdministrationDashboard activeClients={activeClients} clients={clients} credits={loadedCredits} inProgress={inProgress} members={members} mrr={mrr} openRequests={openRequests} requests={requests} />;
+    const metrics = await getAdminMetrics(clients).catch((error) => { console.error('[Admin metrics]', error); return null; });
+    return <AdministrationDashboard activeClients={activeClients} clients={clients} credits={loadedCredits} inProgress={inProgress} members={members} metrics={metrics} mrr={mrr} openRequests={openRequests} requests={requests} />;
   }
   return <CommercialDashboard clients={clients} profile={profile} requests={requests} />;
 }
 
-function AdministrationDashboard({activeClients, clients, credits, inProgress, members, mrr, openRequests, requests}: {activeClients: number; clients: Array<{fields: AirtableWowproClient}>; credits: number; inProgress: number; members: TeamMember[]; mrr: number; openRequests: DataRow[]; requests: DataRow[]}) {
+function AdministrationDashboard({activeClients, clients, credits, inProgress, members, metrics, mrr, openRequests, requests}: {activeClients: number; clients: Array<{fields: AirtableWowproClient}>; credits: number; inProgress: number; members: TeamMember[]; metrics: AdminMetrics | null; mrr: number; openRequests: DataRow[]; requests: DataRow[]}) {
   const graphics = members.filter((member) => member.role === 'graphic_operator');
   const commercials = members.filter((member) => member.role === 'staff');
   const completedRecently = requests.filter((request) => request.status === 'completed' && isRecent(String(request.completed_at || request.created_at))).length;
@@ -49,8 +51,33 @@ function AdministrationDashboard({activeClients, clients, credits, inProgress, m
       <Metric icon={<BadgeEuro />} label="Crediti caricati nel mese" note="su lavorazioni grafiche" tone="violet" value={formatNumber(credits)} />
       <Metric icon={<Euro />} label="MRR ricorrente" note={mrr ? 'abbonamenti attivi' : 'piani da valorizzare'} tone="blue" value={mrr ? formatCurrency(mrr) : '—'} />
     </section>
+    {metrics ? <BusinessNumbers metrics={metrics} /> : null}
     <section><div className="administration-title"><div><h2>Come lavora il team</h2><p>Chi è carico, chi è in difficoltà e a chi assegnare il prossimo lavoro</p></div><span>Situazione attuale</span></div><GraphicTeam members={graphics} requests={requests} /><CommercialTeam clients={clients} members={commercials} openRequests={openRequests.length} /></section>
   </main></>;
+}
+
+function trend(now: number, prev: number) {
+  if (!prev) return now ? 'primo mese con dati' : 'nessun dato il mese scorso';
+  const change = Math.round(((now - prev) / prev) * 100);
+  return `${change >= 0 ? '+' : ''}${change}% sul mese scorso`;
+}
+
+function BusinessNumbers({metrics}: {metrics: AdminMetrics}) {
+  const hours = metrics.firstDraftHours;
+  const turnaround = hours === null ? '—' : hours < 24 ? `${Math.round(hours)} h` : `${(hours / 24).toFixed(1).replace('.', ',')} gg`;
+  return <section className="admin-numbers">
+    <div className="administration-title"><div><h2>I numeri di WOWPRO</h2><p>Consumi, ordini di stampa e tempi del team</p></div><span>Mese in corso</span></div>
+    <div className="metric-grid">
+      <Metric icon={<BadgeEuro />} label="Crediti consumati" note={trend(metrics.creditsUsed, metrics.creditsUsedPrev)} tone="violet" value={formatNumber(metrics.creditsUsed)} />
+      <Metric icon={<Euro />} label="Ordini di stampa pagati" note={`${new Intl.NumberFormat('it-IT', {style: 'currency', currency: 'EUR'}).format(metrics.ordersRevenue)} · ${trend(metrics.ordersCount, metrics.ordersPrev)}`} tone="blue" value={String(metrics.ordersCount)} />
+      <Metric icon={<Clock3 />} label="Tempo medio prima bozza" note={metrics.firstDraftSample ? `su ${metrics.firstDraftSample} richieste negli ultimi 60 giorni` : 'ancora nessuna bozza'} tone="amber" value={turnaround} />
+      <Metric icon={<CircleCheck />} label="Richieste approvate" note="sul totale delle richieste chiuse (60 giorni)" value={metrics.approvalRate === null ? '—' : `${metrics.approvalRate}%`} />
+    </div>
+    <div className="admin-watch">
+      <article><header><h3>Rinnovi nei prossimi 14 giorni</h3><small>{metrics.expiring.length}</small></header>{metrics.expiring.length ? <ul>{metrics.expiring.map((item) => <li key={item.name + item.date}><strong>{item.name}</strong><span>{item.days === 0 ? 'oggi' : item.days === 1 ? 'domani' : `tra ${item.days} giorni`} · {formatDate(item.date)}</span></li>)}</ul> : <p>Nessun rinnovo in arrivo.</p>}</article>
+      <article><header><h3>Clienti quasi senza crediti</h3><small>{metrics.lowCredits.length}</small></header>{metrics.lowCredits.length ? <ul>{metrics.lowCredits.map((item) => <li key={item.name}><strong>{item.name}</strong><span>{formatNumber(item.left)} crediti rimasti su {formatNumber(item.monthly)} al mese · proponi crediti extra</span></li>)}</ul> : <p>Tutti i clienti hanno crediti sufficienti.</p>}</article>
+    </div>
+  </section>;
 }
 
 function GraphicTeam({members, requests}: {members: TeamMember[]; requests: DataRow[]}) {
