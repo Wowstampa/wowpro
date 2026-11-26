@@ -1925,3 +1925,10 @@ textarea.bk-input { resize: vertical; line-height: 1.5; }
   .sidebar-profile .avatar { width: 30px; height: 30px; border-radius: 9px; font-size: 11px; }
   .sidebar-legal { padding-top: 0; }
 }
+@media (min-width: 761px) and (max-height: 760px) {
+  .sidebar .brand small, .sub-card__meta { display: none; }
+  .sidebar .brand { padding-bottom: 10px; }
+  .sidebar .nav-link { min-height: 31px; }
+  .sidebar .nav-label--section { margin: 7px 12px 2px; }
+  .sidebar-new { min-height: 36px; }
+}
