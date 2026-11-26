@@ -20,11 +20,7 @@ export default async function DashboardPage() {
   let managerName = team?.manager?.name || '';
 
   if (!active || !profile.company_id) {
-    let credits = 0;
-    if (company?.airtable_record_id) {
-      try { const record = await getWowproClient(company.airtable_record_id); credits = Number(record.fields.crediti_inclusi_residui || 0) + Number(record.fields.crediti_extra_residui || 0); } catch { /* Balance shown when Airtable is back. */ }
-    }
-    return <><PageHeader eyebrow={`WOWPRO · ${name}`} title="Benvenuto" action={<div className="credit-chip"><i /> <strong>{number(credits)}</strong> crediti</div>} />
+    return <><PageHeader eyebrow="WOWPRO · Area cliente" title="Benvenuto" />
       <ClientDashboard active={false} manager={{id: null, name: ''}} name={name} workspace={null} />
     </>;
   }
@@ -33,10 +29,7 @@ export default async function DashboardPage() {
   if (!managerName && company?.airtable_record_id) {
     try { managerName = (await getWowproClient(company.airtable_record_id)).fields.account_manager_nome || ''; } catch { /* Generic team name below. */ }
   }
-  const credits = workspace.credits.included + workspace.credits.extra;
-  return <><PageHeader eyebrow={`WOWPRO · ${name}`} title="Dashboard" action={<div className="credit-chip"><i /> <strong>{number(credits)}</strong> crediti</div>} />
+  return <><PageHeader eyebrow="WOWPRO · Area cliente" title="Dashboard" />
     <ClientDashboard active manager={{id: team?.manager?.id || null, name: managerName}} name={name} workspace={workspace} />
   </>;
 }
-
-function number(value: number) { return new Intl.NumberFormat('it-IT').format(value); }
