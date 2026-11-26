@@ -433,3 +433,14 @@ export async function deleteDraftOrder(id: string) {
     await shopifyAdminQuery(`mutation DeleteDraft($input: DraftOrderDeleteInput!) { draftOrderDelete(input: $input) { deletedId userErrors { message } } }`, {input: {id}});
   } catch (error) { console.error('[Draft order delete]', error); }
 }
+
+// The customer of a Shopify order, looked up by its name (e.g. "#WW121513"), to file documents under the right client.
+export async function findOrderCustomer(orderName: string) {
+  const name = orderName.startsWith('#') ? orderName : `#${orderName}`;
+  const data = await shopifyAdminQuery<{orders: {nodes: Array<{name: string; email: string | null; customer: {id: string; email: string | null} | null}>}}>(
+    `query OrderByName($search: String!) { orders(first: 1, query: $search) { nodes { name email customer { id email } } } }`,
+    {search: `name:${name}`},
+  );
+  const order = data.orders.nodes[0];
+  return order ? {name: order.name, customerId: order.customer?.id.split('/').pop() || null, email: (order.customer?.email || order.email || '').toLowerCase() || null} : null;
+}
