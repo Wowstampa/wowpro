@@ -31,7 +31,7 @@ export async function POST(request: Request) {
     const included = Number(airtableClient.fields.crediti_inclusi_residui || 0);
     const extra = Number(airtableClient.fields.crediti_extra_residui || 0);
     const creditCost = costs[parsed.data.type];
-    if (included + extra < creditCost) return NextResponse.json({error: `Crediti insufficienti: per questa richiesta servono ${creditCost.toLocaleString('it-IT')} crediti.`}, {status: 400});
+    if (included + extra < creditCost) return NextResponse.json({error: `Crediti insufficienti: per questa richiesta servono ${creditCost.toLocaleString('it-IT', {useGrouping: 'always'} as Intl.NumberFormatOptions)} crediti.`}, {status: 400});
 
     const usedIncluded = Math.min(included, creditCost);
     const usedExtra = creditCost - usedIncluded;
