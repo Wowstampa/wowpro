@@ -1,7 +1,7 @@
 'use client';
 /* eslint-disable @next/next/no-img-element -- Shopify CDN thumbnails are already resized. */
 
-import {ArrowRight, CheckCircle2, Zap, Palette, Receipt, RotateCcw, Upload, CreditCard, LayoutGrid, PenLine, ExternalLink, FileText, Loader2, Package, Paperclip, Plus, Search, Send, ShoppingBag, Trash2, X} from 'lucide-react';
+import {ArrowRight, CheckCircle2, Zap, Palette, Receipt, RotateCcw, FileDown, Upload, CreditCard, LayoutGrid, PenLine, ExternalLink, FileText, Loader2, Package, Paperclip, Plus, Search, Send, ShoppingBag, Trash2, X} from 'lucide-react';
 import Link from 'next/link';
 import {FormEvent, useCallback, useEffect, useMemo, useRef, useState} from 'react';
 
@@ -394,6 +394,7 @@ function QuoteDetail({quoteId, viewer, onChange, onReorder}: {quoteId: string; v
       <ul>{quote.offer.lines.map((line, index) => <li key={index}><span>{line.quantity} × {line.title}{line.properties?.length ? <small className="quote-offer__specs">{line.properties.map((property) => property.name === 'Descrizione' ? property.value : `${property.name}: ${property.value}`).join(' · ')}</small> : null}</span><b>{euro(line.unitPrice * line.quantity)}</b></li>)}{quote.offer.shipping ? <li><span>Spedizione</span><b>{euro(quote.offer.shipping)}</b></li> : null}</ul>
       {quote.offer.note ? <p className="quote-offer__note">{quote.offer.note}</p> : null}
       <div className="quote-offer__total"><span>Totale IVA inclusa</span><strong>{quote.total !== null ? euro(quote.total, quote.currency) : '—'}</strong></div>
+      <a className="quote-pdf" download href={`/api/quotes/${quote.id}/pdf`}><FileDown size={15} /> Scarica il preventivo in PDF</a>
       {quote.status === 'quoted' && !quote.awaitingPayment && quote.validUntil ? quote.expired ? <div className="quote-expired"><strong>Preventivo scaduto il {longDay(quote.validUntil)}</strong><p>{viewer === 'client' ? 'Non è più pagabile: scrivi qui sotto al tuo account manager per ricevere un preventivo aggiornato.' : 'Il cliente non può più pagarlo. Aggiorna prezzi e validità qui sotto e reinvialo.'}</p></div> : <p className="quote-offer__valid">Valido fino al <b>{longDay(quote.validUntil)}</b></p> : null}
       {quote.awaitingPayment ? <TransferStatus onChange={(next) => { onChange(next); void load(); }} onOpenDetails={() => setShowTransfer(true)} quote={quote} viewer={viewer} /> : null}
       {showTransfer && quote.offer ? <BankTransferModal companyName={quote.companyName} currency={quote.currency} lines={quote.offer.lines} onClose={() => setShowTransfer(false)} orderName={quote.orderName} shipping={quote.offer.shipping} statusUrl={quote.invoiceUrl} total={quote.total} /> : null}

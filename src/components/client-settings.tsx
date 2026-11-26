@@ -1,6 +1,6 @@
 'use client';
 
-import {Check, Loader2, MessageCircle, Receipt, User, Users} from 'lucide-react';
+import {Bell, Check, Loader2, MessageCircle, Receipt, User, Users} from 'lucide-react';
 import {type FormEvent, useState} from 'react';
 
 import {BILLING_FIELDS, type BillingDraft} from '@/components/subscription-actions';
@@ -19,7 +19,14 @@ function SaveButton({state}: {state: 'idle' | 'saving' | 'saved'}) {
 }
 
 // Account settings: personal profile, invoicing details and who has access to the portal.
-export function ClientSettings({profile, billing, colleagues}: {profile: {fullName: string; email: string; phone: string}; billing: BillingDraft; colleagues: Colleague[]}) {
+type Prefs = {grafica: boolean; preventivi: boolean; messaggi: boolean};
+const PREF_LABELS: Array<{key: keyof Prefs; title: string; text: string}> = [
+  {key: 'grafica', title: 'Richieste grafiche', text: 'Bozze pronte da approvare, richieste completate o rifiutate.'},
+  {key: 'preventivi', title: 'Preventivi e ordini', text: 'Preventivi pronti, promemoria di scadenza, pagamenti ricevuti, spedizione express.'},
+  {key: 'messaggi', title: 'Messaggi del team', text: 'Nuovi messaggi in chat e commenti sulle tue richieste.'},
+];
+
+export function ClientSettings({profile, billing, colleagues, notifications}: {profile: {fullName: string; email: string; phone: string}; billing: BillingDraft; colleagues: Colleague[]; notifications: Prefs | null}) {
   const [person, setPerson] = useState(profile);
   const [personState, setPersonState] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [personError, setPersonError] = useState('');
@@ -27,6 +34,9 @@ export function ClientSettings({profile, billing, colleagues}: {profile: {fullNa
   const [invoiceState, setInvoiceState] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [invoiceError, setInvoiceError] = useState('');
   const [errorField, setErrorField] = useState<string | null>(null);
+  const [prefs, setPrefs] = useState(notifications);
+  const [prefsState, setPrefsState] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const [prefsError, setPrefsError] = useState('');
 
   async function savePerson(event: FormEvent) {
     event.preventDefault(); setPersonState('saving'); setPersonError('');
@@ -35,6 +45,11 @@ export function ClientSettings({profile, billing, colleagues}: {profile: {fullNa
   async function saveInvoice(event: FormEvent) {
     event.preventDefault(); setInvoiceState('saving'); setInvoiceError(''); setErrorField(null);
     try { await save('/api/client/billing', invoice); setInvoiceState('saved'); setTimeout(() => setInvoiceState('idle'), 2000); } catch (caught) { setInvoiceError(caught instanceof Error ? caught.message : 'Non salvato.'); setErrorField((caught as {field?: string}).field || null); setInvoiceState('idle'); }
+  }
+
+  async function savePrefs(event: FormEvent) {
+    event.preventDefault(); if (!prefs) return; setPrefsState('saving'); setPrefsError('');
+    try { await save('/api/client/notifications', prefs); setPrefsState('saved'); setTimeout(() => setPrefsState('idle'), 2000); } catch (caught) { setPrefsError(caught instanceof Error ? caught.message : 'Non salvato.'); setPrefsState('idle'); }
   }
 
   return <div className="settings">
@@ -58,6 +73,13 @@ export function ClientSettings({profile, billing, colleagues}: {profile: {fullNa
       {invoiceError ? <p className="form-error">{invoiceError}</p> : null}
       <footer><small>Indica il codice SDI oppure la PEC.</small><SaveButton state={invoiceState} /></footer>
     </form>
+
+    {prefs ? <form className="settings-card" onSubmit={savePrefs}>
+      <header><span className="bk-card__icon"><Bell size={18} /></span><div><h3>Notifiche email</h3><p>Scegli per cosa vuoi ricevere un’email. Nel portale trovi comunque sempre tutto.</p></div></header>
+      <ul className="settings-prefs">{PREF_LABELS.map((item) => <li key={item.key}><div><strong>{item.title}</strong><small>{item.text}</small></div><label className="switch"><input checked={prefs[item.key]} onChange={(event) => setPrefs((current) => current ? {...current, [item.key]: event.target.checked} : current)} type="checkbox" /><span aria-hidden="true" /><b className="sr-only">{item.title}</b></label></li>)}</ul>
+      {prefsError ? <p className="form-error">{prefsError}</p> : null}
+      <footer><small>Le email su accesso e sicurezza dell’account arrivano sempre.</small><SaveButton state={prefsState} /></footer>
+    </form> : null}
 
     <section className="settings-card">
       <header><span className="bk-card__icon"><Users size={18} /></span><div><h3>Persone con accesso</h3><p>Chi della tua azienda può entrare nel portale WOWPRO.</p></div></header>

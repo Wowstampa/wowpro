@@ -5,6 +5,7 @@ const SECTIONS: Record<string, {label: string; text: string; icon: typeof Lock}>
   workspace: {label: 'La tua Dashboard', text: 'Il workspace con richieste in corso, ordini, crediti e il tuo account manager dedicato.', icon: LayoutDashboard},
   richieste: {label: 'Richieste', text: 'Richieste grafiche e preventivi di stampa, con il team WowStampa che segue ogni lavoro.', icon: MessageSquareText},
   'brand-kit': {label: 'Brand kit', text: 'Logo, colori, font e file aziendali sempre pronti per il tuo grafico.', icon: Palette},
+  fatture: {label: 'Fatture', text: 'Tutte le fatture di abbonamento, crediti e ordini, sempre scaricabili.', icon: FolderOpen},
   file: {label: 'File', text: 'Tutte le grafiche consegnate dal team, pronte da riscaricare o mandare in stampa.', icon: FolderOpen},
   impostazioni: {label: 'Impostazioni', text: 'Profilo, dati di fatturazione e persone con accesso al portale.', icon: Settings},
   ordini: {label: 'Ordini', text: 'Lo storico dei tuoi ordini, i pagamenti e le spedizioni in un unico posto.', icon: Package},

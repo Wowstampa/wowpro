@@ -53,7 +53,7 @@ function getClientLinks(notificationCounts: AdminNotificationCounts, locked: boo
   {href: '/dashboard/ordini', label: 'Ordini', icon: PackageCheck},
   {href: '/dashboard/brand-kit', label: 'Brand kit', icon: Palette, section: 'IL TUO BRAND'},
   {href: '/dashboard/file', label: 'File', icon: FolderOpen},
-  {href: locked ? '/dashboard/abbonamento' : '/dashboard/crediti', label: 'Piano e crediti', icon: Crown, section: 'ACCOUNT', match: ['/dashboard/crediti', '/dashboard/abbonamento']},
+  {href: locked ? '/dashboard/abbonamento' : '/dashboard/crediti', label: 'Piano e crediti', icon: Crown, section: 'ACCOUNT', match: ['/dashboard/crediti', '/dashboard/abbonamento', '/dashboard/fatture']},
   {href: '/dashboard/supporto', label: 'Messaggi', icon: MessagesSquare, count: notificationCounts.support || undefined, section: 'AIUTO'},
   {href: '/dashboard/feedback', label: 'Feedback & idee', icon: Lightbulb},
   ];
@@ -182,6 +182,7 @@ export function AppShell({mode, children, notificationCounts = {requests: 0, fee
               <LogOut size={16} />
             </button>
           </div>}
+          {mode === 'client' ? <nav aria-label="Documenti legali" className="sidebar-legal"><Link href="/privacy" target="_blank">Privacy</Link><Link href="/cookie" target="_blank">Cookie</Link><Link href="/termini" target="_blank">Termini</Link></nav> : null}
         </div>
       </aside>
       <div className="app-main">{children}</div>

@@ -1,10 +1,12 @@
 import Link from 'next/link';
-import {Coins, Crown, Lock} from 'lucide-react';
+import {Coins, Crown, FileText, Lock} from 'lucide-react';
 
-// One "Piano e crediti" area with two views: credits and subscription.
-export function PlanTabs({current, locked = false}: {current: 'crediti' | 'abbonamento'; locked?: boolean}) {
+// One "Piano e crediti" area with three views: credits, subscription and invoices.
+export function PlanTabs({current, locked = false}: {current: 'crediti' | 'abbonamento' | 'fatture'; locked?: boolean}) {
+  const tab = (key: typeof current, href: string, label: string, Icon: typeof Coins, lockable: boolean) => <Link aria-current={current === key ? 'page' : undefined} className={current === key ? 'is-active' : ''} href={href}><Icon size={16} /> {label}{locked && lockable ? <Lock size={12} /> : null}</Link>;
   return <nav aria-label="Piano e crediti" className="plan-tabs">
-    <Link aria-current={current === 'crediti' ? 'page' : undefined} className={current === 'crediti' ? 'is-active' : ''} href="/dashboard/crediti"><Coins size={16} /> Crediti{locked ? <Lock size={12} /> : null}</Link>
-    <Link aria-current={current === 'abbonamento' ? 'page' : undefined} className={current === 'abbonamento' ? 'is-active' : ''} href="/dashboard/abbonamento"><Crown size={16} /> Abbonamento</Link>
+    {tab('crediti', '/dashboard/crediti', 'Crediti', Coins, true)}
+    {tab('abbonamento', '/dashboard/abbonamento', 'Abbonamento', Crown, false)}
+    {tab('fatture', '/dashboard/fatture', 'Fatture', FileText, true)}
   </nav>;
 }

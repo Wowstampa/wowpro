@@ -1,4 +1,4 @@
-import {ChevronDown, ExternalLink, Package, Truck} from 'lucide-react';
+import {ChevronDown, ExternalLink, Package, Receipt, Truck} from 'lucide-react';
 
 import {ReorderButton} from '@/components/reorder-button';
 import type {CustomerOrder} from '@/lib/integrations/shopify';
@@ -45,17 +45,17 @@ const shipmentLabels: Record<string, string> = {
   NOT_DELIVERED: 'Non consegnato',
 };
 
-export function ClientOrders({orders}: {orders: CustomerOrder[]}) {
+export function ClientOrders({orders, invoices = {}}: {orders: CustomerOrder[]; invoices?: Record<string, string>}) {
   if (!orders.length) {
     return <section className="empty-card empty-card--section"><Package size={26} className="orders-empty-icon" /><h2>Nessun ordine recente</h2><p>Gli ordini effettuati su wowstampa.it negli ultimi 60 giorni compariranno qui.</p></section>;
   }
   return <section className="orders">
     <div className="credits-section-title"><h2>I tuoi ordini</h2><p>Ordini WowStampa degli ultimi 60 giorni</p></div>
-    <div className="orders__list">{orders.map((order) => <OrderCard key={order.id} order={order} />)}</div>
+    <div className="orders__list">{orders.map((order) => <OrderCard invoiceId={invoices[order.name] || null} key={order.id} order={order} />)}</div>
   </section>;
 }
 
-function OrderCard({order}: {order: CustomerOrder}) {
+function OrderCard({order, invoiceId}: {order: CustomerOrder; invoiceId: string | null}) {
   const delivered = order.shipments.find((shipment) => shipment.status === 'DELIVERED');
   const fulfillment = order.cancelled
     ? {label: 'Annullato', tone: 'muted'}
@@ -86,7 +86,7 @@ function OrderCard({order}: {order: CustomerOrder}) {
       </div>)}</div> : null}
       <div className="order-card__foot">
         {order.statusPageUrl ? <a className="order-card__link" href={order.statusPageUrl} rel="noreferrer" target="_blank">Vedi dettaglio su wowstampa.it <ExternalLink size={13} /></a> : <span />}
-        {isPrintOrder(order) ? <ReorderButton draft={draftFromOrder(order)} label="Riordina" /> : null}
+        <span className="order-card__actions">{invoiceId ? <a className="client-action" href={`/api/invoices/${invoiceId}`}><Receipt size={14} /> Fattura</a> : null}{isPrintOrder(order) ? <ReorderButton draft={draftFromOrder(order)} label="Riordina" /> : null}</span>
       </div>
     </div>
   </details>;

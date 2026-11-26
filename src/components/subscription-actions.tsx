@@ -49,6 +49,7 @@ export function PurchaseModal({billing, options, payments, onClose, initialPlan}
   const [error, setError] = useState('');
   const [errorField, setErrorField] = useState('');
   const [isStarting, setIsStarting] = useState(false);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [checkoutUrl, setCheckoutUrl] = useState('');
   const popupRef = useRef<Window | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -62,7 +63,7 @@ export function PurchaseModal({billing, options, payments, onClose, initialPlan}
     const width = 520; const height = 780;
     const popup = window.open('', 'wowpro-subscription', `popup=yes,width=${width},height=${height},left=${Math.max(window.screenX + (window.outerWidth - width) / 2, 0)},top=${Math.max(window.screenY + (window.outerHeight - height) / 2, 0)}`);
     try {
-      const response = await fetch('/api/client/subscription/checkout', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({plan, billing: form})});
+      const response = await fetch('/api/client/subscription/checkout', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({plan, billing: form, acceptedTerms})});
       const result = await response.json() as {checkoutUrl?: string; error?: string; field?: string};
       if (!response.ok || !result.checkoutUrl) { setErrorField(result.field || ''); throw new Error(result.error || 'Impossibile avviare il pagamento.'); }
       setCheckoutUrl(result.checkoutUrl);
@@ -135,6 +136,7 @@ export function PurchaseModal({billing, options, payments, onClose, initialPlan}
         <fieldset className="buy-group"><legend>Azienda</legend>{field('company')}{field('vatNumber')}{field('taxCode')}</fieldset>
         <fieldset className="buy-group"><legend>Fatturazione elettronica <small>codice SDI oppure PEC</small></legend>{field('sdi')}{field('pec')}</fieldset>
         <fieldset className="buy-group buy-group--address"><legend>Sede legale</legend>{field('address')}{field('zip')}{field('city')}{field('province')}</fieldset>
+        <label className="buy-terms"><input checked={acceptedTerms} onChange={(event) => setAcceptedTerms(event.target.checked)} required type="checkbox" /><span>Ho letto e accetto i <a href="/termini" rel="noreferrer" target="_blank">Termini del servizio WOWPRO</a> e l’<a href="/privacy" rel="noreferrer" target="_blank">Informativa privacy</a>.</span></label>
         {error ? <p className="form-error">{error}</p> : null}
         <footer className="buy-form__foot">
           <div><small>Totale di oggi</small><strong>{isAnnual ? '1.290 €' : '129 €'} <span>+ IVA</span></strong></div>
