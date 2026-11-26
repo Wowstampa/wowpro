@@ -79,7 +79,6 @@ export function CreditsOverview({included, extra, monthly, renewal, moves}: {inc
         </div>
         {reset ? <div className="cr-renew"><CalendarClock size={17} /><span>Tornano a {n(monthly)} {reset.days === 0 ? <b>oggi</b> : reset.days === 1 ? <b>domani</b> : <>tra <b>{reset.days} giorni</b></>} · {longDay(reset.date)}</span></div> : <div className="cr-renew"><CalendarClock size={17} /><span>Si ricaricano ogni mese alla data di attivazione del piano</span></div>}
       </article>
-      <div aria-hidden="true" className="cr-flow"><span><ArrowRight size={16} /></span><small>prima gli inclusi,<br />poi gli extra</small></div>
       <article className="cr-card cr-card--ext">
         <div className="cr-card__top"><div className="cr-card__title"><span><PiggyBank size={19} /></span><div><strong>Crediti extra</strong><small>La tua riserva</small></div></div><b className="cr-tag"><Forever size={11} /> Non scadono</b></div>
         <div className="cr-big">{n(extra)}</div>
