@@ -19,11 +19,12 @@ function SaveButton({state}: {state: 'idle' | 'saving' | 'saved'}) {
 }
 
 // Account settings: personal profile, invoicing details and who has access to the portal.
-type Prefs = {grafica: boolean; preventivi: boolean; messaggi: boolean};
+type Prefs = {grafica: boolean; preventivi: boolean; messaggi: boolean; idee: boolean};
 const PREF_LABELS: Array<{key: keyof Prefs; title: string; text: string}> = [
   {key: 'grafica', title: 'Richieste grafiche', text: 'Bozze pronte da approvare, richieste completate o rifiutate.'},
   {key: 'preventivi', title: 'Preventivi e ordini', text: 'Preventivi pronti, promemoria di scadenza, pagamenti ricevuti, spedizione express.'},
   {key: 'messaggi', title: 'Messaggi del team', text: 'Nuovi messaggi in chat e commenti sulle tue richieste.'},
+  {key: 'idee', title: 'Feedback & idee', text: 'Quando un’idea che hai proposto o votato cambia stato o riceve una risposta.'},
 ];
 
 export function ClientSettings({profile, billing, colleagues, notifications}: {profile: {fullName: string; email: string; phone: string}; billing: BillingDraft; colleagues: Colleague[]; notifications: Prefs | null}) {

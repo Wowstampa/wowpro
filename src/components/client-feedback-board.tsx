@@ -15,13 +15,13 @@ export type FeedbackItem = {
   status: 'new' | 'evaluating' | 'implementing' | 'completed' | 'rejected';
   publicResponse: string;
   authorName: string;
+  mine: boolean;
   votes: number;
   voted: boolean;
   createdAt: string;
   updatedAt: string;
 };
 
-const statusLabels: Record<FeedbackItem['status'], string> = {new: 'Proposta', evaluating: 'In valutazione', implementing: 'In sviluppo', completed: 'Rilasciata', rejected: 'Non in programma'};
 const categoryIcons: Record<string, typeof Package> = {'Nuovo prodotto': Package, 'Sito web': Monitor, WOWPRO: Sparkles, 'Funzionalità': Lightbulb};
 const categoryFilters: Array<{label: string; value: string}> = [{label: 'Prodotti', value: 'Nuovo prodotto'}, {label: 'Sito web', value: 'Sito web'}, {label: 'WOWPRO', value: 'WOWPRO'}, {label: 'Funzioni', value: 'Funzionalità'}];
 const STEPS = ['Proposta', 'In valutazione', 'In sviluppo', 'Rilasciata'];
@@ -33,7 +33,12 @@ const PROMPTS: Array<{category: FeedbackCategory; title: string; text: string}> 
 ];
 const CATEGORY_HINTS: Record<FeedbackCategory, string> = {'Nuovo prodotto': 'Qualcosa da stampare che oggi manca', 'Sito web': 'Ordinare e personalizzare sul sito', WOWPRO: 'Il portale e il servizio in abbonamento', 'Funzionalità': 'Uno strumento che ti farebbe comodo'};
 const categoryLabel = (value: string) => categoryFilters.find((filter) => filter.value === value)?.label || value;
-const roadmapColumns: Array<FeedbackItem['status']> = ['evaluating', 'implementing', 'completed'];
+const roadmapColumns: Array<{status: FeedbackItem['status']; title: string; text: string; empty: string; icon: typeof Package}> = [
+  {status: 'evaluating', title: 'In valutazione', text: 'Le stiamo studiando', empty: 'Nessuna idea in valutazione.', icon: Hourglass},
+  {status: 'implementing', title: 'In sviluppo', text: 'Ci stiamo lavorando', empty: 'Nessuna idea in sviluppo al momento.', icon: Rocket},
+  {status: 'completed', title: 'Rilasciate', text: 'Già disponibili per te', empty: 'Le idee realizzate compariranno qui.', icon: CheckCircle2},
+];
+const votesLabel = (votes: number) => votes === 1 ? '1 voto' : `${votes} voti`;
 
 export function ClientFeedbackBoard({initialItems, now}: {initialItems: FeedbackItem[]; now: number}) {
   const router = useRouter();
@@ -42,6 +47,7 @@ export function ClientFeedbackBoard({initialItems, now}: {initialItems: Feedback
   const [category, setCategory] = useState('all');
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState<'votes' | 'recent'>('votes');
+  const [scope, setScope] = useState<'all' | 'voted' | 'mine'>('all');
   const [isProposing, setIsProposing] = useState(false);
   const [proposeCategory, setProposeCategory] = useState<FeedbackCategory>('WOWPRO');
   const [voting, setVoting] = useState<string | null>(null);
@@ -54,7 +60,7 @@ export function ClientFeedbackBoard({initialItems, now}: {initialItems: Feedback
 
   const term = query.trim().toLocaleLowerCase('it-IT');
   const visible = items
-    .filter((item) => (category === 'all' || item.category === category) && (!term || `${item.title} ${item.description}`.toLocaleLowerCase('it-IT').includes(term)))
+    .filter((item) => (category === 'all' || item.category === category) && (scope === 'all' || (scope === 'voted' ? item.voted : item.mine)) && (!term || `${item.title} ${item.description}`.toLocaleLowerCase('it-IT').includes(term)))
     .sort((a, b) => sort === 'votes' ? b.votes - a.votes || b.createdAt.localeCompare(a.createdAt) : b.createdAt.localeCompare(a.createdAt));
 
   async function vote(item: FeedbackItem) {
@@ -73,7 +79,7 @@ export function ClientFeedbackBoard({initialItems, now}: {initialItems: Feedback
   }
 
   // The most voted idea still open gets the spotlight.
-  const hot = [...items].filter((item) => item.status !== 'completed' && item.status !== 'rejected' && item.votes > 0).sort((a, b) => b.votes - a.votes || b.createdAt.localeCompare(a.createdAt))[0] || null;
+  const hot = [...items].filter((item) => item.status !== 'completed' && item.status !== 'rejected' && item.votes >= 2).sort((a, b) => b.votes - a.votes || b.createdAt.localeCompare(a.createdAt))[0] || null;
   const propose = (value: FeedbackCategory) => { setProposeCategory(value); setIsProposing(true); };
 
   return <section className="feedback-portal fx">
@@ -117,20 +123,30 @@ export function ClientFeedbackBoard({initialItems, now}: {initialItems: Feedback
 
     {view === 'board' ? <>
       <div className="fx-tools">
+        <div className="fx-scope" role="group" aria-label="Mostra">{([['all', 'Tutte le idee'], ['voted', `Votate da te · ${items.filter((item) => item.voted).length}`], ['mine', `Proposte da te · ${items.filter((item) => item.mine).length}`]] as const).map(([value, label]) => <button aria-pressed={scope === value} className={scope === value ? 'is-on' : ''} key={value} onClick={() => setScope(value)} type="button">{label}</button>)}</div>
+        <span className="fx-tools__spacer" />
         <label className="client-search"><Search size={16} /><input onChange={(event) => setQuery(event.target.value)} placeholder="Cerca tra le idee..." value={query} /></label>
         <label className="feedback-sort">Ordina<select onChange={(event) => setSort(event.target.value as 'votes' | 'recent')} value={sort}><option value="votes">Più votate</option><option value="recent">Più recenti</option></select></label>
       </div>
       <div className="fx-list">
         {visible.map((item) => <FeedbackCard isVoting={voting === item.id} item={item} key={item.id} now={now} onVote={() => vote(item)} />)}
-        {!visible.length ? <div className="feedback-empty"><Search size={22} /><p>{items.length ? 'Nessuna idea corrisponde ai filtri.' : 'Nessuna proposta per ora.'}</p><small>{items.length ? 'Prova a cambiare categoria o proponi una nuova idea.' : 'Sii il primo a suggerire un miglioramento!'}</small></div> : null}
+        {!visible.length ? <div className="feedback-empty"><Search size={22} /><p>{items.length ? scope === 'mine' && !items.some((item) => item.mine) ? 'Non hai ancora proposto idee.' : 'Nessuna idea corrisponde ai filtri.' : 'Nessuna proposta per ora.'}</p><small>{items.length ? 'Prova a cambiare categoria o proponi una nuova idea.' : 'Sii il primo a suggerire un miglioramento!'}</small></div> : null}
       </div>
-    </> : <div className="feedback-roadmap">
-      {roadmapColumns.map((status) => {
-        const column = items.filter((item) => item.status === status).sort((a, b) => b.votes - a.votes);
-        return <section className={`feedback-roadmap__col feedback-roadmap__col--${status}`} key={status}>
-          <header><span className={`feedback-pill feedback-pill--${status}`}>{statusLabels[status]}</span><b>{column.length}</b></header>
-          {column.map((item) => <article key={item.id}><CategoryTag category={item.category} /><strong>{item.title}</strong><small><ChevronUp size={13} /> {item.votes} voti</small></article>)}
-          {!column.length ? <p>Nessuna idea in questa fase.</p> : null}
+    </> : <div className="fx-roadmap">
+      {roadmapColumns.map((column) => {
+        const list = items.filter((item) => item.status === column.status).sort((a, b) => b.votes - a.votes);
+        const Icon = column.icon;
+        return <section className={`fx-road fx-road--${column.status}`} key={column.status}>
+          <header><span className="fx-road__icon"><Icon size={17} /></span><div><strong>{column.title}</strong><small>{column.text}</small></div><b>{list.length}</b></header>
+          <div className="fx-road__list">
+            {list.map((item) => <article className="fx-road__card" key={item.id}>
+              <CategoryTag category={item.category} />
+              <strong>{item.title}</strong>
+              {item.publicResponse ? <p><MessageSquareReply size={13} /> {item.publicResponse}</p> : null}
+              <footer><button aria-pressed={item.voted} className={item.voted ? 'fx-minivote is-voted' : 'fx-minivote'} disabled={voting === item.id} onClick={() => vote(item)} type="button">{item.voted ? <Check size={13} /> : <ChevronUp size={14} />}{votesLabel(item.votes)}</button>{item.status === 'completed' ? <small>{relative(item.updatedAt, now)}</small> : null}</footer>
+            </article>)}
+            {!list.length ? <div className="fx-road__empty">{column.empty}</div> : null}
+          </div>
         </section>;
       })}
     </div>}
