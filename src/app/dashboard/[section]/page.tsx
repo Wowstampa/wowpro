@@ -11,6 +11,7 @@ import {SupportChat} from '@/components/support-chat';
 import {ClientPromos} from '@/components/client-promos';
 import {ClientPriceListView} from '@/components/client-pricelist';
 import {readPriceList} from '@/lib/pricelist';
+import {productHandles} from '@/lib/integrations/shopify';
 import {getClientPromos, type ClientPromo} from '@/lib/promo-view';
 import {ClientFeedbackBoard, type FeedbackItem} from '@/components/client-feedback-board';
 import {getConversationCompany} from '@/lib/support';
@@ -254,7 +255,10 @@ async function PriceListPage() {
   const companyId = profile.company_id || '';
   const admin = createAdminClient();
   const [list, {data: company}, team] = await Promise.all([readPriceList(companyId).catch(() => null), admin.from('companies').select('name').eq('id', companyId).maybeSingle(), getConversationCompany(companyId).catch(() => null)]);
-  return <><PageHeader eyebrow="WOWPRO · Area cliente" title="Il tuo listino" /><main className="page-content">{list ? <ClientPriceListView clientName={company?.name || profile.full_name || 'la tua azienda'} list={{items: list.items, validUntil: list.validUntil, note: list.note, updatedAt: list.updatedAt}} managerName={team?.manager?.name || ''} /> : <section className="empty-card empty-card--section"><span className="eyebrow">LISTINO NON DISPONIBILE</span><h2>Impossibile caricare il listino</h2><p>Riprova tra qualche istante.</p></section>}</main></>;
+  // Catalog products open the same configurator as the shop (options, finishes, sizes): their handle is needed.
+  const handles = list ? await productHandles(list.items.map((item) => item.productId || '')).catch(() => new Map<string, {handle: string; url: string | null}>()) : new Map<string, {handle: string; url: string | null}>();
+  const items = (list?.items || []).map((item) => ({...item, handle: (item.productId && handles.get(item.productId)?.handle) || null, productUrl: (item.productId && handles.get(item.productId)?.url) || null}));
+  return <><PageHeader eyebrow="WOWPRO · Area cliente" title="Il tuo listino" /><main className="page-content">{list ? <ClientPriceListView clientName={company?.name || profile.full_name || 'la tua azienda'} list={{items, validUntil: list.validUntil, note: list.note, updatedAt: list.updatedAt}} managerName={team?.manager?.name || ''} /> : <section className="empty-card empty-card--section"><span className="eyebrow">LISTINO NON DISPONIBILE</span><h2>Impossibile caricare il listino</h2><p>Riprova tra qualche istante.</p></section>}</main></>;
 }
 
 async function PromoPage() {
