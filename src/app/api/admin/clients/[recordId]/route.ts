@@ -4,6 +4,7 @@ import {z} from 'zod';
 import {getCurrentProfile} from '@/lib/auth';
 import {updateWowproClient} from '@/lib/integrations/airtable';
 import {createAdminClient} from '@/lib/supabase/admin.server';
+import {linkClientAccount} from '@/lib/client-login-link';
 
 const updateSchema = z.object({
   ragione_sociale: z.string().trim().min(1).max(200),
@@ -46,7 +47,17 @@ export async function PATCH(request: Request, {params}: {params: Promise<{record
         if (company) await admin.from('graphic_requests').update({assigned_to: designerId}).eq('company_id', company.id).is('assigned_to', null).in('status', ['new', 'in_progress', 'review']);
       }
     }
-    return NextResponse.json({fields: record.fields});
+    // The login email decides which account is this client's: convert it if it still has another role.
+    let warning: string | undefined;
+    const {data: company} = await createAdminClient().from('companies').select('id').eq('airtable_record_id', recordId).maybeSingle();
+    if (company) {
+      try {
+        const linked = await linkClientAccount(fields.email_login, company.id, profile.id);
+        if (linked === 'self') warning = 'Salvato, ma l’email di accesso è quella del tuo account: il tuo accesso amministrativo non è stato cambiato.';
+        if (linked === 'linked') warning = 'Salvato. L’account con questa email ora accede all’area cliente.';
+      } catch (error) { console.error('[Client account link]', error); }
+    }
+    return NextResponse.json({fields: record.fields, warning});
   } catch (error) {
     console.error('[Client update]', error);
     return NextResponse.json({error: 'Impossibile aggiornare il cliente.'}, {status: 502});
