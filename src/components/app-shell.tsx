@@ -15,6 +15,7 @@ import {
   Lock,
   Palette,
   FolderOpen,
+  Gift,
   Plus,
   Settings,
   ChevronUp,
@@ -36,6 +37,8 @@ type NavigationLink = {
   label: string;
   icon: typeof Home;
   count?: number;
+  // Short text badge (e.g. NUOVA) instead of a number.
+  tag?: string;
   section?: string;
   separated?: boolean;
   children?: Array<{href: string; label: string; icon: typeof Home}>;
@@ -43,7 +46,7 @@ type NavigationLink = {
   match?: string[];
 };
 
-function getClientLinks(notificationCounts: AdminNotificationCounts, locked: boolean): NavigationLink[] {
+function getClientLinks(notificationCounts: AdminNotificationCounts, locked: boolean, promoTag?: string): NavigationLink[] {
   // Without a subscription the home is the welcome page and the workspace dashboard is a separate, locked entry.
   const home: NavigationLink[] = locked ? [{href: '/dashboard', label: 'Benvenuto', icon: Home}, {href: '/dashboard/workspace', label: 'Dashboard', icon: ChartNoAxesCombined}] : [{href: '/dashboard', label: 'Dashboard', icon: ChartNoAxesCombined}];
   return [
@@ -51,6 +54,7 @@ function getClientLinks(notificationCounts: AdminNotificationCounts, locked: boo
   // Grouped by what the client is doing; the Richieste badge counts only what waits for the client.
   {href: '/dashboard/richieste', label: 'Richieste', icon: MessageSquareText, count: notificationCounts.requests || undefined, section: 'LAVORI'},
   {href: '/dashboard/ordini', label: 'Ordini', icon: PackageCheck},
+  {href: '/dashboard/promo', label: 'In anteprima', icon: Gift, section: 'PROMOZIONI', tag: promoTag},
   {href: '/dashboard/brand-kit', label: 'Brand kit', icon: Palette, section: 'IL TUO BRAND'},
   {href: '/dashboard/file', label: 'File', icon: FolderOpen},
   {href: locked ? '/dashboard/abbonamento' : '/dashboard/crediti', label: 'Piano e crediti', icon: Crown, section: 'ACCOUNT', match: ['/dashboard/crediti', '/dashboard/abbonamento', '/dashboard/fatture']},
@@ -73,6 +77,7 @@ function getAdminLinks(notificationCounts: AdminNotificationCounts, isAdministra
   {href: '/admin/messaggi', label: 'Messaggi', icon: MessagesSquare, count: notificationCounts.support || undefined},
   {href: '/admin/crediti', label: 'Crediti', icon: BadgeEuro},
   {href: '/admin/feedback', label: 'Feedback & idee', icon: Lightbulb, count: notificationCounts.feedback || undefined, section: 'COMMUNITY'},
+  {href: '/admin/promo', label: 'Promo', icon: Gift},
   ];
   if (isAdministrator) links.push({href: '/admin/team-ruoli', label: 'Team & ruoli', icon: UsersRound, section: 'AMMINISTRAZIONE'});
   return links;
@@ -85,10 +90,19 @@ export type AdminNotificationCounts = {requests: number; feedback: number; suppo
 // Client credits shown in every page header, from the shell (one source, same on every page).
 const ShellContext = createContext<{credits: number | null}>({credits: null});
 
-export function AppShell({mode, children, notificationCounts = {requests: 0, feedback: 0}, operatorName, isAdministrator = false, subscription, locked = false}: {mode: ShellMode; locked?: boolean; children: React.ReactNode; notificationCounts?: AdminNotificationCounts; operatorName?: string; isAdministrator?: boolean; subscription?: {plan: string; monthlyCredits: number; renewalDate: string; status: string; included?: number; extra?: number}}) {
+export function AppShell({mode, children, notificationCounts = {requests: 0, feedback: 0}, operatorName, isAdministrator = false, subscription, locked = false, freshPromos = []}: {mode: ShellMode; locked?: boolean; freshPromos?: string[]; children: React.ReactNode; notificationCounts?: AdminNotificationCounts; operatorName?: string; isAdministrator?: boolean; subscription?: {plan: string; monthlyCredits: number; renewalDate: string; status: string; included?: number; extra?: number}}) {
   const pathname = usePathname();
   const router = useRouter();
-  const links = mode === 'admin' ? getAdminLinks(notificationCounts, isAdministrator) : mode === 'graphic' ? graphicLinks.map((link) => link.href === '/operatore/richieste' ? {...link, count: notificationCounts.requests || undefined} : link) : getClientLinks(notificationCounts, mode === 'client' && locked);
+  // "NUOVA" next to Promo while an early promo has not been opened yet on this device.
+  const [promoTag, setPromoTag] = useState<string | undefined>(undefined);
+  useEffect(() => {
+    if (!freshPromos.length) return;
+    let seen: string[] = [];
+    try { seen = JSON.parse(window.localStorage.getItem('wowpro:promo-seen') || '[]') as string[]; } catch { /* Storage unavailable. */ }
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reads the device's seen list once
+    setPromoTag(freshPromos.some((id) => !seen.includes(id)) ? 'NUOVA' : undefined);
+  }, [freshPromos, pathname]);
+  const links = mode === 'admin' ? getAdminLinks(notificationCounts, isAdministrator) : mode === 'graphic' ? graphicLinks.map((link) => link.href === '/operatore/richieste' ? {...link, count: notificationCounts.requests || undefined} : link) : getClientLinks(notificationCounts, mode === 'client' && locked, promoTag);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   // Without an active subscription only the home and Abbonamento stay open for clients.
@@ -135,7 +149,7 @@ export function AppShell({mode, children, notificationCounts = {requests: 0, fee
         {mode === 'admin' ? <div className="internal-pill">PANNELLO INTERNO</div> : mode === 'graphic' ? <div className="internal-pill">ACCESSO OPERATORE GRAFICO</div> : null}
         <nav className="nav-list">
           {links.map((link) => {
-            const {href, label, icon: Icon, count, children, section, separated} = link;
+            const {href, label, icon: Icon, count, tag, children, section, separated} = link;
             const childIsActive = children?.some((child) => pathname === child.href || pathname.startsWith(`${child.href}/`));
             const active = Boolean(childIsActive) || matches(link);
             return (
@@ -144,7 +158,7 @@ export function AppShell({mode, children, notificationCounts = {requests: 0, fee
                 <Link aria-label={isLocked(href) ? `${label} (riservato agli abbonati)` : undefined} href={href} className={`nav-link${active ? ' nav-link--active' : ''}${isLocked(href) ? ' nav-link--locked' : ''}`} onClick={() => setMenuOpen(false)}>
                   <Icon size={18} />
                   <span>{label}</span>
-                  {isLocked(href) ? <Lock className="nav-lock" size={14} /> : count ? <b>{count}</b> : null}
+                  {isLocked(href) ? <Lock className="nav-lock" size={14} /> : count ? <b>{count}</b> : tag ? <b className="nav-tag">{tag}</b> : null}
                 </Link>
                 {children ? <div className="nav-sublist">{children.map(({href: childHref, label: childLabel, icon: ChildIcon}) => {
                   const childActive = pathname === childHref || pathname.startsWith(`${childHref}/`);

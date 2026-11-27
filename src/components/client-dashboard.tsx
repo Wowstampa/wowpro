@@ -1,7 +1,7 @@
 /* eslint-disable @next/next/no-img-element -- Shopify CDN thumbnails are already resized */
 import Link from 'next/link';
 import Image from 'next/image';
-import {ArrowRight, ArrowUpRight, Bell, Coins, Crown, ExternalLink, FileText, MessageCircle, MessageSquareText, Package, Palette, Play, Plus, Printer, Truck} from 'lucide-react';
+import {ArrowRight, ArrowUpRight, Bell, Coins, Crown, Gift, Lock, ExternalLink, FileText, MessageCircle, MessageSquareText, Package, Palette, Play, Plus, Printer, Truck} from 'lucide-react';
 
 import {Avatar} from '@/components/avatar';
 import {DashboardOnboarding} from '@/components/dashboard-onboarding';
@@ -10,7 +10,7 @@ import {OpenChatButton} from '@/components/support-widget';
 import {VideoIntro} from '@/components/video-intro';
 import type {DashboardActivity, WorkspaceData} from '@/lib/dashboard-data';
 
-export type ClientDashboardProps = {name: string; active: boolean; manager: {id: string | null; name: string}; workspace: WorkspaceData | null};
+export type ClientDashboardProps = {name: string; active: boolean; manager: {id: string | null; name: string}; workspace: WorkspaceData | null; promo?: {id: string; title: string; discount: string; publicStartsAt: string | null; endsAt: string | null} | null};
 
 const number = (value: number) => new Intl.NumberFormat('it-IT', {useGrouping: 'always'} as Intl.NumberFormatOptions).format(value);
 const money = (value: number, currency: string) => new Intl.NumberFormat('it-IT', {style: 'currency', currency: currency || 'EUR'}).format(value);
@@ -26,7 +26,7 @@ function ago(value: string) {
 const ACTIVITY_ICONS: Record<DashboardActivity['kind'], typeof Bell> = {grafica: Palette, stampa: Printer, messaggio: MessageCircle, file: FileText};
 
 // Client home: welcome page (no subscription) or the subscriber workspace.
-export function ClientDashboard({name, active, manager, workspace}: ClientDashboardProps) {
+export function ClientDashboard({name, active, manager, workspace, promo}: ClientDashboardProps) {
   const hero = <section className="dash-hero">
     <div className="dash-hero__copy">
       <span className="dash-pill"><i /> {active ? 'WOWPRO attivo' : 'Benvenuto in WOWPRO'}</span>
@@ -135,6 +135,7 @@ export function ClientDashboard({name, active, manager, workspace}: ClientDashbo
   return <main className="page-content dash">
     {hero}
     <DashboardOnboarding steps={onboarding} />
+    {promo ? <Link className="dash-promo" href="/dashboard/promo"><span className="dash-promo__icon"><Gift size={22} /></span><div><small><Lock size={11} /> Promo in anteprima · solo WOWPRO</small><strong>{promo.title} <em>{promo.discount}</em></strong><span>{promo.publicStartsAt ? `Per te già attiva, per tutti dal ${day(promo.publicStartsAt)}` : promo.endsAt ? `Riservata a te fino al ${day(promo.endsAt)}` : 'Riservata ai clienti WOWPRO'}</span></div><i>Scopri la promo <ArrowRight size={15} /></i></Link> : null}
     {cards}
     <div className="dash-split">{jobsPanel}{activityPanel}</div>
     <div className="dash-split">{ordersPanel}{managerCard}</div>

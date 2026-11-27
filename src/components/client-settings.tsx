@@ -19,11 +19,12 @@ function SaveButton({state}: {state: 'idle' | 'saving' | 'saved'}) {
 }
 
 // Account settings: personal profile, invoicing details and who has access to the portal.
-type Prefs = {grafica: boolean; preventivi: boolean; messaggi: boolean; idee: boolean};
+type Prefs = {grafica: boolean; preventivi: boolean; messaggi: boolean; idee: boolean; promo: boolean};
 const PREF_LABELS: Array<{key: keyof Prefs; title: string; text: string}> = [
   {key: 'grafica', title: 'Richieste grafiche', text: 'Bozze pronte da approvare, richieste completate o rifiutate.'},
   {key: 'preventivi', title: 'Preventivi e ordini', text: 'Preventivi pronti, promemoria di scadenza, pagamenti ricevuti, spedizione express.'},
   {key: 'messaggi', title: 'Messaggi del team', text: 'Nuovi messaggi in chat e commenti sulle tue richieste.'},
+  {key: 'promo', title: 'Promo in anteprima', text: 'Quando si sblocca una nuova promozione riservata ai clienti WOWPRO.'},
   {key: 'idee', title: 'Feedback & idee', text: 'Quando un’idea che hai proposto o votato cambia stato o riceve una risposta.'},
 ];
 

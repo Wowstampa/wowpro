@@ -1,7 +1,7 @@
 'use client';
 /* eslint-disable @next/next/no-img-element -- Shopify CDN thumbnails are already resized. */
 
-import {ArrowRight, CheckCircle2, Zap, Palette, Receipt, RotateCcw, FileDown, Upload, CreditCard, LayoutGrid, PenLine, ExternalLink, FileText, Loader2, Package, Paperclip, Plus, Search, Send, ShoppingBag, Trash2, X} from 'lucide-react';
+import {ArrowRight, CheckCircle2, Zap, Palette, Receipt, RotateCcw, FileDown, Upload, CreditCard, LayoutGrid, PenLine, ExternalLink, FileText, Loader2, Package, Paperclip, Plus, Search, Send, ShoppingBag, Trash2, X, Gift} from 'lucide-react';
 import Link from 'next/link';
 import {FormEvent, useCallback, useEffect, useMemo, useRef, useState} from 'react';
 
@@ -147,7 +147,7 @@ function NewQuoteModal({onClose, onCreated, linked, initial}: {onClose: () => vo
     <button aria-label="Chiudi" className="subscription-buy__close" onClick={onClose} type="button"><X size={18} /></button>
     <form className="quote-new__layout" onSubmit={submit}>
       <div className="quote-new__catalog">
-        {initial && !linked ? <div className="quote-linked"><RotateCcw size={16} /><span><b>Riordino {initial.source}</b>Abbiamo aggiunto gli stessi prodotti a destra: controlla quantità e note, puoi anche aggiungerne altri.</span></div> : null}
+        {initial?.promo && !linked ? <div className="quote-linked quote-linked--promo"><Gift size={16} /><span><b>Promo {initial.promo.title} · {initial.promo.discount}</b>Scegli i prodotti: il tuo account manager applica lo sconto (codice {initial.promo.code}) al preventivo.</span></div> : initial && !linked ? <div className="quote-linked"><RotateCcw size={16} /><span><b>Riordino {initial.source}</b>Abbiamo aggiunto gli stessi prodotti a destra: controlla quantità e note, puoi anche aggiungerne altri.</span></div> : null}
         {linked ? <div className="quote-linked"><Palette size={16} /><span><b>Grafica {linked.publicId} collegata · ora la stampa</b>{linked.title}. Scegli il prodotto su cui stamparla o descrivilo: i file della grafica restano collegati al preventivo.</span></div> : null}
         {mode === 'choose' ? <>
           <header><span className="buy-form__step">{linked ? 'Ordina la stampa' : 'Preventivo o ordine'}</span><h3>{linked ? 'Su cosa vuoi stamparla?' : 'Come vuoi procedere?'}</h3></header>
