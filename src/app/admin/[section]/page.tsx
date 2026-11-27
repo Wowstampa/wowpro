@@ -14,6 +14,8 @@ import {getFileStorageSummary} from '@/lib/file-archive';
 import {ARCHIVE_AFTER_DAYS, STORAGE_LIMIT_BYTES, listRequestFiles} from '@/lib/request-files';
 import {AdminInbox} from '@/components/admin-inbox';
 import {AdminPromos, type AdminPromo} from '@/components/admin-promos';
+import {AdminPriceListEditor, AdminPriceListIndex, type AdminPriceListClient} from '@/components/admin-pricelist';
+import {readPriceList} from '@/lib/pricelist';
 import {countPromoOrders, listShopifyCollections, promoStage, readStore} from '@/lib/promos';
 import {listConversations, listTeamMembers, type SupportPerson} from '@/lib/support';
 
@@ -26,9 +28,10 @@ const titles: Record<string, string> = {
   feedback: 'Feedback & idee',
   messaggi: 'Messaggi',
   promo: 'Promo',
+  listini: 'Listini',
 };
 
-export default async function AdminSectionPage({params, searchParams}: {params: Promise<{section: string}>; searchParams: Promise<{c?: string}>}) {
+export default async function AdminSectionPage({params, searchParams}: {params: Promise<{section: string}>; searchParams: Promise<{c?: string; r?: string}>}) {
   const {section} = await params;
   const title = titles[section] || 'Back-office';
 
@@ -39,6 +42,7 @@ export default async function AdminSectionPage({params, searchParams}: {params: 
   if (section === 'preventivi') return <QuotesAdminPage />;
   if (section === 'feedback') return <FeedbackPage />;
   if (section === 'promo') return <PromoAdminPage />;
+  if (section === 'listini') return <PriceListsPage {...await searchParams} />;
   if (section === 'team-ruoli') return <TeamRolesPage />;
   if (section === 'messaggi') return <MessagesPage companyId={(await searchParams).c} />;
 
@@ -77,6 +81,36 @@ async function TeamRolesPage() {
     operators = (data || []).filter((operator) => ['admin', 'staff', 'graphic_operator'].includes(operator.role)).map((operator) => ({id: operator.id, email: operator.email, fullName: operator.full_name || operator.email, role: operator.role, status: operator.status, createdAt: operator.created_at, phone: phoneById.get(operator.id) || null}));
   } catch (error) { console.error('[Team directory]', error); hasLoadError = true; }
   return <><PageHeader eyebrow="WowStampa · Amministrazione" title="Team & ruoli" /><main className="page-content">{hasLoadError ? <section className="empty-card empty-card--section"><span className="eyebrow">REGISTRO NON DISPONIBILE</span><h2>Impossibile caricare il team</h2><p>Verifica la configurazione Supabase del servizio e riprova.</p></section> : <AdminTeamDirectory initialOperators={operators} />}</main></>;
+}
+
+async function PriceListsPage({c, r}: {c?: string; r?: string}) {
+  await requireProfile(['staff', 'admin']);
+  const admin = createAdminClient();
+  // From the Clienti page the link carries the Airtable record: the company is found (or created) from it.
+  let companyId = c || '';
+  if (!companyId && r) {
+    const {data: found} = await admin.from('companies').select('id').eq('airtable_record_id', r).maybeSingle();
+    if (found) companyId = found.id;
+    else {
+      const record = (await listWowproClients().catch(() => [])).find((item) => item.id === r);
+      if (record) { const {data: created} = await admin.from('companies').insert({airtable_record_id: r, name: record.fields.ragione_sociale || 'Cliente WOWPRO'}).select('id').single(); companyId = created?.id || ''; }
+    }
+  }
+  if (companyId) {
+    const [{data: company}, list] = await Promise.all([admin.from('companies').select('id,name').eq('id', companyId).maybeSingle(), readPriceList(companyId)]);
+    if (company) return <><PageHeader eyebrow="WowStampa · Programma WOWPRO" title="Listino" /><main className="page-content"><AdminPriceListEditor clientName={company.name} companyId={company.id} initial={{items: list.items, validUntil: list.validUntil, note: list.note, updatedAt: list.updatedAt, updatedBy: list.updatedBy}} /></main></>;
+  }
+  const [records, {data: companies}] = await Promise.all([listWowproClients().catch(() => []), admin.from('companies').select('id,name,airtable_record_id')]);
+  const byRecord = new Map((companies || []).map((row) => [row.airtable_record_id as string, row]));
+  const clients: AdminPriceListClient[] = [];
+  for (const record of records) {
+    if (record.fields.archiviato) continue;
+    const company = byRecord.get(record.id);
+    if (!company) continue;
+    const list = await readPriceList(company.id).catch(() => null);
+    clients.push({companyId: company.id, name: record.fields.ragione_sociale || company.name, clientId: record.fields.cliente_id || '', items: list?.items.length || 0, updatedAt: list?.updatedAt || null, validUntil: list?.validUntil || ''});
+  }
+  return <><PageHeader eyebrow="WowStampa · Programma WOWPRO" title="Listini" /><main className="page-content"><AdminPriceListIndex clients={clients} /></main></>;
 }
 
 async function PromoAdminPage() {
