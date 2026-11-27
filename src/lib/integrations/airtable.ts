@@ -92,12 +92,17 @@ export async function updateWowproClient(recordId: string, fields: Partial<Airta
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({fields}),
+      // typecast: a select value Airtable does not know yet (e.g. a new status) is added instead of refused.
+      body: JSON.stringify({fields, typecast: true}),
       cache: 'no-store',
       signal: AbortSignal.timeout(10_000),
     },
   );
-  if (!response.ok) throw new Error(`Airtable ha risposto con stato ${response.status}.`);
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '');
+    console.error('[Airtable update]', response.status, detail.slice(0, 500));
+    throw new Error(`Airtable ha risposto con stato ${response.status}.`);
+  }
   const record = await response.json() as AirtableRecord<AirtableWowproClient>;
   // Credit and client updates must be reflected immediately after a successful write.
   revalidateTag('airtable-wowpro-clients', 'max');
