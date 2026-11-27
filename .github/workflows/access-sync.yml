@@ -12,3 +12,6 @@ jobs:
     steps:
       - name: Sync access
         run: curl -fsS --max-time 120 --retry 2 --retry-delay 30 https://wowpro.it/api/cron/access-sync
+      - name: Promo jobs
+        if: always()
+        run: curl -fsS --max-time 120 --retry 2 --retry-delay 30 https://wowpro.it/api/cron/promos
