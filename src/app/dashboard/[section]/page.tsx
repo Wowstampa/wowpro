@@ -251,7 +251,7 @@ async function FeedbackPage() {
   try {
     const admin = createAdminClient();
     const [{data, error}, {data: votes, error: votesError}] = await Promise.all([
-      admin.from('feedback').select('id,title,description,category,status,public_response,created_at,updated_at,author:author_id(full_name,email),companies(name)').order('created_at', {ascending: false}),
+      admin.from('feedback').select('id,title,description,category,status,public_response,created_at,updated_at,author_id,author:author_id(full_name,email),companies(name)').order('created_at', {ascending: false}),
       admin.from('feedback_votes').select('feedback_id,voter_id'),
     ]);
     if (error || votesError) throw error || votesError;
@@ -264,7 +264,7 @@ async function FeedbackPage() {
     items = (data || []).map((row) => {
       const author = (Array.isArray(row.author) ? row.author[0] : row.author) as {full_name?: string; email?: string} | null;
       const company = (Array.isArray(row.companies) ? row.companies[0] : row.companies) as {name?: string} | null;
-      return {id: row.id, title: row.title, description: row.description, category: row.category, status: row.status, publicResponse: row.public_response || '', authorName: shortName(author?.full_name || company?.name || 'Cliente WOWPRO'), votes: counts.get(row.id) || 0, voted: mine.has(row.id), createdAt: row.created_at, updatedAt: row.updated_at};
+      return {id: row.id, title: row.title, description: row.description, category: row.category, status: row.status, publicResponse: row.public_response || '', authorName: shortName(author?.full_name || company?.name || 'Cliente WOWPRO'), mine: row.author_id === profile.id, votes: counts.get(row.id) || 0, voted: mine.has(row.id), createdAt: row.created_at, updatedAt: row.updated_at};
     });
   } catch (error) { console.error('[Client feedback]', error); hasLoadError = true; }
   return <><PageHeader eyebrow="WOWPRO · Area cliente" title="Feedback & idee" /><main className="page-content">{hasLoadError ? <section className="empty-card empty-card--section"><span className="eyebrow">BACHECA NON DISPONIBILE</span><h2>Impossibile caricare le proposte</h2><p>Riprova tra qualche istante.</p></section> : <ClientFeedbackBoard initialItems={items} now={now} />}</main></>;
