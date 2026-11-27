@@ -1,7 +1,7 @@
 'use client';
 /* eslint-disable @next/next/no-img-element -- Shopify CDN images. */
 
-import {Check, ExternalLink, Loader2, Minus, Package, Plus, Ruler} from 'lucide-react';
+import {Check, ExternalLink, Loader2, Minus, Package, Plus, Ruler, UserRound} from 'lucide-react';
 import {useEffect, useMemo, useRef, useState} from 'react';
 
 type Value = {label: string; image: string | null; surcharge: number | null};
@@ -22,6 +22,9 @@ export type ConfiguredItem = {productId: string; variantId: string; productTitle
 
 const euro = (value: number) => new Intl.NumberFormat('it-IT', {style: 'currency', currency: 'EUR'}).format(value);
 const isQuantityOption = (name: string) => /quantit/i.test(name);
+// The client can leave a choice to the account manager: it reaches the quote as "to be advised".
+const AM = '__account_manager__';
+const AM_LABEL = 'Da consigliare (account manager)';
 
 // Product configurator for quote requests: the same options the customer finds on wowstampa.com.
 export type PendingResult = {item: ConfiguredItem} | {error: string} | null;
@@ -55,7 +58,8 @@ export function QuoteConfigurator({product, onBack, onAdd, registerPending}: {pr
     return () => { active = false; };
   }, [product.handle]);
 
-  const variant = useMemo(() => config?.variants.find((item) => item.options.every((value, index) => !config.options[index] || value === selected[index])) || null, [config, selected]);
+  const delegatedVariant = selected.some((value) => value === AM);
+  const variant = useMemo(() => config?.variants.find((item) => item.options.every((value, index) => !config.options[index] || selected[index] === AM || value === selected[index])) || null, [config, selected]);
   const hasQuantityOption = !!config?.options.some((option) => isQuantityOption(option.name));
 
   function visible(field: Field) {
@@ -80,10 +84,11 @@ export function QuoteConfigurator({product, onBack, onAdd, registerPending}: {pr
     setError('');
     const chosen = variant || config.variants[0];
     if (!chosen) return fail('Prodotto non disponibile.');
-    const options: ConfiguredItem['options'] = config.options.map((option, index) => ({name: option.name, value: selected[index] || ''})).filter((option) => option.value);
+    const options: ConfiguredItem['options'] = config.options.map((option, index) => ({name: option.name, value: selected[index] === AM ? AM_LABEL : selected[index] || ''})).filter((option) => option.value);
     for (const field of visibleFields) {
       if (field.kind === 'choice' || field.kind === 'swatch' || field.kind === 'text') {
-        const value = (fieldValues[field.id] || '').trim();
+        const raw = (fieldValues[field.id] || '').trim();
+        const value = raw === AM ? AM_LABEL : raw;
         if (!value && field.required) return fail(`Scegli: ${field.title}.`);
         if (value) options.push({name: field.title, value});
       }
@@ -99,6 +104,8 @@ export function QuoteConfigurator({product, onBack, onAdd, registerPending}: {pr
       if ((config.dimensions.maxWidth && base > config.dimensions.maxWidth) || (config.dimensions.maxHeight && tall > config.dimensions.maxHeight)) return fail(`Misura massima ${config.dimensions.maxWidth || '–'} × ${config.dimensions.maxHeight || '–'} cm.`);
       options.push({name: 'Misure', value: `${base} × ${tall} cm`});
     }
+    // A variant left to the account manager: the line arrives without a fixed variant, the offer defines it.
+    if (delegatedVariant) return {item: {productId: product.id, variantId: '', productTitle: config.title, variantTitle: '', imageUrl: swatchImage || config.imageUrl || product.imageUrl, quantity: hasQuantityOption ? 1 : quantity, note: note.trim(), listPrice: null, options}};
     return {item: {productId: product.id, variantId: chosen.id, productTitle: config.title, variantTitle: chosen.title, imageUrl: swatchImage || chosen.imageUrl || product.imageUrl, quantity: hasQuantityOption ? 1 : quantity, note: note.trim(), listPrice: adminPrice(chosen.id) ?? chosen.price, options}};
   }
 
@@ -126,7 +133,7 @@ export function QuoteConfigurator({product, onBack, onAdd, registerPending}: {pr
       <div className="qc__title">
         <span className="qc__eyebrow">Configura il prodotto</span>
         <h4>{product.title}</h4>
-        {fromPrice !== null ? <p>Listino da <b>{euro(fromPrice)}</b> + IVA<br /><small>Il prezzo WOWPRO riservato arriva nel preventivo.</small></p> : null}
+        {fromPrice !== null ? <p>Prezzo indicativo da <b>{euro(fromPrice)}</b> + IVA<br /><small>Il tuo account manager ti conferma l’offerta con il prezzo WOWPRO riservato.</small></p> : null}
         {config?.url ? <a href={config.url} rel="noreferrer" target="_blank">Vedi sul sito <ExternalLink size={12} /></a> : null}
       </div>
     </div>
@@ -137,11 +144,11 @@ export function QuoteConfigurator({product, onBack, onAdd, registerPending}: {pr
 
     {config ? <div className="qc__steps">
       {config.options.map((option, index) => <section className="qc__group" key={option.name}>
-        <header><b>{stepLabel(`option:${option.name}`)}</b>{option.name}<em>{selected[index]}</em></header>
+        <header><b>{stepLabel(`option:${option.name}`)}</b>{option.name}<em>{selected[index] === AM ? 'Deciderà l’account manager' : selected[index]}</em></header>
         <div className="qc__chips">{option.values.map((value) => {
           const available = config.variants.some((item) => item.available && item.options[index] === value && item.options.every((other, position) => position === index || !config.options[position] || other === selected[position]));
           return <button aria-pressed={selected[index] === value} className={`${selected[index] === value ? 'is-active' : ''}${available ? '' : ' is-muted'}`} key={value} onClick={() => setSelected((current) => { const next = [...current]; next[index] = value; return next; })} type="button">{selected[index] === value ? <Check size={13} /> : null}{value}</button>;
-        })}</div>
+        })}{isQuantityOption(option.name) ? null : <AmChip active={selected[index] === AM} onClick={() => setSelected((current) => { const next = [...current]; next[index] = AM; return next; })} />}</div>
       </section>)}
 
       {config.dimensions ? <section className="qc__group">
@@ -169,14 +176,14 @@ export function QuoteConfigurator({product, onBack, onAdd, registerPending}: {pr
           <input className="qc__input" maxLength={300} onChange={(event) => setFieldValues((current) => ({...current, [field.id]: event.target.value}))} value={fieldValues[field.id] || ''} />
         </section>;
         return <section className="qc__group" key={field.id}>
-          <header><b>{stepLabel(`field:${field.id}`)}</b>{field.title}<em>{fieldValues[field.id]}</em></header>
+          <header><b>{stepLabel(`field:${field.id}`)}</b>{field.title}<em>{fieldValues[field.id] === AM ? 'Deciderà l’account manager' : fieldValues[field.id]}</em></header>
           <div className={field.kind === 'swatch' ? 'qc__swatches' : 'qc__chips'}>{field.values.map((value) => {
             const active = fieldValues[field.id] === value.label;
             const choose = () => setFieldValues((current) => ({...current, [field.id]: active && !field.required ? '' : value.label}));
             return field.kind === 'swatch'
               ? <button aria-label={value.label} aria-pressed={active} className={active ? 'is-active' : ''} key={value.label} onClick={choose} title={value.label} type="button">{value.image ? <img alt="" src={value.image} /> : <i>{value.label.slice(0, 2)}</i>}<small>{value.label}</small></button>
               : <button aria-pressed={active} className={active ? 'is-active' : ''} key={value.label} onClick={choose} type="button">{active ? <Check size={13} /> : null}{value.label}{value.surcharge ? <small>+{euro(value.surcharge)}</small> : null}</button>;
-          })}</div>
+          })}<AmChip active={fieldValues[field.id] === AM} onClick={() => setFieldValues((current) => ({...current, [field.id]: current[field.id] === AM && !field.required ? '' : AM}))} /></div>
         </section>;
       })}
 
@@ -188,8 +195,13 @@ export function QuoteConfigurator({product, onBack, onAdd, registerPending}: {pr
 
     {error ? <p className="form-error">{error}</p> : null}
     <div className="qc__footer">
-      <span>{variant?.title || (config?.dimensions && area ? `${width} × ${height} cm` : product.title)}<small>Aggiungi e scegli altri prodotti, oppure invia direttamente la richiesta.</small></span>
+      <span>{delegatedVariant ? 'Alcune scelte le farà il tuo account manager' : variant?.title || (config?.dimensions && area ? `${width} × ${height} cm` : product.title)}<small>Aggiungi e scegli altri prodotti, oppure invia direttamente la richiesta.</small></span>
       <button className="button button--primary" disabled={!config && !loadError} onClick={add} type="button"><Plus size={16} /> Aggiungi alla richiesta</button>
     </div>
   </div>;
+}
+
+// "Not sure? Let my account manager decide" choice, shown next to the options of each step.
+function AmChip({active, onClick}: {active: boolean; onClick: () => void}) {
+  return <button aria-pressed={active} className={`qc__am${active ? ' is-active' : ''}`} onClick={onClick} title="Non sei sicuro? Il tuo account manager ti consiglia la scelta migliore nell’offerta." type="button">{active ? <Check size={13} /> : <UserRound size={13} />}Lascia decidere al mio account manager</button>;
 }

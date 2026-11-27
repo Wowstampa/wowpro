@@ -67,7 +67,7 @@ export function ClientPriceListView({list, clientName, managerName}: {list: Clie
   </section>;
 
   return <section className="lp">
-    <PageIntro action={<a className="button" href="/api/client/pricelist/pdf"><Download size={16} /> Scarica PDF</a>} text="I prezzi concordati con WowStampa per la tua azienda. Scegli un prodotto e chiedi il preventivo: il prezzo è già applicato." title="Il tuo listino riservato" />
+    <PageIntro action={<a className="button" href="/api/client/pricelist/pdf"><Download size={16} /> Scarica PDF</a>} text="I prezzi concordati con WowStampa per la tua azienda. Scegli un prodotto e chiedi il preventivo: il tuo account manager ti conferma l’offerta partendo da questi prezzi." title="Il tuo listino riservato" />
     <div className="lp-sum">
       <div className="lp-sum__main"><small><Tags size={12} /> Listino personalizzato</small><strong>{clientName}</strong><span>{managerName ? `Preparato da ${managerName}, il tuo account manager` : 'Preparato dal team WowStampa'}</span></div>
       <div className="lp-stat"><small>Prodotti nel listino</small><b>{list.items.length}</b><em>{categories.length === 1 ? 'in 1 categoria' : `in ${categories.length} categorie`}</em></div>
@@ -112,7 +112,7 @@ function AreaCalculator({item, onQuote}: {item: ClientPriceItem; onQuote: (size:
     <label className="lp-calc__pcs"><span>Pezzi</span><div><input inputMode="numeric" onChange={(event) => setPieces(event.target.value.replace(/\D/g, ''))} value={pieces} /></div></label>
     <div className="lp-calc__result">{result ? <>
       <small>{area(result.perPiece)} mq a pezzo{p > 1 ? ` · ${area(result.totalArea)} mq in totale` : ''} · {money(result.rate)}/mq{minApplied ? ` (minimo ${area(item.minArea || 0)} mq)` : ''}</small>
-      <strong>{money(result.total)} <em>{p > 1 ? `${money(result.piecePrice)} a pezzo · ` : ''}IVA esclusa</em></strong>
+      <strong>{money(result.total)} <em>{p > 1 ? `${money(result.piecePrice)} a pezzo · ` : ''}prezzo indicativo IVA esclusa</em></strong>
     </> : <small>Inserisci base e altezza</small>}</div>
     <button className="lp-btn" disabled={!ready} onClick={() => onQuote({width: w, height: h, pieces: p})} type="button"><Printer size={15} /> Chiedi preventivo</button>
   </div>;
