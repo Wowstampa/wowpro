@@ -2622,3 +2622,8 @@ textarea.bk-input { resize: vertical; line-height: 1.5; }
 .lp-calc .lp-btn:disabled { opacity: .5; cursor: not-allowed; }
 @media (max-width: 560px) { .lp-calc__result { flex-basis: 100%; } .lp-calc .lp-btn { width: 100%; justify-content: center; } }
 .pl-tiers .pl-area { border-style: dashed; background: #f4faf6; } .pl-tiers .pl-area b { color: #172130; font-size: 12px; }
+/* Listino admin: the reserved price stands out, the site price stays secondary */
+.pl-tiers span { padding: 7px 11px; border-color: #cfe9da; background: #f4faf6; }
+.pl-tiers b { font-size: 15px; letter-spacing: -.01em; }
+.pl-site { color: #9aa4b2; font-weight: 600; }
+.pl-site s { color: #9aa4b2; }
