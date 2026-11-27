@@ -74,7 +74,7 @@ export function AdminClientDirectory({archived, designers = [], initialClients, 
       </section>
 
       {isCreating ? <CreateClientModal designers={designers} teamMembers={teamMembers} onClose={() => setIsCreating(false)} onCreated={(client, warning) => { setClients((current) => [client, ...current]); setIsCreating(false); setNotice(warning || `${client.companyName} è stato aggiunto ai clienti.`); }} /> : null}
-      {editingClient ? <EditClientModal designers={designers} teamMembers={teamMembers} client={editingClient} onClose={() => setEditingClient(null)} onSaved={(patch) => { replaceClient(editingClient.recordId, patch); setEditingClient(null); }} /> : null}
+      {editingClient ? <EditClientModal designers={designers} teamMembers={teamMembers} client={editingClient} onClose={() => setEditingClient(null)} onSaved={(patch, warning) => { replaceClient(editingClient.recordId, patch); setEditingClient(null); if (warning) setNotice(warning); }} /> : null}
       {creditClient ? <CreditModal client={creditClient} onClose={() => setCreditClient(null)} onSaved={(patch) => { replaceClient(creditClient.recordId, patch); setCreditClient(null); }} /> : null}
       {archivingClient ? <ArchiveClientModal client={archivingClient} onArchived={() => { replaceClient(archivingClient.recordId, {isArchived: true}); setArchivingClient(null); }} onClose={() => setArchivingClient(null)} /> : null}
     </>
@@ -164,7 +164,7 @@ function CreateClientModal({designers, onClose, onCreated, teamMembers}: {design
   </Modal>;
 }
 
-function EditClientModal({client, designers, onClose, onSaved, teamMembers}: {client: AdminClient; designers: TeamMemberOption[]; onClose: () => void; onSaved: (patch: Partial<AdminClient>) => void; teamMembers: TeamMemberOption[]}) {
+function EditClientModal({client, designers, onClose, onSaved, teamMembers}: {client: AdminClient; designers: TeamMemberOption[]; onClose: () => void; onSaved: (patch: Partial<AdminClient>, warning?: string) => void; teamMembers: TeamMemberOption[]}) {
   const [error, setError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
@@ -186,7 +186,7 @@ function EditClientModal({client, designers, onClose, onSaved, teamMembers}: {cl
       const response = await fetch(`/api/admin/clients/${client.recordId}`, {method: 'PATCH', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)});
       const result = await readApiResponse(response);
       if (!response.ok || !result.fields) throw new Error(result.error || 'Salvataggio non riuscito.');
-      onSaved({companyName: result.fields.ragione_sociale || '', email: result.fields.email_login || '', plan: result.fields.piano || '', subscriptionStatus: result.fields.stato_abbonamento || '', accountManager: result.fields.account_manager_nome || '', accountManagerId: payload.account_manager_id, designerId: payload.designer_id, shopifyCustomerId: result.fields.shopify_customer_id || ''});
+      onSaved({companyName: result.fields.ragione_sociale || '', email: result.fields.email_login || '', plan: result.fields.piano || '', subscriptionStatus: result.fields.stato_abbonamento || '', accountManager: result.fields.account_manager_nome || '', accountManagerId: payload.account_manager_id, designerId: payload.designer_id, shopifyCustomerId: result.fields.shopify_customer_id || ''}, result.warning);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Salvataggio non riuscito.');
     } finally { setIsSaving(false); }
