@@ -9,6 +9,8 @@ import {OpenChatButton} from '@/components/support-widget';
 import {MobileTabs} from '@/components/mobile-tabs';
 import {SupportChat} from '@/components/support-chat';
 import {ClientPromos} from '@/components/client-promos';
+import {ClientPriceListView} from '@/components/client-pricelist';
+import {readPriceList} from '@/lib/pricelist';
 import {getClientPromos, type ClientPromo} from '@/lib/promo-view';
 import {ClientFeedbackBoard, type FeedbackItem} from '@/components/client-feedback-board';
 import {getConversationCompany} from '@/lib/support';
@@ -38,7 +40,7 @@ import {readPrefs} from '@/lib/notification-prefs';
 import {BrandKitEditor} from '@/components/brand-kit';
 import {readBrandKit, toBrandKitView} from '@/lib/brand-kit';
 
-const titles: Record<string, string> = {workspace: 'Dashboard', 'brand-kit': 'Brand kit', crediti: 'Piano e crediti', file: 'File', fatture: 'Piano e crediti', impostazioni: 'Impostazioni', richieste: 'Richieste grafiche', ordini: 'Ordini', abbonamento: 'Abbonamento', preventivi: 'Preventivi', supporto: 'Messaggi', feedback: 'Feedback & idee', promo: 'Promo in anteprima'};
+const titles: Record<string, string> = {workspace: 'Dashboard', 'brand-kit': 'Brand kit', crediti: 'Piano e crediti', file: 'File', fatture: 'Piano e crediti', impostazioni: 'Impostazioni', richieste: 'Richieste grafiche', ordini: 'Ordini', abbonamento: 'Abbonamento', preventivi: 'Preventivi', supporto: 'Messaggi', feedback: 'Feedback & idee', promo: 'Promo in anteprima', listino: 'Il tuo listino'};
 
 export default async function ClientSectionPage({params, searchParams}: {params: Promise<{section: string}>; searchParams: Promise<Record<string, string | string[] | undefined>>}) {
   const {section} = await params;
@@ -60,6 +62,7 @@ export default async function ClientSectionPage({params, searchParams}: {params:
   if (section === 'supporto') return <SupportPage />;
   if (section === 'feedback') return <FeedbackPage />;
   if (section === 'promo') return <PromoPage />;
+  if (section === 'listino') return <PriceListPage />;
   const title = titles[section] || 'WOWPRO';
   return <><PageHeader eyebrow="WOWPRO · Area cliente" title={title} /><main className="page-content"><section className="empty-card empty-card--section"><span className="eyebrow">IN PREPARAZIONE</span><h2>{title}</h2><p>Questo spazio verrà collegato ai dati del tuo account.</p></section></main></>;
 }
@@ -244,6 +247,14 @@ async function OrdersPage() {
     hasLoadError = true;
   }
   return <><PageHeader eyebrow="WOWPRO · Area cliente" title="Ordini" /><main className="page-content">{hasLoadError ? <section className="empty-card empty-card--section"><span className="eyebrow">COLLEGAMENTO NON DISPONIBILE</span><h2>Impossibile caricare gli ordini</h2><p>Riprova tra qualche istante. Se il problema continua, contatta il tuo account manager.</p></section> : <ClientOrders invoices={Object.fromEntries(invoices.filter((invoice) => invoice.orderName).map((invoice) => [invoice.orderName!, invoice.id]))} orders={orders} />}</main></>;
+}
+
+async function PriceListPage() {
+  const profile = await requireProfile(['client']);
+  const companyId = profile.company_id || '';
+  const admin = createAdminClient();
+  const [list, {data: company}, team] = await Promise.all([readPriceList(companyId).catch(() => null), admin.from('companies').select('name').eq('id', companyId).maybeSingle(), getConversationCompany(companyId).catch(() => null)]);
+  return <><PageHeader eyebrow="WOWPRO · Area cliente" title="Il tuo listino" /><main className="page-content">{list ? <ClientPriceListView clientName={company?.name || profile.full_name || 'la tua azienda'} list={{items: list.items, validUntil: list.validUntil, note: list.note, updatedAt: list.updatedAt}} managerName={team?.manager?.name || ''} /> : <section className="empty-card empty-card--section"><span className="eyebrow">LISTINO NON DISPONIBILE</span><h2>Impossibile caricare il listino</h2><p>Riprova tra qualche istante.</p></section>}</main></>;
 }
 
 async function PromoPage() {
