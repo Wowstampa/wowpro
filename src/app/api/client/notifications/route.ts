@@ -4,7 +4,7 @@ import {z} from 'zod';
 import {getCurrentProfile} from '@/lib/auth';
 import {createAdminClient} from '@/lib/supabase/admin.server';
 
-const schema = z.object({grafica: z.boolean(), preventivi: z.boolean(), messaggi: z.boolean(), idee: z.boolean().default(true)});
+const schema = z.object({grafica: z.boolean(), preventivi: z.boolean(), messaggi: z.boolean(), idee: z.boolean().default(true), promo: z.boolean().default(true)});
 
 // The client's email notification preferences.
 export async function PUT(request: Request) {
