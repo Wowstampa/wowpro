@@ -23,6 +23,8 @@ export function LoginForm() {
       const form = new FormData(event.currentTarget);
       const {data, error: signInError} = await supabase.auth.signInWithPassword({email: email.trim(), password: String(form.get('password') || '')});
       if (signInError || !data.user) throw new Error('Email o password non corrette.');
+      // Airtable decides the role: align it before choosing which area to open.
+      await fetch('/api/auth/sync-access', {method: 'POST'}).catch(() => null);
       const {data: profile} = await supabase.from('profiles').select('role,status').eq('id', data.user.id).maybeSingle();
       if (!profile || profile.status !== 'active') {
         await supabase.auth.signOut();
