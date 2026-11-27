@@ -97,5 +97,8 @@ export function areaQuote(item: Pick<PriceItem, 'tiers' | 'minArea'>, widthCm: n
 export function dimensionsFrom(options: Array<{name: string; value: string}> | undefined) {
   const find = (pattern: RegExp) => { const option = (options || []).find((entry) => pattern.test(entry.name)); const value = option ? Number(option.value.replace(',', '.').replace(/[^\d.]/g, '')) : NaN; return Number.isFinite(value) && value > 0 ? value : null; };
   const width = find(/^(base|larghezza|width)/i); const height = find(/^(altezza|height)/i);
-  return width && height ? {width, height} : null;
+  if (width && height) return {width, height};
+  // Product configurator: "Misure: 150 × 100 cm".
+  const sizes = (options || []).find((entry) => /^misur/i.test(entry.name))?.value.match(/(\d+(?:[.,]\d+)?)\s*[×x]\s*(\d+(?:[.,]\d+)?)/i);
+  return sizes ? {width: Number(sizes[1].replace(',', '.')), height: Number(sizes[2].replace(',', '.'))} : null;
 }
