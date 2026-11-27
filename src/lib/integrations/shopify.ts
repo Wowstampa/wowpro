@@ -332,9 +332,11 @@ export function getCustomerAccountUrl() {
 export type CatalogProduct = {id: string; handle: string; title: string; imageUrl: string | null; url: string | null; variants: Array<{id: string; title: string; price: number}>};
 
 // Active products of the online store for the quote request picker (WOWPRO credits and subscription excluded).
-export async function searchCatalog(term: string) {
+// With `handles`, the exact products with those handles (price list CSV import).
+export async function searchCatalog(term: string, options: {handles?: string[]} = {}) {
   const clean = term.replace(/["\\]/g, ' ').trim().slice(0, 80);
-  const query = ['status:active', 'published_status:published', clean ? `title:*${clean}*` : ''].filter(Boolean).join(' ');
+  const handles = (options.handles || []).map((handle) => handle.replace(/[^a-z0-9-]/gi, '')).filter(Boolean).slice(0, 20);
+  const query = handles.length ? `(${handles.map((handle) => `handle:${handle}`).join(' OR ')})` : ['status:active', 'published_status:published', clean ? `title:*${clean}*` : ''].filter(Boolean).join(' ');
   const data = await shopifyAdminQuery<{products: {nodes: Array<{id: string; handle: string; title: string; onlineStoreUrl: string | null; featuredMedia: {preview: {image: {url: string} | null} | null} | null; variants: {nodes: Array<{id: string; title: string; price: string}>}}>}}>(
     `query Catalog($query: String!) { products(first: 20, query: $query, sortKey: RELEVANCE) { nodes { id handle title onlineStoreUrl featuredMedia { preview { image { url(transform: {maxWidth: 160, maxHeight: 160}) } } } variants(first: 60) { nodes { id title price } } } } }`,
     {query},
