@@ -2633,3 +2633,5 @@ textarea.bk-input { resize: vertical; line-height: 1.5; }
 .qc__am { display: inline-flex; align-items: center; gap: 6px; border-style: dashed !important; border-color: #b9e0c8 !important; background: #f8fcf9 !important; color: #0b7a39 !important; font-weight: 700; }
 .qc__am.is-active { border-style: solid !important; border-color: var(--green) !important; background: #eaf6ef !important; }
 .qc__swatches .qc__am { align-self: center; padding: 8px 12px; border: 1.5px dashed #b9e0c8; border-radius: 10px; font: inherit; font-size: 12.5px; cursor: pointer; }
+.qc__reserved { padding: 8px 10px; border-radius: 10px; background: #eaf6ef; color: #0b7a39; }
+.qc__reserved b { color: #0b7a39; }
