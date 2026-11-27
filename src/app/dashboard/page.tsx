@@ -5,6 +5,7 @@ import {requireProfile} from '@/lib/auth';
 import {getWorkspaceData} from '@/lib/dashboard-data';
 import {getWowproClient} from '@/lib/integrations/airtable';
 import {getConversationCompany} from '@/lib/support';
+import {getEarlyPromos} from '@/lib/promo-view';
 import {createClient} from '@/lib/supabase/server';
 
 // Client home: the welcome page without a subscription, the full workspace with one.
@@ -25,11 +26,11 @@ export default async function DashboardPage() {
     </>;
   }
 
-  const workspace = await getWorkspaceData(profile.company_id, company?.airtable_record_id || null, profile.email);
+  const [workspace, earlyPromos] = await Promise.all([getWorkspaceData(profile.company_id, company?.airtable_record_id || null, profile.email), getEarlyPromos()]);
   if (!managerName && company?.airtable_record_id) {
     try { managerName = (await getWowproClient(company.airtable_record_id)).fields.account_manager_nome || ''; } catch { /* Generic team name below. */ }
   }
   return <><PageHeader eyebrow="WOWPRO · Area cliente" title="Dashboard" />
-    <ClientDashboard active manager={{id: team?.manager?.id || null, name: managerName}} name={name} workspace={workspace} />
+    <ClientDashboard active manager={{id: team?.manager?.id || null, name: managerName}} name={name} promo={earlyPromos[0] || null} workspace={workspace} />
   </>;
 }
