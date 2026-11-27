@@ -148,7 +148,7 @@ export function QuoteConfigurator({product, onBack, onAdd, registerPending}: {pr
         <div className="qc__chips">{option.values.map((value) => {
           const available = config.variants.some((item) => item.available && item.options[index] === value && item.options.every((other, position) => position === index || !config.options[position] || other === selected[position]));
           return <button aria-pressed={selected[index] === value} className={`${selected[index] === value ? 'is-active' : ''}${available ? '' : ' is-muted'}`} key={value} onClick={() => setSelected((current) => { const next = [...current]; next[index] = value; return next; })} type="button">{selected[index] === value ? <Check size={13} /> : null}{value}</button>;
-        })}{isQuantityOption(option.name) ? null : <AmChip active={selected[index] === AM} onClick={() => setSelected((current) => { const next = [...current]; next[index] = AM; return next; })} />}</div>
+        })}{isQuantityOption(option.name) || option.values.length < 2 ? null : <AmChip active={selected[index] === AM} onClick={() => setSelected((current) => { const next = [...current]; next[index] = AM; return next; })} />}</div>
       </section>)}
 
       {config.dimensions ? <section className="qc__group">
@@ -183,7 +183,7 @@ export function QuoteConfigurator({product, onBack, onAdd, registerPending}: {pr
             return field.kind === 'swatch'
               ? <button aria-label={value.label} aria-pressed={active} className={active ? 'is-active' : ''} key={value.label} onClick={choose} title={value.label} type="button">{value.image ? <img alt="" src={value.image} /> : <i>{value.label.slice(0, 2)}</i>}<small>{value.label}</small></button>
               : <button aria-pressed={active} className={active ? 'is-active' : ''} key={value.label} onClick={choose} type="button">{active ? <Check size={13} /> : null}{value.label}{value.surcharge ? <small>+{euro(value.surcharge)}</small> : null}</button>;
-          })}<AmChip active={fieldValues[field.id] === AM} onClick={() => setFieldValues((current) => ({...current, [field.id]: current[field.id] === AM && !field.required ? '' : AM}))} /></div>
+          })}{field.values.length < 2 ? null : <AmChip active={fieldValues[field.id] === AM} onClick={() => setFieldValues((current) => ({...current, [field.id]: current[field.id] === AM && !field.required ? '' : AM}))} />}</div>
         </section>;
       })}
 
