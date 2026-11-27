@@ -452,3 +452,11 @@ export async function findOrderCustomer(orderName: string) {
   const order = data.orders.nodes[0];
   return order ? {name: order.name, customerId: order.customer?.id.split('/').pop() || null, email: (order.customer?.email || order.email || '').toLowerCase() || null} : null;
 }
+
+// Handles of products by id (to open the product configurator from the reserved price list).
+export async function productHandles(ids: string[]) {
+  const unique = [...new Set(ids.filter((id) => id.startsWith('gid://shopify/Product/')))].slice(0, 250);
+  if (!unique.length) return new Map<string, {handle: string; url: string | null}>();
+  const data = await shopifyAdminQuery<{nodes: Array<{id: string; handle: string; onlineStoreUrl: string | null} | null>}>(`query PriceListHandles($ids: [ID!]!) { nodes(ids: $ids) { ... on Product { id handle onlineStoreUrl } } }`, {ids: unique});
+  return new Map(data.nodes.filter((node): node is {id: string; handle: string; onlineStoreUrl: string | null} => !!node?.handle).map((node) => [node.id, {handle: node.handle, url: node.onlineStoreUrl}]));
+}
