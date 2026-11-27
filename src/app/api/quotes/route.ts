@@ -1,4 +1,6 @@
 import {NextResponse} from 'next/server';
+
+import {matchPriceItem, priceFor, readPriceList} from '@/lib/pricelist';
 import {z} from 'zod';
 
 import {getCurrentProfile} from '@/lib/auth';
@@ -43,7 +45,10 @@ export async function POST(request: Request) {
     const {data: graphic} = await admin.from('graphic_requests').select('id,public_id,status').eq('id', id).single();
     if (graphic) graphics.push(graphic);
   }
-  const {data, error} = await admin.from('quote_requests').insert({public_id: newQuotePublicId(), company_id: profile.company_id, requested_by: profile.id, kind, items, notes, needed_by: neededBy || null}).select(QUOTE_COLUMNS).single();
+  // Reserved price list: the unit price for the chosen quantity is filled in, so the offer starts from it.
+  const priceList = await readPriceList(profile.company_id).catch(() => null);
+  const pricedItems = priceList?.items.length ? items.map((item) => { const match = matchPriceItem(priceList, item); const price = match ? priceFor(match, item.quantity) : null; return price !== null ? {...item, listPrice: price} : item; }) : items;
+  const {data, error} = await admin.from('quote_requests').insert({public_id: newQuotePublicId(), company_id: profile.company_id, requested_by: profile.id, kind, items: pricedItems, notes, needed_by: neededBy || null}).select(QUOTE_COLUMNS).single();
   if (error || !data) {
     console.error('[Quote create]', error);
     return NextResponse.json({error: 'Richiesta non inviata. Riprova.'}, {status: 502});
