@@ -3,12 +3,13 @@
 /* eslint-disable @next/next/no-img-element -- Shopify CDN thumbnails */
 import Link from 'next/link';
 import {useEffect, useMemo, useRef, useState, type FormEvent} from 'react';
-import {ArrowLeft, Check, Download, FileUp, Loader2, Package, PenLine, Pencil, Plus, Search, Tags, Trash2, X} from 'lucide-react';
+import {ArrowLeft, Check, Download, FileUp, Link2, Loader2, Package, PenLine, Pencil, Plus, Search, Tags, Trash2, X} from 'lucide-react';
 
 import {useConfirm} from '@/components/confirm-dialog';
 import type {ClientPriceItem} from '@/components/client-pricelist';
 
 type Tier = {minQty: number; price: number};
+type CatalogMatch = {productId: string; variantId: string; imageUrl: string | null; title: string; variantTitle: string; price: number};
 type CatalogProduct = {id: string; title: string; imageUrl: string | null; variants: Array<{id: string; title: string; price: number}>};
 export type AdminPriceListClient = {companyId: string; name: string; clientId: string; items: number; updatedAt: string | null; validUntil: string};
 
@@ -17,7 +18,7 @@ const qty = (value: number) => new Intl.NumberFormat('it-IT', {useGrouping: 'alw
 const day = (value: string) => new Intl.DateTimeFormat('it-IT', {day: 'numeric', month: 'short', year: 'numeric'}).format(new Date(value.length === 10 ? `${value}T12:00:00` : value));
 const num = (value: string) => Number(String(value).replace(/\s/g, '').replace(/\.(?=\d{3}(\D|$))/g, '').replace(',', '.'));
 const newId = () => Math.random().toString(36).slice(2, 10);
-const CSV_TEMPLATE = 'categoria;prodotto;dettaglio;unita;quantita;prezzo;prezzo_sito;minimo;note\nVolantini;Volantino A5;Patinata opaca 170 g fronte/retro;pz;500;0,09;0,12;500;Consegna in 3 giorni\nVolantini;Volantino A5;Patinata opaca 170 g fronte/retro;pz;1000;0,07;;;\nStriscioni;Striscione in PVC;PVC 510 g con occhielli;mq;1;14;18;1;Minimo fatturato 1 mq a pezzo\nStriscioni;Striscione in PVC;PVC 510 g con occhielli;mq;10;11;;;\n';
+const CSV_TEMPLATE = 'categoria;prodotto;handle;variante;dettaglio;unita;quantita;prezzo;prezzo_sito;minimo;note\nVolantini;Volantino A5;;;Patinata opaca 170 g fronte/retro;pz;500;0,09;0,12;500;Consegna in 3 giorni\nVolantini;Volantino A5;;;Patinata opaca 170 g fronte/retro;pz;1000;0,07;;;\nStriscioni;Striscione in PVC;;;PVC 510 g con occhielli;mq;1;14;18;1;Minimo fatturato 1 mq a pezzo\nStriscioni;Striscione in PVC;;;PVC 510 g con occhielli;mq;10;11;;;\n';
 
 // Back-office list of clients with their price list status.
 export function AdminPriceListIndex({clients}: {clients: AdminPriceListClient[]}) {
@@ -47,6 +48,9 @@ export function AdminPriceListEditor({companyId, clientName, initial}: {companyI
   const [error, setError] = useState('');
   const [editing, setEditing] = useState<ClientPriceItem | 'new' | null>(null);
   const [searching, setSearching] = useState(false);
+  const [linking, setLinking] = useState<ClientPriceItem | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [importNote, setImportNote] = useState('');
   const [confirmUi, ask] = useConfirm();
   const fileRef = useRef<HTMLInputElement>(null);
   const categories = useMemo(() => [...new Set(items.map((item) => item.category).filter(Boolean))], [items]);
@@ -78,10 +82,26 @@ export function AdminPriceListEditor({companyId, clientName, initial}: {companyI
   async function importCsv(file: File) {
     setError('');
     try {
-      const added = parseCsv(await file.text());
-      if (!added.length) throw new Error('Nessun prodotto trovato nel file. Usa il modello CSV.');
+      const parsed = parseCsv(await file.text());
+      if (!parsed.length) throw new Error('Nessun prodotto trovato nel file. Usa il modello CSV.');
+      setImporting(true);
+      // Each product is looked up in the Shopify catalog (by handle, or by exact name) for photo and site price.
+      let matches: Record<string, CatalogMatch | null> = {};
+      try {
+        const response = await fetch('/api/admin/pricelists/catalog-match', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({rows: parsed.map((item) => ({key: item.id, handle: item.csvHandle, title: item.title, variant: item.csvVariant}))})});
+        const result = await response.json().catch(() => ({})) as {matches?: Record<string, CatalogMatch | null>; error?: string};
+        if (response.ok && result.matches) matches = result.matches; else setError(result.error || 'Catalogo non raggiungibile: i prodotti sono stati importati come voci libere.');
+      } catch { setError('Catalogo non raggiungibile: i prodotti sono stati importati come voci libere.'); }
+      const added: ClientPriceItem[] = parsed.map(({csvHandle: _handle, csvVariant: _variant, ...item}) => {
+        void _handle; void _variant;
+        const match = matches[item.id];
+        if (!match) return item;
+        return {...item, productId: match.productId, variantId: match.variantId || null, imageUrl: match.imageUrl, detail: item.detail || match.variantTitle, listPrice: item.listPrice ?? (item.pricing === 'area' ? null : match.price || null)};
+      });
+      const linked = added.filter((item) => item.productId).length;
       change([...items, ...added]);
-    } catch (caught) { setError(caught instanceof Error ? caught.message : 'File non valido.'); }
+      setImportNote(`${added.length} ${added.length === 1 ? 'prodotto importato' : 'prodotti importati'}: ${linked} collegati al catalogo con foto${added.length - linked ? `, ${added.length - linked} come voce libera (usa “Collega al catalogo” sulla riga)` : ''}. Controlla e salva.`);
+    } catch (caught) { setError(caught instanceof Error ? caught.message : 'File non valido.'); } finally { setImporting(false); }
   }
 
   return <>
@@ -93,6 +113,7 @@ export function AdminPriceListEditor({companyId, clientName, initial}: {companyI
         <div className="pl-head__actions">{dirty ? <span className="pl-dirty">Modifiche non salvate</span> : null}<button className="button button--primary" disabled={state === 'saving' || (!dirty && state !== 'saved')} onClick={save} type="button">{state === 'saving' ? <Loader2 className="spin" size={16} /> : <Check size={16} />}{state === 'saving' ? 'Salvataggio…' : state === 'saved' ? 'Salvato' : 'Salva listino'}</button></div>
       </div>
       {error ? <p className="form-error">{error}</p> : null}
+      {importNote ? <p className="directory-notice">{importNote}</p> : null}
       <div className="pl-settings">
         <label className="ap-field"><span>Valido fino al <small>facoltativo</small></span><input onChange={(event) => { setValidUntil(event.target.value); setDirty(true); }} type="date" value={validUntil} /></label>
         <label className="ap-field"><span>Nota per il cliente <small>facoltativa</small></span><input maxLength={600} onChange={(event) => { setNote(event.target.value); setDirty(true); }} placeholder="Es. Prezzi validi per ordini con consegna a Roma" value={note} /></label>
@@ -100,7 +121,7 @@ export function AdminPriceListEditor({companyId, clientName, initial}: {companyI
       <div className="pl-tools">
         <button className="button button--primary" onClick={() => setSearching(true)} type="button"><Search size={16} /> Aggiungi dal catalogo</button>
         <button className="button" onClick={() => setEditing('new')} type="button"><PenLine size={16} /> Voce libera</button>
-        <button className="button" onClick={() => fileRef.current?.click()} type="button"><FileUp size={16} /> Importa CSV</button>
+        <button className="button" disabled={importing} onClick={() => fileRef.current?.click()} type="button">{importing ? <Loader2 className="spin" size={16} /> : <FileUp size={16} />} {importing ? 'Collego al catalogo…' : 'Importa CSV'}</button>
         <a className="pl-template" download="modello-listino.csv" href={`data:text/csv;charset=utf-8,${encodeURIComponent(CSV_TEMPLATE)}`}><Download size={14} /> Modello CSV</a>
         <input accept=".csv,text/csv" hidden onChange={(event) => { const file = event.target.files?.[0]; if (file) void importCsv(file); event.target.value = ''; }} ref={fileRef} type="file" />
       </div>
@@ -109,21 +130,22 @@ export function AdminPriceListEditor({companyId, clientName, initial}: {companyI
     {items.length ? <div className="pl-table">
       <div className="pl-table__head"><span>Prodotto</span><span>Prezzi per quantità</span><span>Sito</span><span /></div>
       {items.map((item) => <article className="pl-table__row" key={item.id}>
-        <div className="pl-prod"><span className="lp-img lp-img--sm">{item.imageUrl ? <img alt="" src={item.imageUrl} /> : <Package size={20} />}</span><div>{item.category ? <small>{item.category}</small> : null}<strong>{item.title}</strong>{item.detail ? <p>{item.detail}</p> : null}{item.note ? <em>{item.note}</em> : null}</div></div>
+        <div className="pl-prod"><span className="lp-img lp-img--sm">{item.imageUrl ? <img alt="" src={item.imageUrl} /> : <Package size={20} />}</span><div>{item.category ? <small>{item.category}</small> : null}<strong>{item.title} {item.productId ? <i className="pl-badge pl-badge--on">Catalogo</i> : <i className="pl-badge">Voce libera</i>}</strong>{item.detail ? <p>{item.detail}</p> : null}{item.note ? <em>{item.note}</em> : null}</div></div>
         <div className="pl-tiers">{item.tiers.map((tier, index) => <span key={tier.minQty}>{index === 0 && tier.minQty <= 1 ? null : <small>{item.pricing === 'area' ? `da ${tier.minQty} mq` : `${qty(tier.minQty)}+ ${item.unit}`}</small>}<b>{money(tier.price)}{item.pricing === 'area' ? '/mq' : ''}</b></span>)}</div>
         <div className="pl-site">{item.listPrice ? <s>{money(item.listPrice)}{item.pricing === 'area' ? '/mq' : ''}</s> : '—'}{item.pricing === 'area' ? (item.minArea ? <small>min. {item.minArea} mq/pz</small> : null) : item.minQty > 1 ? <small>min. {qty(item.minQty)}</small> : null}</div>
-        <div className="pl-row-actions"><button className="client-action" onClick={() => setEditing(item)} type="button"><Pencil size={14} />Modifica</button><button aria-label={`Togli ${item.title}`} className="client-action client-action--ghost" onClick={() => remove(item)} type="button"><Trash2 size={14} /></button></div>
+        <div className="pl-row-actions">{!item.productId ? <button className="client-action" onClick={() => setLinking(item)} title="Collega al prodotto del catalogo per foto e prezzo automatico" type="button"><Link2 size={14} />Collega</button> : null}<button className="client-action" onClick={() => setEditing(item)} type="button"><Pencil size={14} />Modifica</button><button aria-label={`Togli ${item.title}`} className="client-action client-action--ghost" onClick={() => remove(item)} type="button"><Trash2 size={14} /></button></div>
       </article>)}
     </div> : <section className="pm-empty"><span><Tags size={26} /></span><div><strong>Listino vuoto</strong><p>Aggiungi i prodotti dal catalogo Shopify, come voce libera o importando un CSV. Il cliente vedrà il listino appena lo salvi.</p></div></section>}
 
     {searching ? <CatalogPicker onClose={() => setSearching(false)} onPick={(item) => { setSearching(false); setEditing(item); }} /> : null}
+    {linking ? <CatalogPicker initialQuery={linking.title} onClose={() => setLinking(null)} onPick={(picked) => { const target = linking; setLinking(null); change(items.map((entry) => entry.id === target.id ? {...entry, productId: picked.productId, variantId: picked.variantId, imageUrl: picked.imageUrl, detail: entry.detail || picked.detail, listPrice: entry.listPrice ?? (entry.pricing === 'area' ? null : picked.listPrice)} : entry)); }} title="Collega al catalogo" /> : null}
     {editing ? <ItemModal categories={categories} item={editing === 'new' ? null : editing} onClose={() => setEditing(null)} onSave={(item) => { change(items.some((entry) => entry.id === item.id) ? items.map((entry) => entry.id === item.id ? item : entry) : [...items, item]); setEditing(null); }} /> : null}
   </>;
 }
 
 // Search the Shopify catalog and pick a variant: it becomes a price list row to complete.
-function CatalogPicker({onClose, onPick}: {onClose: () => void; onPick: (item: ClientPriceItem) => void}) {
-  const [query, setQuery] = useState('');
+function CatalogPicker({onClose, onPick, initialQuery = '', title = 'Aggiungi dal catalogo'}: {onClose: () => void; onPick: (item: ClientPriceItem) => void; initialQuery?: string; title?: string}) {
+  const [query, setQuery] = useState(initialQuery);
   const [products, setProducts] = useState<CatalogProduct[]>([]);
   const [state, setState] = useState<'idle' | 'loading' | 'error'>('idle');
   useEffect(() => {
@@ -140,7 +162,7 @@ function CatalogPicker({onClose, onPick}: {onClose: () => void; onPick: (item: C
     return () => window.clearTimeout(timer);
   }, [query]);
   const pick = (product: CatalogProduct, variant: CatalogProduct['variants'][number]) => onPick({id: newId(), category: '', title: product.title, detail: variant.title === 'Default Title' ? '' : variant.title, productId: product.id, variantId: variant.id, imageUrl: product.imageUrl, listPrice: variant.price || null, pricing: 'unit', minArea: 0, unit: 'pz', tiers: [{minQty: 1, price: variant.price || 0}], minQty: 1, note: ''});
-  return <div aria-modal="true" className="modal-backdrop" role="dialog"><section className="client-request-modal pl-modal"><header className="client-request-modal__head"><div><h2>Aggiungi dal catalogo</h2><p>Cerca un prodotto WowStampa e scegli la variante: poi imposti il prezzo riservato.</p></div><button aria-label="Chiudi" className="modal-close" onClick={onClose} type="button"><X size={19} /></button></header>
+  return <div aria-modal="true" className="modal-backdrop" role="dialog"><section className="client-request-modal pl-modal"><header className="client-request-modal__head"><div><h2>{title}</h2><p>Cerca un prodotto WowStampa e scegli la variante: poi imposti il prezzo riservato.</p></div><button aria-label="Chiudi" className="modal-close" onClick={onClose} type="button"><X size={19} /></button></header>
     <div className="client-request-modal__body">
       <label className="lp-search pl-search"><Search size={16} /><input autoFocus onChange={(event) => setQuery(event.target.value)} placeholder="Es. volantini, t-shirt, adesivi…" value={query} />{state === 'loading' ? <Loader2 className="spin" size={16} /> : null}</label>
       {state === 'error' ? <p className="form-error">Catalogo non disponibile al momento.</p> : null}
@@ -191,22 +213,23 @@ function ItemModal({item, categories, onClose, onSave}: {item: ClientPriceItem |
 }
 
 // CSV (comma or semicolon): one row per quantity tier; rows with the same category/product/details are merged.
-function parseCsv(text: string): ClientPriceItem[] {
+type ImportedItem = ClientPriceItem & {csvHandle: string; csvVariant: string};
+function parseCsv(text: string): ImportedItem[] {
   const lines = text.replace(/^﻿/, '').split(/\r?\n/).filter((line) => line.trim());
   if (lines.length < 2) return [];
   const separator = (lines[0].match(/;/g) || []).length >= (lines[0].match(/,/g) || []).length ? ';' : ',';
   const split = (line: string) => { const cells: string[] = []; let cell = ''; let quoted = false; for (const char of line) { if (char === '"') quoted = !quoted; else if (char === separator && !quoted) { cells.push(cell); cell = ''; } else cell += char; } cells.push(cell); return cells.map((value) => value.trim()); };
   const header = split(lines[0]).map((value) => value.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, '_'));
   const col = (names: string[]) => header.findIndex((value) => names.includes(value));
-  const at = {category: col(['categoria', 'category']), title: col(['prodotto', 'nome', 'product']), detail: col(['dettaglio', 'dettagli', 'descrizione']), unit: col(['unita', 'unit']), qty: col(['quantita', 'qta', 'da']), price: col(['prezzo', 'price']), site: col(['prezzo_sito', 'prezzo_listino']), min: col(['minimo', 'min']), note: col(['note', 'nota'])};
+  const at = {handle: col(['handle', 'link', 'url', 'link_prodotto']), variant: col(['variante', 'variant']), category: col(['categoria', 'category']), title: col(['prodotto', 'nome', 'product']), detail: col(['dettaglio', 'dettagli', 'descrizione']), unit: col(['unita', 'unit']), qty: col(['quantita', 'qta', 'da']), price: col(['prezzo', 'price']), site: col(['prezzo_sito', 'prezzo_listino']), min: col(['minimo', 'min']), note: col(['note', 'nota'])};
   if (at.title < 0 || at.price < 0) throw new Error('Il file deve avere almeno le colonne "prodotto" e "prezzo".');
-  const merged = new Map<string, ClientPriceItem>();
+  const merged = new Map<string, ImportedItem>();
   for (const line of lines.slice(1)) {
     const cells = split(line);
     const get = (index: number) => (index >= 0 ? cells[index] || '' : '');
     const title = get(at.title); const price = num(get(at.price));
     if (!title || !Number.isFinite(price)) continue;
-    const key = [get(at.category), title, get(at.detail)].join('|').toLowerCase();
+    const key = [get(at.category), title, get(at.handle), get(at.variant), get(at.detail)].join('|').toLowerCase();
     const isArea = /^(mq|m2|m²)$/i.test(get(at.unit));
     const rawQty = num(get(at.qty));
     const minQty = isArea ? (rawQty > 0 ? rawQty : 1) : Math.max(1, Math.round(rawQty) || 1);
@@ -214,7 +237,7 @@ function parseCsv(text: string): ClientPriceItem[] {
     if (existing) { if (!existing.tiers.some((tier) => tier.minQty === minQty)) existing.tiers.push({minQty, price}); continue; }
     const site = num(get(at.site)); const min = Math.round(num(get(at.min)));
     const minRaw = num(get(at.min));
-    merged.set(key, {id: newId(), category: get(at.category), title, detail: get(at.detail), productId: null, variantId: null, imageUrl: null, listPrice: Number.isFinite(site) && site > 0 ? site : null, pricing: isArea ? 'area' : 'unit', minArea: isArea && Number.isFinite(minRaw) && minRaw > 0 ? minRaw : 0, unit: isArea ? 'mq' : get(at.unit) || 'pz', tiers: [{minQty, price}], minQty: isArea ? 1 : Number.isFinite(min) && min > 0 ? min : minQty, note: get(at.note)});
+    merged.set(key, {id: newId(), category: get(at.category), title, detail: get(at.detail), productId: null, variantId: null, imageUrl: null, listPrice: Number.isFinite(site) && site > 0 ? site : null, pricing: isArea ? 'area' : 'unit', minArea: isArea && Number.isFinite(minRaw) && minRaw > 0 ? minRaw : 0, unit: isArea ? 'mq' : get(at.unit) || 'pz', tiers: [{minQty, price}], minQty: isArea ? 1 : Number.isFinite(min) && min > 0 ? min : minQty, note: get(at.note), csvHandle: get(at.handle), csvVariant: get(at.variant)});
   }
   return [...merged.values()].map((item) => ({...item, tiers: item.tiers.sort((a, b) => a.minQty - b.minQty)}));
 }
