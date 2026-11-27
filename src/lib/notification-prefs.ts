@@ -3,9 +3,9 @@ import 'server-only';
 import {createAdminClient} from '@/lib/supabase/admin.server';
 
 // Which service emails a client user wants. Everything is on until they switch it off in Impostazioni.
-export type NotificationCategory = 'grafica' | 'preventivi' | 'messaggi';
+export type NotificationCategory = 'grafica' | 'preventivi' | 'messaggi' | 'idee';
 export type NotificationPrefs = Record<NotificationCategory, boolean>;
-export const DEFAULT_PREFS: NotificationPrefs = {grafica: true, preventivi: true, messaggi: true};
+export const DEFAULT_PREFS: NotificationPrefs = {grafica: true, preventivi: true, messaggi: true, idee: true};
 
 export const readPrefs = (value: unknown): NotificationPrefs => ({...DEFAULT_PREFS, ...((value && typeof value === 'object' ? value : {}) as Partial<NotificationPrefs>)});
 
