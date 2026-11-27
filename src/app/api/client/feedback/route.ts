@@ -1,9 +1,10 @@
-import {NextResponse} from 'next/server';
+import {after, NextResponse} from 'next/server';
 import {z} from 'zod';
 
 import {getCurrentProfile} from '@/lib/auth';
 import {FEEDBACK_CATEGORIES} from '@/lib/feedback-categories';
 import {createAdminClient} from '@/lib/supabase/admin.server';
+import {notifyNewIdea} from '@/lib/feedback-notify';
 import {hasActiveSubscription, subscriptionRequired} from '@/lib/access';
 
 const schema = z.object({
@@ -28,5 +29,9 @@ export async function POST(request: Request) {
   }
   // The author automatically supports their own idea.
   await admin.from('feedback_votes').insert({feedback_id: data.id, voter_id: profile.id});
+  after(async () => {
+    const {data: company} = await admin.from('companies').select('name').eq('id', profile.company_id || '').maybeSingle();
+    await notifyNewIdea({id: data.id, ...parsed.data, author: [profile.full_name, company?.name].filter(Boolean).join(' · ') || profile.email}).catch((error) => console.error('[Idea notify]', error));
+  });
   return NextResponse.json({feedback: {id: data.id, createdAt: data.created_at}}, {status: 201});
 }
