@@ -13,6 +13,8 @@ import {AdminFileStorage} from '@/components/admin-file-storage';
 import {getFileStorageSummary} from '@/lib/file-archive';
 import {ARCHIVE_AFTER_DAYS, STORAGE_LIMIT_BYTES, listRequestFiles} from '@/lib/request-files';
 import {AdminInbox} from '@/components/admin-inbox';
+import {AdminPromos, type AdminPromo} from '@/components/admin-promos';
+import {countPromoOrders, listShopifyCollections, promoStage, readStore} from '@/lib/promos';
 import {listConversations, listTeamMembers, type SupportPerson} from '@/lib/support';
 
 const titles: Record<string, string> = {
@@ -23,6 +25,7 @@ const titles: Record<string, string> = {
   crediti: 'Crediti',
   feedback: 'Feedback & idee',
   messaggi: 'Messaggi',
+  promo: 'Promo',
 };
 
 export default async function AdminSectionPage({params, searchParams}: {params: Promise<{section: string}>; searchParams: Promise<{c?: string}>}) {
@@ -35,6 +38,7 @@ export default async function AdminSectionPage({params, searchParams}: {params: 
   if (section === 'richieste') return <RequestsPage />;
   if (section === 'preventivi') return <QuotesAdminPage />;
   if (section === 'feedback') return <FeedbackPage />;
+  if (section === 'promo') return <PromoAdminPage />;
   if (section === 'team-ruoli') return <TeamRolesPage />;
   if (section === 'messaggi') return <MessagesPage companyId={(await searchParams).c} />;
 
@@ -73,6 +77,19 @@ async function TeamRolesPage() {
     operators = (data || []).filter((operator) => ['admin', 'staff', 'graphic_operator'].includes(operator.role)).map((operator) => ({id: operator.id, email: operator.email, fullName: operator.full_name || operator.email, role: operator.role, status: operator.status, createdAt: operator.created_at, phone: phoneById.get(operator.id) || null}));
   } catch (error) { console.error('[Team directory]', error); hasLoadError = true; }
   return <><PageHeader eyebrow="WowStampa · Amministrazione" title="Team & ruoli" /><main className="page-content">{hasLoadError ? <section className="empty-card empty-card--section"><span className="eyebrow">REGISTRO NON DISPONIBILE</span><h2>Impossibile caricare il team</h2><p>Verifica la configurazione Supabase del servizio e riprova.</p></section> : <AdminTeamDirectory initialOperators={operators} />}</main></>;
+}
+
+async function PromoAdminPage() {
+  await requireProfile(['staff', 'admin']);
+  const store = await readStore().catch(() => null);
+  const promos = store?.promos || [];
+  const now = new Date().getTime();
+  const [collections, orders] = await Promise.all([
+    listShopifyCollections().catch((error) => { console.error('[Promo collections]', error); return null; }),
+    Promise.all(promos.map((promo) => promoStage(promo, now) === 'upcoming' ? Promise.resolve(null) : countPromoOrders(promo.code).catch(() => null))),
+  ]);
+  const items: AdminPromo[] = promos.map((promo, index) => ({...promo, stage: promoStage(promo, now), orders: orders[index]}));
+  return <><PageHeader eyebrow="WowStampa · Programma WOWPRO" title="Promo" /><main className="page-content">{store ? <AdminPromos collections={collections} initialPromos={items} /> : <section className="empty-card empty-card--section"><span className="eyebrow">PROMO NON DISPONIBILI</span><h2>Impossibile caricare le promo</h2><p>Riprova tra qualche istante.</p></section>}</main></>;
 }
 
 async function FeedbackPage() {
