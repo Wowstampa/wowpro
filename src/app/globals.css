@@ -2281,3 +2281,35 @@ textarea.bk-input { resize: vertical; line-height: 1.5; }
 .fx-similar button { padding: 6px 10px; display: inline-flex; align-items: center; gap: 4px; border: 1px solid #dce3eb; border-radius: 8px; background: white; color: #3a4556; font: inherit; font-size: 11.5px; font-weight: 800; cursor: pointer; white-space: nowrap; }
 .fx-similar button.is-voted { border-color: var(--green); background: var(--green); color: white; }
 @media (max-width: 560px) { .fx-modal__cats { grid-template-columns: 1fr; } }
+/* Feedback: scope filter and roadmap */
+.fx-tools { justify-content: flex-start; }
+.fx-tools__spacer { flex: 1; }
+.fx-scope { padding: 3px; display: flex; gap: 2px; border: 1px solid var(--line); border-radius: 11px; background: white; }
+.fx-scope button { padding: 7px 12px; border: 0; border-radius: 8px; background: transparent; color: #5b6575; font-size: 12px; font-weight: 800; white-space: nowrap; }
+.fx-scope button.is-on { background: var(--green-soft, #eaf6ef); color: var(--green-dark); }
+.fx-roadmap { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; align-items: start; }
+.fx-road { overflow: hidden; border: 1px solid var(--line); border-radius: 18px; background: #f6f8fa; }
+.fx-road > header { padding: 14px 16px; display: grid; grid-template-columns: 36px 1fr auto; gap: 11px; align-items: center; border-bottom: 1px solid var(--line); background: white; }
+.fx-road > header strong { display: block; font-size: 14px; }
+.fx-road > header small { color: #8a95a5; font-size: 11.5px; font-weight: 600; }
+.fx-road > header b { min-width: 28px; height: 28px; padding: 0 8px; display: grid; place-items: center; border-radius: 999px; background: #f1f4f7; font-size: 13px; }
+.fx-road__icon { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 11px; }
+.fx-road--evaluating .fx-road__icon { background: #fff4e0; color: #9a5b00; }
+.fx-road--implementing .fx-road__icon { background: #eaf6ef; color: #0b7a39; }
+.fx-road--completed .fx-road__icon { background: var(--green); color: white; }
+.fx-road--evaluating { box-shadow: inset 0 3px 0 #f3a712; }
+.fx-road--implementing { box-shadow: inset 0 3px 0 #7fd3a2; }
+.fx-road--completed { box-shadow: inset 0 3px 0 var(--green); }
+.fx-road__list { padding: 12px; display: grid; gap: 10px; }
+.fx-road__card { padding: 14px; display: grid; gap: 8px; justify-items: start; border: 1px solid var(--line); border-radius: 14px; background: white; box-shadow: 0 1px 2px rgba(16,24,40,.04); }
+.fx-road__card > strong { font-size: 14px; line-height: 1.35; }
+.fx-road__card > p { margin: 0; display: flex; gap: 6px; color: #5b6575; font-size: 12px; line-height: 1.45; }
+.fx-road__card > p svg { flex: 0 0 auto; margin-top: 2px; color: var(--green-dark); }
+.fx-road__card footer { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.fx-road__card footer small { color: #8a95a5; font-size: 11.5px; }
+.fx-minivote { padding: 5px 10px; display: inline-flex; align-items: center; gap: 4px; border: 1px solid #dfe5ec; border-radius: 8px; background: white; color: #3a4556; font-size: 12px; font-weight: 800; }
+.fx-minivote:hover:not(.is-voted) { border-color: var(--green); color: var(--green-dark); }
+.fx-minivote.is-voted { border-color: var(--green); background: var(--green); color: white; }
+.fx-road__empty { padding: 22px 12px; border: 1.5px dashed #dbe2ea; border-radius: 14px; color: #8a95a5; font-size: 12.5px; text-align: center; }
+@media (max-width: 900px) { .fx-roadmap { grid-template-columns: 1fr; } }
+@media (max-width: 560px) { .fx-scope { width: 100%; overflow-x: auto; } .fx-tools__spacer { display: none; } }
