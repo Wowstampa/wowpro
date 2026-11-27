@@ -2627,3 +2627,5 @@ textarea.bk-input { resize: vertical; line-height: 1.5; }
 .pl-tiers b { font-size: 15px; letter-spacing: -.01em; }
 .pl-site { color: #9aa4b2; font-weight: 600; }
 .pl-site s { color: #9aa4b2; }
+.pl-badge { margin-left: 6px; padding: 2px 7px; border-radius: 999px; background: #f1f4f7; color: #8a95a5; font-size: 10px; font-style: normal; font-weight: 800; vertical-align: 2px; }
+.pl-badge--on { background: #eaf6ef; color: #0b7a39; }
