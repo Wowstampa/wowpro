@@ -75,15 +75,16 @@ export async function buildPriceListPdf(list: PriceList, clientName: string) {
     y -= 28;
     for (const item of items) {
       const title = wrap(item.title, bold, 10, cols.tiers - cols.desc - 14);
-      const detail = [item.detail, item.note, item.minQty > 1 ? `Minimo ${qty(item.minQty)} ${item.unit}` : ''].filter(Boolean).join(' · ');
+      const area = item.pricing === 'area';
+      const detail = [item.detail, area ? `Prezzo al mq: base x altezza${item.minArea ? `, minimo ${item.minArea} mq a pezzo` : ''}` : '', item.note, !area && item.minQty > 1 ? `Minimo ${qty(item.minQty)} ${item.unit}` : ''].filter(Boolean).join(' · ');
       const detailLines = detail ? wrap(detail, regular, 8.5, cols.tiers - cols.desc - 14).slice(0, 4) : [];
-      const tierLines = item.tiers.map((tier) => `${qty(tier.minQty)}+ ${item.unit}: ${money(tier.price)}`);
+      const tierLines = item.tiers.map((tier) => area ? `da ${tier.minQty} mq: ${money(tier.price)}/mq` : `${qty(tier.minQty)}+ ${item.unit}: ${money(tier.price)}`);
       const rowHeight = Math.max(title.length * 13 + detailLines.length * 11, tierLines.length * 12) + 14;
       ensure(rowHeight);
       title.forEach((part, index) => text(part, cols.desc, y - index * 13, 10, bold));
       detailLines.forEach((part, index) => text(part, cols.desc, y - title.length * 13 - index * 11 + 2, 8.5, regular, MUTED));
       tierLines.forEach((part, index) => text(part, cols.tiers, y - index * 12, 9));
-      right(`${money(bestPrice(item))}/${item.unit}`, cols.best, y, 10.5, bold, GREEN);
+      right(`${money(bestPrice(item))}/${area ? 'mq' : item.unit}`, cols.best, y, 10.5, bold, GREEN);
       const saving = savingPercent(item);
       if (item.listPrice) right(`sito ${money(item.listPrice)}${saving ? `  -${saving}%` : ''}`, cols.best, y - 13, 8, regular, MUTED);
       y -= rowHeight;
