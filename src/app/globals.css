@@ -2606,3 +2606,19 @@ textarea.bk-input { resize: vertical; line-height: 1.5; }
   .pl-settings { grid-template-columns: 1fr; }
   .pl-table__head { display: none; } .pl-table__row { grid-template-columns: 1fr; }
 }
+/* Listino: products priced per m² */
+.lp-calc { grid-column: 1 / -1; padding: 12px 14px; display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap; border-radius: 14px; background: #f6f8fa; }
+.lp-calc label { display: grid; gap: 4px; color: #6b7686; font-size: 11px; font-weight: 800; }
+.lp-calc label > div { height: 40px; display: flex; align-items: center; border: 1px solid #dce3eb; border-radius: 10px; background: white; overflow: hidden; }
+.lp-calc input { width: 78px; height: 100%; padding: 0 10px; border: 0; outline: 0; font: inherit; font-size: 14px; font-weight: 700; color: var(--ink); }
+.lp-calc__pcs input { width: 62px; }
+.lp-calc label i { padding: 0 10px; color: #8a95a5; font-style: normal; font-size: 12px; font-weight: 700; }
+.lp-calc label > div:focus-within { border-color: var(--green); box-shadow: 0 0 0 3px rgba(29,182,91,.12); }
+.lp-calc__x { padding-bottom: 10px; color: #9aa4b2; font-weight: 800; }
+.lp-calc__result { flex: 1; min-width: 200px; display: grid; gap: 2px; padding-bottom: 2px; }
+.lp-calc__result small { color: #6b7686; font-size: 12px; }
+.lp-calc__result strong { color: #0b7a39; font-size: 20px; letter-spacing: -.02em; }
+.lp-calc__result em { color: #6b7686; font-size: 12px; font-style: normal; font-weight: 600; letter-spacing: 0; }
+.lp-calc .lp-btn:disabled { opacity: .5; cursor: not-allowed; }
+@media (max-width: 560px) { .lp-calc__result { flex-basis: 100%; } .lp-calc .lp-btn { width: 100%; justify-content: center; } }
+.pl-tiers .pl-area { border-style: dashed; background: #f4faf6; } .pl-tiers .pl-area b { color: #172130; font-size: 12px; }
