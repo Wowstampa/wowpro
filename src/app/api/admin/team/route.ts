@@ -3,6 +3,7 @@ import {z} from 'zod';
 
 import {getCurrentProfile} from '@/lib/auth';
 import {createAdminClient} from '@/lib/supabase/admin.server';
+import {writeTeamMemberToAirtable} from '@/lib/access-sync';
 
 const createOperatorSchema = z.object({
   fullName: z.string().trim().min(2).max(120),
@@ -31,7 +32,10 @@ export async function POST(request: Request) {
       .select('id,email,full_name,role,status,created_at')
       .single();
     if (profileError || !createdProfile) throw profileError || new Error('Profilo non creato.');
-    return NextResponse.json({operator: createdProfile}, {status: 201});
+    let warning: string | undefined;
+    try { await writeTeamMemberToAirtable({email: createdProfile.email, fullName: parsed.data.fullName, role: parsed.data.role, status: 'active'}); }
+    catch (airtableError) { console.error('[Team Airtable]', airtableError); warning = 'Invito inviato, ma la persona non è stata aggiunta in Airtable (Utenti): aggiungila a mano, altrimenti la sincronizzazione le toglie l’accesso.'; }
+    return NextResponse.json({operator: createdProfile, warning}, {status: 201});
   } catch (error) {
     console.error('[Team invite]', error);
     return NextResponse.json({error: 'Impossibile invitare l’operatore.'}, {status: 502});
