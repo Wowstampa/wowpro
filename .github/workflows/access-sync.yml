@@ -1,0 +1,14 @@
+name: Sincronizza accessi da Airtable
+
+# Every 15 minutes: portal roles and access follow the Clienti and Utenti tables in Airtable.
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Sync access
+        run: curl -fsS --max-time 120 --retry 2 --retry-delay 30 https://wowpro.it/api/cron/access-sync
