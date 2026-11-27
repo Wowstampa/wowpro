@@ -2485,3 +2485,6 @@ textarea.bk-input { resize: vertical; line-height: 1.5; }
   .ap-row { grid-template-columns: 64px minmax(0, 1fr); } .ap-thumb { width: 64px; height: 64px; } .ap-actions { grid-column: 1 / -1; }
   .ap-form, .ap-dates, .ap-modes { grid-template-columns: 1fr; }
 }
+.ap-modes button { grid-template-columns: 17px 1fr; column-gap: 9px; align-items: start; }
+.ap-modes button > span:nth-child(2) { font-size: 13px; }
+.ap-modes button small { grid-column: 2; }
