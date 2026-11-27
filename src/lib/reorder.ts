@@ -2,7 +2,7 @@
 import type {CustomerOrder} from '@/lib/integrations/shopify';
 
 export type ReorderItem = {productId: string; variantId: string; productTitle: string; variantTitle: string; imageUrl: string | null; quantity: number; note: string; listPrice: number | null; options?: Array<{name: string; value: string}>; graphicRequest?: {id: string; publicId: string; title: string} | null};
-export type ReorderDraft = {items: ReorderItem[]; notes: string; source: string};
+export type ReorderDraft = {items: ReorderItem[]; notes: string; source: string; promo?: {code: string; title: string; discount: string}};
 
 const KEY = 'wowpro:reorder';
 export const REORDER_URL = '/dashboard/richieste?tab=preventivi&new=reorder';
@@ -16,7 +16,7 @@ export function takeReorder(): ReorderDraft | null {
     const raw = window.sessionStorage.getItem(KEY);
     window.sessionStorage.removeItem(KEY);
     const draft = raw ? JSON.parse(raw) as ReorderDraft : null;
-    return draft?.items?.length ? draft : null;
+    return draft?.items?.length || draft?.promo ? draft : null;
   } catch { return null; }
 }
 
