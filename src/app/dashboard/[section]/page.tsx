@@ -8,6 +8,8 @@ import {ClientOrders} from '@/components/client-orders';
 import {OpenChatButton} from '@/components/support-widget';
 import {MobileTabs} from '@/components/mobile-tabs';
 import {SupportChat} from '@/components/support-chat';
+import {ClientPromos} from '@/components/client-promos';
+import {getClientPromos, type ClientPromo} from '@/lib/promo-view';
 import {ClientFeedbackBoard, type FeedbackItem} from '@/components/client-feedback-board';
 import {getConversationCompany} from '@/lib/support';
 import {createAdminClient} from '@/lib/supabase/admin.server';
@@ -36,7 +38,7 @@ import {readPrefs} from '@/lib/notification-prefs';
 import {BrandKitEditor} from '@/components/brand-kit';
 import {readBrandKit, toBrandKitView} from '@/lib/brand-kit';
 
-const titles: Record<string, string> = {workspace: 'Dashboard', 'brand-kit': 'Brand kit', crediti: 'Piano e crediti', file: 'File', fatture: 'Piano e crediti', impostazioni: 'Impostazioni', richieste: 'Richieste grafiche', ordini: 'Ordini', abbonamento: 'Abbonamento', preventivi: 'Preventivi', supporto: 'Messaggi', feedback: 'Feedback & idee'};
+const titles: Record<string, string> = {workspace: 'Dashboard', 'brand-kit': 'Brand kit', crediti: 'Piano e crediti', file: 'File', fatture: 'Piano e crediti', impostazioni: 'Impostazioni', richieste: 'Richieste grafiche', ordini: 'Ordini', abbonamento: 'Abbonamento', preventivi: 'Preventivi', supporto: 'Messaggi', feedback: 'Feedback & idee', promo: 'Promo in anteprima'};
 
 export default async function ClientSectionPage({params, searchParams}: {params: Promise<{section: string}>; searchParams: Promise<Record<string, string | string[] | undefined>>}) {
   const {section} = await params;
@@ -57,6 +59,7 @@ export default async function ClientSectionPage({params, searchParams}: {params:
   if (section === 'preventivi') return redirectQuotes(await searchParams);
   if (section === 'supporto') return <SupportPage />;
   if (section === 'feedback') return <FeedbackPage />;
+  if (section === 'promo') return <PromoPage />;
   const title = titles[section] || 'WOWPRO';
   return <><PageHeader eyebrow="WOWPRO · Area cliente" title={title} /><main className="page-content"><section className="empty-card empty-card--section"><span className="eyebrow">IN PREPARAZIONE</span><h2>{title}</h2><p>Questo spazio verrà collegato ai dati del tuo account.</p></section></main></>;
 }
@@ -241,6 +244,17 @@ async function OrdersPage() {
     hasLoadError = true;
   }
   return <><PageHeader eyebrow="WOWPRO · Area cliente" title="Ordini" /><main className="page-content">{hasLoadError ? <section className="empty-card empty-card--section"><span className="eyebrow">COLLEGAMENTO NON DISPONIBILE</span><h2>Impossibile caricare gli ordini</h2><p>Riprova tra qualche istante. Se il problema continua, contatta il tuo account manager.</p></section> : <ClientOrders invoices={Object.fromEntries(invoices.filter((invoice) => invoice.orderName).map((invoice) => [invoice.orderName!, invoice.id]))} orders={orders} />}</main></>;
+}
+
+async function PromoPage() {
+  const profile = await requireProfile(['client']);
+  const supabase = await createClient();
+  const {data: company} = await supabase.from('companies').select('airtable_record_id').eq('id', profile.company_id || '').maybeSingle();
+  let promos: ClientPromo[] = [];
+  let failed = false;
+  const now = new Date().getTime();
+  try { promos = await getClientPromos(profile.id, company?.airtable_record_id || null, profile.email); } catch (error) { console.error('[Client promos]', error); failed = true; }
+  return <><PageHeader eyebrow="WOWPRO · Area cliente" title="Promo in anteprima" /><main className="page-content">{failed ? <section className="empty-card empty-card--section"><span className="eyebrow">PROMO NON DISPONIBILI</span><h2>Impossibile caricare le promo</h2><p>Riprova tra qualche istante.</p></section> : <ClientPromos now={now} promos={promos} />}</main></>;
 }
 
 async function FeedbackPage() {
