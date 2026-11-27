@@ -29,7 +29,7 @@ const AM_LABEL = 'Da consigliare (account manager)';
 // Product configurator for quote requests: the same options the customer finds on wowstampa.com.
 export type PendingResult = {item: ConfiguredItem} | {error: string} | null;
 
-export function QuoteConfigurator({product, onBack, onAdd, registerPending}: {product: CatalogPick; onBack: () => void; onAdd: (item: ConfiguredItem) => void; registerPending?: (build: (() => PendingResult) | null) => void}) {
+export function QuoteConfigurator({product, onBack, onAdd, registerPending, reservedLabel, initialSize, initialQuantity}: {product: CatalogPick; onBack: () => void; onAdd: (item: ConfiguredItem) => void; registerPending?: (build: (() => PendingResult) | null) => void; reservedLabel?: string; initialSize?: {width: number; height: number} | null; initialQuantity?: number}) {
   const [config, setConfig] = useState<Config | null>(null);
   const [loadError, setLoadError] = useState('');
   const [selected, setSelected] = useState<string[]>([]);
@@ -37,7 +37,7 @@ export function QuoteConfigurator({product, onBack, onAdd, registerPending}: {pr
   const [sizes, setSizes] = useState<Record<string, Record<string, number>>>({});
   const [width, setWidth] = useState('');
   const [height, setHeight] = useState('');
-  const [quantity, setQuantity] = useState(1);
+  const [quantity, setQuantity] = useState(Math.max(1, initialQuantity || 1));
   const [note, setNote] = useState('');
   const [image, setImage] = useState<string | null>(null);
   const [error, setError] = useState('');
@@ -52,10 +52,11 @@ export function QuoteConfigurator({product, onBack, onAdd, registerPending}: {pr
         setConfig(next);
         setSelected(first?.options || []);
         setFieldValues(Object.fromEntries(next.fields.filter((field) => field.kind === 'choice' || field.kind === 'swatch' || field.kind === 'text').map((field) => [field.id, 'preselect' in field ? field.preselect : ''])));
-        if (next.dimensions) { setWidth(String(next.dimensions.formats[0]?.base || next.dimensions.defaultWidth)); setHeight(String(next.dimensions.formats[0]?.height || next.dimensions.defaultHeight)); }
+        if (next.dimensions) { setWidth(String(initialSize?.width || next.dimensions.formats[0]?.base || next.dimensions.defaultWidth)); setHeight(String(initialSize?.height || next.dimensions.formats[0]?.height || next.dimensions.defaultHeight)); }
       })
       .catch((caught) => { if (active) setLoadError(caught instanceof Error ? caught.message : 'Dettagli non disponibili.'); });
     return () => { active = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the starting size only applies to the first load
   }, [product.handle]);
 
   const delegatedVariant = selected.some((value) => value === AM);
@@ -133,7 +134,7 @@ export function QuoteConfigurator({product, onBack, onAdd, registerPending}: {pr
       <div className="qc__title">
         <span className="qc__eyebrow">Configura il prodotto</span>
         <h4>{product.title}</h4>
-        {fromPrice !== null ? <p>Prezzo indicativo da <b>{euro(fromPrice)}</b> + IVA<br /><small>Il tuo account manager ti conferma l’offerta con il prezzo WOWPRO riservato.</small></p> : null}
+        {reservedLabel ? <p className="qc__reserved">Dal tuo listino riservato: <b>{reservedLabel}</b> + IVA<br /><small>Prezzo indicativo: scegli le opzioni, il tuo account manager ti conferma l’offerta.</small></p> : fromPrice !== null ? <p>Prezzo indicativo da <b>{euro(fromPrice)}</b> + IVA<br /><small>Il tuo account manager ti conferma l’offerta con il prezzo WOWPRO riservato.</small></p> : null}
         {config?.url ? <a href={config.url} rel="noreferrer" target="_blank">Vedi sul sito <ExternalLink size={12} /></a> : null}
       </div>
     </div>

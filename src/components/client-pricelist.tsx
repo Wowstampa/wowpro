@@ -9,7 +9,7 @@ import {PageIntro} from '@/components/page-intro';
 import {OpenChatButton} from '@/components/support-widget';
 import {REORDER_URL, saveReorder} from '@/lib/reorder';
 
-export type ClientPriceItem = {id: string; category: string; title: string; detail: string; productId: string | null; variantId: string | null; imageUrl: string | null; listPrice: number | null; pricing?: 'unit' | 'area'; minArea?: number; unit: string; tiers: Array<{minQty: number; price: number}>; minQty: number; note: string};
+export type ClientPriceItem = {id: string; category: string; title: string; detail: string; productId: string | null; variantId: string | null; imageUrl: string | null; listPrice: number | null; pricing?: 'unit' | 'area'; minArea?: number; handle?: string | null; productUrl?: string | null; unit: string; tiers: Array<{minQty: number; price: number}>; minQty: number; note: string};
 export type ClientPriceList = {items: ClientPriceItem[]; validUntil: string; note: string; updatedAt: string | null};
 
 const money = (value: number) => new Intl.NumberFormat('it-IT', {style: 'currency', currency: 'EUR', minimumFractionDigits: 2, maximumFractionDigits: 4}).format(value);
@@ -39,7 +39,20 @@ export function ClientPriceListView({list, clientName, managerName}: {list: Clie
   const average = savings.length ? Math.round(savings.reduce((total, value) => total + value, 0) / savings.length) : 0;
   const expired = list.validUntil && list.validUntil < new Date().toISOString().slice(0, 10);
 
+  // Catalog products open the shop's configurator (variants, finishes, sizes) with the reserved price shown.
+  function configure(item: ClientPriceItem, size: {width: number; height: number} | null, quantity: number) {
+    if (!item.handle || !item.productId) return false;
+    const cheapest = best(item);
+    saveReorder({source: 'il tuo listino', notes: '', items: [], configure: {
+      product: {id: item.productId, handle: item.handle, title: item.title, imageUrl: item.imageUrl, url: item.productUrl || null, variants: []},
+      reserved: `${item.tiers.length > 1 ? 'da ' : ''}${money(cheapest)}${item.pricing === 'area' ? '/mq' : `/${item.unit}`}`, size, quantity,
+    }});
+    router.push(REORDER_URL);
+    return true;
+  }
+
   function quoteArea(item: ClientPriceItem, size: {width: number; height: number; pieces: number}) {
+    if (configure(item, {width: size.width, height: size.height}, size.pieces)) return;
     const result = areaQuote(item, size.width, size.height, size.pieces);
     const catalog = item.productId && item.variantId;
     saveReorder({source: 'il tuo listino', notes: '', items: [{
@@ -52,6 +65,7 @@ export function ClientPriceListView({list, clientName, managerName}: {list: Clie
   }
 
   function quote(item: ClientPriceItem) {
+    if (configure(item, null, item.minQty)) return;
     const price = item.tiers.reduce((current, tier) => (item.minQty >= tier.minQty ? tier.price : current), item.tiers[0]?.price ?? null);
     saveReorder({source: 'il tuo listino', notes: '', items: [{
       productId: item.productId && item.variantId ? item.productId : 'custom', variantId: item.productId && item.variantId ? item.variantId : '',

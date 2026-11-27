@@ -95,8 +95,9 @@ function NewQuoteModal({onClose, onCreated, linked, initial}: {onClose: () => vo
   const [term, setTerm] = useState('');
   const [products, setProducts] = useState<Product[] | null>(null);
   const [isSearching, setIsSearching] = useState(false);
-  const [picked, setPicked] = useState<Product | null>(null);
-  const [mode, setMode] = useState<'choose' | 'catalog' | 'custom'>('choose');
+  const [picked, setPicked] = useState<Product | null>(initial?.configure?.product || null);
+  const [mode, setMode] = useState<'choose' | 'catalog' | 'custom'>(initial?.configure ? 'catalog' : 'choose');
+  const reserved = initial?.configure && picked?.id === initial.configure.product.id ? initial.configure : null;
   const [items, setItems] = useState<Item[]>(() => (initial?.items || []) as Item[]);
   const pendingRef = useRef<(() => PendingResult) | null>(null);
   const [hasPending, setHasPending] = useState(false);
@@ -160,7 +161,7 @@ function NewQuoteModal({onClose, onCreated, linked, initial}: {onClose: () => vo
         {mode === 'catalog' ? <>
         <header className="quote-new__head"><div><span className="buy-form__step">Catalogo WowStampa</span><h3>Scegli i prodotti</h3></div><button className="quote-new__switch" onClick={() => { setPicked(null); setMode('custom'); }} type="button"><PenLine size={14} /> Richiesta personalizzata</button></header>
         <label className="quote-new__search"><Search size={17} /><input autoFocus onChange={(event) => setTerm(event.target.value)} placeholder="Cerca: roll-up, banner, adesivi, t-shirt…" value={term} />{isSearching ? <Loader2 className="spin" size={16} /> : null}</label>
-        {picked ? <QuoteConfigurator registerPending={registerPending} onAdd={(item) => { setItems((current) => [...current, item]); setPicked(null); }} onBack={() => setPicked(null)} product={picked} />
+        {picked ? <QuoteConfigurator initialQuantity={reserved?.quantity} initialSize={reserved?.size || null} registerPending={registerPending} reservedLabel={reserved?.reserved} onAdd={(item) => { setItems((current) => [...current, item]); setPicked(null); }} onBack={() => setPicked(null)} product={picked} />
           : <div className="quote-new__results">
           {products?.map((product) => <button key={product.id} onClick={() => pick(product)} type="button">{product.imageUrl ? <img alt="" src={product.imageUrl} /> : <i><Package size={20} /></i>}<strong>{product.title}</strong><small>{product.variants.length ? `da ${euro(Math.min(...product.variants.map((item) => item.price)))}` : ''}</small></button>)}
           {products && !products.length ? <p className="quotes__none">Nessun prodotto trovato. <button className="quote-new__inline" onClick={() => setMode('custom')} type="button">Fai una richiesta personalizzata</button></p> : null}
