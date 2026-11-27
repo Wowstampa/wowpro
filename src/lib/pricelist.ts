@@ -1,0 +1,76 @@
+import 'server-only';
+
+import {z} from 'zod';
+
+import {REQUEST_FILES_BUCKET, ensureRequestFilesBucket} from '@/lib/request-files';
+import {createAdminClient} from '@/lib/supabase/admin.server';
+
+// Each client's reserved price list, written by the team. One JSON document per company in storage
+// (no database change). Prices are per unit, VAT excluded, with optional quantity tiers.
+
+export const tierSchema = z.object({minQty: z.coerce.number().int().min(1).max(1_000_000), price: z.coerce.number().nonnegative().max(1_000_000)});
+export const priceItemSchema = z.object({
+  id: z.string().trim().min(1).max(60),
+  category: z.string().trim().max(60).default(''),
+  title: z.string().trim().min(1, 'Ogni prodotto deve avere un nome.').max(160),
+  detail: z.string().trim().max(400).default(''),
+  productId: z.string().trim().max(120).nullable().default(null),
+  variantId: z.string().trim().max(120).nullable().default(null),
+  imageUrl: z.string().trim().url().max(600).nullable().default(null),
+  listPrice: z.coerce.number().nonnegative().max(1_000_000).nullable().default(null),
+  unit: z.string().trim().max(20).default('pz'),
+  tiers: z.array(tierSchema).min(1, 'Ogni prodotto deve avere almeno un prezzo.').max(12),
+  minQty: z.coerce.number().int().min(1).max(1_000_000).default(1),
+  note: z.string().trim().max(300).default(''),
+});
+export const priceListSchema = z.object({
+  items: z.array(priceItemSchema).max(500),
+  validUntil: z.union([z.string().regex(/^\d{4}-\d{2}-\d{2}$/), z.literal('')]).default(''),
+  note: z.string().trim().max(600).default(''),
+});
+export type PriceItem = z.infer<typeof priceItemSchema>;
+export type PriceList = z.infer<typeof priceListSchema> & {updatedAt: string | null; updatedBy: string | null};
+
+export const EMPTY_PRICE_LIST: PriceList = {items: [], validUntil: '', note: '', updatedAt: null, updatedBy: null};
+const pathOf = (companyId: string) => `pricelists/${companyId}.json`;
+
+export async function readPriceList(companyId: string): Promise<PriceList> {
+  const {data} = await createAdminClient().storage.from(REQUEST_FILES_BUCKET).download(pathOf(companyId));
+  if (!data) return {...EMPTY_PRICE_LIST};
+  try { return {...EMPTY_PRICE_LIST, ...(JSON.parse(await data.text()) as Partial<PriceList>)}; } catch { return {...EMPTY_PRICE_LIST}; }
+}
+
+export async function writePriceList(companyId: string, list: z.infer<typeof priceListSchema>, updatedBy: string) {
+  await ensureRequestFilesBucket();
+  // Tiers sorted by quantity; the minimum order is never below the first tier.
+  const items = list.items.map((item) => {
+    const tiers = [...item.tiers].sort((a, b) => a.minQty - b.minQty);
+    return {...item, tiers, minQty: Math.max(item.minQty, tiers[0]?.minQty || 1)};
+  });
+  const body: PriceList = {...list, items, updatedAt: new Date().toISOString(), updatedBy};
+  const {error} = await createAdminClient().storage.from(REQUEST_FILES_BUCKET).upload(pathOf(companyId), new Blob([JSON.stringify(body)], {type: 'application/json'}), {upsert: true, contentType: 'application/json'});
+  if (error) throw error;
+  return body;
+}
+
+// Unit price for a quantity: the best tier reached (the first tier below its minimum).
+export function priceFor(item: Pick<PriceItem, 'tiers'>, quantity: number) {
+  const tiers = [...item.tiers].sort((a, b) => a.minQty - b.minQty);
+  let price = tiers[0]?.price ?? null;
+  for (const tier of tiers) if (quantity >= tier.minQty) price = tier.price;
+  return price;
+}
+
+export const bestPrice = (item: Pick<PriceItem, 'tiers'>) => Math.min(...item.tiers.map((tier) => tier.price));
+export function savingPercent(item: Pick<PriceItem, 'tiers' | 'listPrice'>) {
+  if (!item.listPrice || item.listPrice <= 0) return null;
+  const pct = Math.round((1 - bestPrice(item) / item.listPrice) * 100);
+  return pct > 0 ? pct : null;
+}
+
+// The reserved price for a product a client puts in a quote (matched by variant, then by product).
+export function matchPriceItem(list: PriceList, line: {variantId?: string | null; productId?: string | null; productTitle?: string}) {
+  return list.items.find((item) => item.variantId && line.variantId && item.variantId === line.variantId)
+    || list.items.find((item) => !item.variantId && item.productId && line.productId && item.productId === line.productId)
+    || null;
+}
