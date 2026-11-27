@@ -147,12 +147,15 @@ export type CustomerOrder = {
   creditsOnly: boolean;
   subscriptionPlan: string | null;
   shipments: Array<{status: string | null; company: string | null; number: string | null; url: string | null}>;
+  discountCodes: string[];
+  discountTotal: number;
 };
 
 type OrdersQuery = {orders: {nodes: Array<{
   id: string; name: string; createdAt: string; cancelledAt: string | null;
   displayFinancialStatus: string | null; displayFulfillmentStatus: string | null; statusPageUrl: string | null;
   totalPriceSet: {shopMoney: {amount: string; currencyCode: string}};
+  discountCodes: string[]; totalDiscountsSet: {shopMoney: {amount: string}} | null;
   lineItems: {nodes: Array<{title: string; variantTitle: string | null; quantity: number; image: {url: string} | null; product: {id: string} | null; variant: {id: string} | null; sellingPlan: {name: string} | null}>};
   fulfillments: Array<{displayStatus: string | null; trackingInfo: Array<{company: string | null; number: string | null; url: string | null}>}>;
 }>}};
@@ -187,6 +190,7 @@ export async function listCustomerOrders({customerId, email}: {customerId?: stri
         nodes {
           id name createdAt cancelledAt displayFinancialStatus displayFulfillmentStatus statusPageUrl
           totalPriceSet { shopMoney { amount currencyCode } }
+          discountCodes totalDiscountsSet { shopMoney { amount } }
           lineItems(first: 30) { nodes { title variantTitle quantity product { id } variant { id } sellingPlan { name } image { url(transform: {maxWidth: 120, maxHeight: 120}) } } }
           fulfillments(first: 10) { displayStatus trackingInfo(first: 5) { company number url } }
         }
@@ -205,6 +209,8 @@ export async function listCustomerOrders({customerId, email}: {customerId?: stri
     total: Number(order.totalPriceSet.shopMoney.amount),
     currency: order.totalPriceSet.shopMoney.currencyCode,
     statusPageUrl: order.statusPageUrl,
+    discountCodes: order.discountCodes || [],
+    discountTotal: Number(order.totalDiscountsSet?.shopMoney.amount || 0),
     items: order.lineItems.nodes.map((item) => ({title: item.title, variantTitle: item.variantTitle, quantity: item.quantity, imageUrl: item.image?.url || null, productId: item.product?.id || null, variantId: item.variant?.id || null})),
     creditsOnly: order.lineItems.nodes.length > 0 && order.lineItems.nodes.every((item) => item.product?.id === creditsProduct),
     subscriptionPlan: order.lineItems.nodes.find((item) => item.sellingPlan)?.sellingPlan?.name || null,
