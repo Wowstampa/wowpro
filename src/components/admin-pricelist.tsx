@@ -17,7 +17,7 @@ const qty = (value: number) => new Intl.NumberFormat('it-IT', {useGrouping: 'alw
 const day = (value: string) => new Intl.DateTimeFormat('it-IT', {day: 'numeric', month: 'short', year: 'numeric'}).format(new Date(value.length === 10 ? `${value}T12:00:00` : value));
 const num = (value: string) => Number(String(value).replace(/\s/g, '').replace(/\.(?=\d{3}(\D|$))/g, '').replace(',', '.'));
 const newId = () => Math.random().toString(36).slice(2, 10);
-const CSV_TEMPLATE = 'categoria;prodotto;dettaglio;unita;quantita;prezzo;prezzo_sito;minimo;note\nVolantini;Volantino A5;Patinata opaca 170 g fronte/retro;pz;500;0,09;0,12;500;Consegna in 3 giorni\nVolantini;Volantino A5;Patinata opaca 170 g fronte/retro;pz;1000;0,07;;;\n';
+const CSV_TEMPLATE = 'categoria;prodotto;dettaglio;unita;quantita;prezzo;prezzo_sito;minimo;note\nVolantini;Volantino A5;Patinata opaca 170 g fronte/retro;pz;500;0,09;0,12;500;Consegna in 3 giorni\nVolantini;Volantino A5;Patinata opaca 170 g fronte/retro;pz;1000;0,07;;;\nStriscioni;Striscione in PVC;PVC 510 g con occhielli;mq;1;14;18;1;Minimo fatturato 1 mq a pezzo\nStriscioni;Striscione in PVC;PVC 510 g con occhielli;mq;10;11;;;\n';
 
 // Back-office list of clients with their price list status.
 export function AdminPriceListIndex({clients}: {clients: AdminPriceListClient[]}) {
@@ -110,8 +110,8 @@ export function AdminPriceListEditor({companyId, clientName, initial}: {companyI
       <div className="pl-table__head"><span>Prodotto</span><span>Prezzi per quantità</span><span>Sito</span><span /></div>
       {items.map((item) => <article className="pl-table__row" key={item.id}>
         <div className="pl-prod"><span className="lp-img lp-img--sm">{item.imageUrl ? <img alt="" src={item.imageUrl} /> : <Package size={20} />}</span><div>{item.category ? <small>{item.category}</small> : null}<strong>{item.title}</strong>{item.detail ? <p>{item.detail}</p> : null}{item.note ? <em>{item.note}</em> : null}</div></div>
-        <div className="pl-tiers">{item.tiers.map((tier) => <span key={tier.minQty}><small>{qty(tier.minQty)}+ {item.unit}</small><b>{money(tier.price)}</b></span>)}</div>
-        <div className="pl-site">{item.listPrice ? money(item.listPrice) : '—'}{item.minQty > 1 ? <small>min. {qty(item.minQty)}</small> : null}</div>
+        <div className="pl-tiers">{item.pricing === 'area' ? <span className="pl-area"><small>al mq</small><b>Base × altezza</b></span> : null}{item.tiers.map((tier) => <span key={tier.minQty}><small>{item.pricing === 'area' ? `da ${tier.minQty} mq` : `${qty(tier.minQty)}+ ${item.unit}`}</small><b>{money(tier.price)}{item.pricing === 'area' ? '/mq' : ''}</b></span>)}</div>
+        <div className="pl-site">{item.listPrice ? `${money(item.listPrice)}${item.pricing === 'area' ? '/mq' : ''}` : '—'}{item.pricing === 'area' ? (item.minArea ? <small>min. {item.minArea} mq/pz</small> : null) : item.minQty > 1 ? <small>min. {qty(item.minQty)}</small> : null}</div>
         <div className="pl-row-actions"><button className="client-action" onClick={() => setEditing(item)} type="button"><Pencil size={14} />Modifica</button><button aria-label={`Togli ${item.title}`} className="client-action client-action--ghost" onClick={() => remove(item)} type="button"><Trash2 size={14} /></button></div>
       </article>)}
     </div> : <section className="pm-empty"><span><Tags size={26} /></span><div><strong>Listino vuoto</strong><p>Aggiungi i prodotti dal catalogo Shopify, come voce libera o importando un CSV. Il cliente vedrà il listino appena lo salvi.</p></div></section>}
@@ -139,7 +139,7 @@ function CatalogPicker({onClose, onPick}: {onClose: () => void; onPick: (item: C
     }, 300);
     return () => window.clearTimeout(timer);
   }, [query]);
-  const pick = (product: CatalogProduct, variant: CatalogProduct['variants'][number]) => onPick({id: newId(), category: '', title: product.title, detail: variant.title === 'Default Title' ? '' : variant.title, productId: product.id, variantId: variant.id, imageUrl: product.imageUrl, listPrice: variant.price || null, unit: 'pz', tiers: [{minQty: 1, price: variant.price || 0}], minQty: 1, note: ''});
+  const pick = (product: CatalogProduct, variant: CatalogProduct['variants'][number]) => onPick({id: newId(), category: '', title: product.title, detail: variant.title === 'Default Title' ? '' : variant.title, productId: product.id, variantId: variant.id, imageUrl: product.imageUrl, listPrice: variant.price || null, pricing: 'unit', minArea: 0, unit: 'pz', tiers: [{minQty: 1, price: variant.price || 0}], minQty: 1, note: ''});
   return <div aria-modal="true" className="modal-backdrop" role="dialog"><section className="client-request-modal pl-modal"><header className="client-request-modal__head"><div><h2>Aggiungi dal catalogo</h2><p>Cerca un prodotto WowStampa e scegli la variante: poi imposti il prezzo riservato.</p></div><button aria-label="Chiudi" className="modal-close" onClick={onClose} type="button"><X size={19} /></button></header>
     <div className="client-request-modal__body">
       <label className="lp-search pl-search"><Search size={16} /><input autoFocus onChange={(event) => setQuery(event.target.value)} placeholder="Es. volantini, t-shirt, adesivi…" value={query} />{state === 'loading' ? <Loader2 className="spin" size={16} /> : null}</label>
@@ -154,18 +154,19 @@ function CatalogPicker({onClose, onPick}: {onClose: () => void; onPick: (item: C
 
 function ItemModal({item, categories, onClose, onSave}: {item: ClientPriceItem | null; categories: string[]; onClose: () => void; onSave: (item: ClientPriceItem) => void}) {
   const [tiers, setTiers] = useState<Array<{minQty: string; price: string}>>(() => (item?.tiers.length ? item.tiers : [{minQty: 1, price: 0}]).map((tier) => ({minQty: String(tier.minQty), price: tier.price ? String(tier.price).replace('.', ',') : ''})));
+  const [pricing, setPricing] = useState<'unit' | 'area'>(item?.pricing || 'unit');
   const [error, setError] = useState('');
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    const parsed: Tier[] = tiers.map((tier) => ({minQty: Math.round(num(tier.minQty)), price: num(tier.price)})).filter((tier) => tier.minQty >= 1 && Number.isFinite(tier.price) && tier.price >= 0);
+    const parsed: Tier[] = tiers.map((tier) => ({minQty: pricing === 'area' ? Math.max(0.01, num(tier.minQty) || 0.01) : Math.round(num(tier.minQty)), price: num(tier.price)})).filter((tier) => tier.minQty > 0 && Number.isFinite(tier.price) && tier.price >= 0);
     if (!parsed.length || parsed.length !== tiers.length) { setError('Inserisci quantità e prezzo per ogni scaglione.'); return; }
     if (new Set(parsed.map((tier) => tier.minQty)).size !== parsed.length) { setError('Due scaglioni hanno la stessa quantità.'); return; }
     const listPrice = String(form.get('listPrice') || '').trim();
     onSave({
       id: item?.id || newId(), category: String(form.get('category') || '').trim(), title: String(form.get('title') || '').trim(), detail: String(form.get('detail') || '').trim(),
       productId: item?.productId || null, variantId: item?.variantId || null, imageUrl: item?.imageUrl || null,
-      listPrice: listPrice ? num(listPrice) : null, unit: String(form.get('unit') || 'pz').trim() || 'pz',
+      listPrice: listPrice ? num(listPrice) : null, pricing, minArea: pricing === 'area' ? Math.max(0, num(String(form.get('minArea') || '0')) || 0) : 0, unit: pricing === 'area' ? 'mq' : String(form.get('unit') || 'pz').trim() || 'pz',
       tiers: parsed.sort((a, b) => a.minQty - b.minQty), minQty: Math.max(1, Math.round(num(String(form.get('minQty') || '1'))) || 1), note: String(form.get('note') || '').trim(),
     });
   }
@@ -174,12 +175,13 @@ function ItemModal({item, categories, onClose, onSave}: {item: ClientPriceItem |
       <div className="client-request-modal__body ap-form">
         <label className="ap-field"><span>Categoria</span><input defaultValue={item?.category || ''} list="pl-categories" maxLength={60} name="category" placeholder="Es. Volantini" /><datalist id="pl-categories">{categories.map((value) => <option key={value} value={value} />)}</datalist></label>
         <label className="ap-field"><span>Nome <b>*</b></span><input defaultValue={item?.title || ''} maxLength={160} name="title" required /></label>
+        <div className="ap-field ap-wide"><span>Come si calcola il prezzo</span><div className="ap-seg ap-seg--wide"><button className={pricing === 'unit' ? 'is-on' : ''} onClick={() => setPricing('unit')} type="button">Al pezzo</button><button className={pricing === 'area' ? 'is-on' : ''} onClick={() => setPricing('area')} type="button">Al metro quadro (base × altezza)</button></div></div>
         <label className="ap-field ap-wide"><span>Dettagli</span><input defaultValue={item?.detail || ''} maxLength={400} name="detail" placeholder="Formato, carta, stampa, finiture…" /></label>
-        <div className="ap-field ap-wide"><span>Prezzi per quantità <b>*</b> <small>prezzo unitario IVA esclusa</small></span>
-          <div className="pl-tier-editor">{tiers.map((tier, index) => <div key={index}><label>Da<input inputMode="numeric" onChange={(event) => setTiers((current) => current.map((entry, position) => position === index ? {...entry, minQty: event.target.value} : entry))} value={tier.minQty} /></label><label>Prezzo €<input inputMode="decimal" onChange={(event) => setTiers((current) => current.map((entry, position) => position === index ? {...entry, price: event.target.value} : entry))} placeholder="0,00" value={tier.price} /></label>{tiers.length > 1 ? <button aria-label="Togli scaglione" onClick={() => setTiers((current) => current.filter((_, position) => position !== index))} type="button"><X size={14} /></button> : null}</div>)}
+        <div className="ap-field ap-wide"><span>{pricing === 'area' ? 'Prezzo al mq' : 'Prezzi per quantità'} <b>*</b> <small>{pricing === 'area' ? 'in base ai mq totali dell’ordine, IVA esclusa' : 'prezzo unitario IVA esclusa'}</small></span>
+          <div className="pl-tier-editor">{tiers.map((tier, index) => <div key={index}><label>{pricing === 'area' ? 'Da mq' : 'Da pezzi'}<input inputMode={pricing === 'area' ? 'decimal' : 'numeric'} onChange={(event) => setTiers((current) => current.map((entry, position) => position === index ? {...entry, minQty: event.target.value} : entry))} value={tier.minQty} /></label><label>{pricing === 'area' ? '€ al mq' : 'Prezzo €'}<input inputMode="decimal" onChange={(event) => setTiers((current) => current.map((entry, position) => position === index ? {...entry, price: event.target.value} : entry))} placeholder="0,00" value={tier.price} /></label>{tiers.length > 1 ? <button aria-label="Togli scaglione" onClick={() => setTiers((current) => current.filter((_, position) => position !== index))} type="button"><X size={14} /></button> : null}</div>)}
             {tiers.length < 12 ? <button className="pl-add-tier" onClick={() => setTiers((current) => [...current, {minQty: '', price: ''}])} type="button"><Plus size={14} /> Aggiungi scaglione</button> : null}</div></div>
-        <label className="ap-field"><span>Prezzo sul sito <small>per mostrare il risparmio</small></span><input defaultValue={item?.listPrice ? String(item.listPrice).replace('.', ',') : ''} inputMode="decimal" name="listPrice" placeholder="0,00" /></label>
-        <div className="pl-two"><label className="ap-field"><span>Minimo</span><input defaultValue={item?.minQty || 1} inputMode="numeric" name="minQty" /></label><label className="ap-field"><span>Unità</span><input defaultValue={item?.unit || 'pz'} maxLength={20} name="unit" /></label></div>
+        <label className="ap-field"><span>Prezzo sul sito{pricing === 'area' ? ' al mq' : ''} <small>per mostrare il risparmio</small></span><input defaultValue={item?.listPrice ? String(item.listPrice).replace('.', ',') : ''} inputMode="decimal" name="listPrice" placeholder="0,00" /></label>
+        {pricing === 'area' ? <div className="pl-two"><label className="ap-field"><span>Minimo fatturato <small>mq a pezzo</small></span><input defaultValue={item?.minArea ? String(item.minArea).replace('.', ',') : ''} inputMode="decimal" name="minArea" placeholder="Es. 1" /></label><label className="ap-field"><span>Pezzi minimi</span><input defaultValue={item?.minQty || 1} inputMode="numeric" name="minQty" /></label></div> : <div className="pl-two"><label className="ap-field"><span>Minimo</span><input defaultValue={item?.minQty || 1} inputMode="numeric" name="minQty" /></label><label className="ap-field"><span>Unità</span><input defaultValue={item?.unit || 'pz'} maxLength={20} name="unit" /></label></div>}
         <label className="ap-field ap-wide"><span>Nota per il cliente</span><input defaultValue={item?.note || ''} maxLength={300} name="note" placeholder="Es. Consegna in 3 giorni lavorativi" /></label>
         {error ? <p className="form-error ap-wide">{error}</p> : null}
       </div>
@@ -205,11 +207,14 @@ function parseCsv(text: string): ClientPriceItem[] {
     const title = get(at.title); const price = num(get(at.price));
     if (!title || !Number.isFinite(price)) continue;
     const key = [get(at.category), title, get(at.detail)].join('|').toLowerCase();
-    const minQty = Math.max(1, Math.round(num(get(at.qty))) || 1);
+    const isArea = /^(mq|m2|m²)$/i.test(get(at.unit));
+    const rawQty = num(get(at.qty));
+    const minQty = isArea ? (rawQty > 0 ? rawQty : 1) : Math.max(1, Math.round(rawQty) || 1);
     const existing = merged.get(key);
     if (existing) { if (!existing.tiers.some((tier) => tier.minQty === minQty)) existing.tiers.push({minQty, price}); continue; }
     const site = num(get(at.site)); const min = Math.round(num(get(at.min)));
-    merged.set(key, {id: newId(), category: get(at.category), title, detail: get(at.detail), productId: null, variantId: null, imageUrl: null, listPrice: Number.isFinite(site) && site > 0 ? site : null, unit: get(at.unit) || 'pz', tiers: [{minQty, price}], minQty: Number.isFinite(min) && min > 0 ? min : minQty, note: get(at.note)});
+    const minRaw = num(get(at.min));
+    merged.set(key, {id: newId(), category: get(at.category), title, detail: get(at.detail), productId: null, variantId: null, imageUrl: null, listPrice: Number.isFinite(site) && site > 0 ? site : null, pricing: isArea ? 'area' : 'unit', minArea: isArea && Number.isFinite(minRaw) && minRaw > 0 ? minRaw : 0, unit: isArea ? 'mq' : get(at.unit) || 'pz', tiers: [{minQty, price}], minQty: isArea ? 1 : Number.isFinite(min) && min > 0 ? min : minQty, note: get(at.note)});
   }
   return [...merged.values()].map((item) => ({...item, tiers: item.tiers.sort((a, b) => a.minQty - b.minQty)}));
 }
