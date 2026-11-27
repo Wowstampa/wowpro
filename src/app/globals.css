@@ -2313,3 +2313,16 @@ textarea.bk-input { resize: vertical; line-height: 1.5; }
 .fx-road__empty { padding: 22px 12px; border: 1.5px dashed #dbe2ea; border-radius: 14px; color: #8a95a5; font-size: 12.5px; text-align: center; }
 @media (max-width: 900px) { .fx-roadmap { grid-template-columns: 1fr; } }
 @media (max-width: 560px) { .fx-scope { width: 100%; overflow-x: auto; } .fx-tools__spacer { display: none; } }
+/* Team: Airtable access sync */
+.team-toolbar__actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.directory-notice { margin: 0 0 12px; padding: 10px 14px; border-radius: 10px; background: #eaf6ef; color: #0b7a39; font-size: 13px; font-weight: 700; }
+.team-sync-hint { margin: 0 0 14px; color: #6b7686; font-size: 12.5px; line-height: 1.5; }
+.team-sync-hint b { color: #172130; }
+.team-sync { margin: 0 0 16px; padding: 16px 18px; display: grid; gap: 14px; border: 1px solid #cfe9da; border-radius: 16px; background: #f8fcf9; }
+.team-sync > header { display: flex; align-items: center; gap: 8px; color: #0b7a39; }
+.team-sync h4 { margin: 0 0 6px; color: #6b7686; font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+.team-sync ul { margin: 0; padding: 0; display: grid; gap: 6px; list-style: none; }
+.team-sync li { padding: 9px 12px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; border-radius: 10px; background: white; font-size: 13px; }
+.team-sync li span { font-weight: 700; }
+.team-sync li small { color: #6b7686; font-size: 12px; }
+.team-sync li .client-action { margin-left: auto; }
