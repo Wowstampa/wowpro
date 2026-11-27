@@ -1,7 +1,7 @@
 'use client';
 
 import {FormEvent, useState} from 'react';
-import {Archive, Check, Coins, Pencil, RotateCcw, Search, UserRoundPlus, X} from 'lucide-react';
+import {Archive, Check, Coins, Pencil, RotateCcw, Search, UserRoundPlus, X, Tags} from 'lucide-react';
 
 export type AdminClient = {
   recordId: string;
@@ -90,7 +90,7 @@ function ClientRow({archived, client, isRestoring, onArchive, onEdit, onCredits,
       <CreditBalance current={client.includedCredits} label="inclusi" />
       <div><strong className="extra-credit">{formatNumber(client.extraCredits)}</strong><small>crediti extra</small></div>
       <div><strong>{client.accountManager || 'Non assegnato'}</strong><small>{client.shopifyCustomerId ? 'Shopify collegato' : 'Shopify non collegato'}</small></div>
-      <div className="client-actions">{archived ? <button className="client-action" disabled={isRestoring} onClick={onRestore} type="button"><RotateCcw size={15} />{isRestoring ? 'Ripristino...' : 'Ripristina'}</button> : <><button className="client-action" onClick={onEdit} type="button"><Pencil size={15} />Modifica</button><button className="client-action client-action--primary" onClick={onCredits} type="button"><Coins size={16} />Crediti</button><button aria-label={`Archivia ${client.companyName}`} className="client-action client-action--archive" onClick={onArchive} type="button"><Archive size={15} /></button></>}</div>
+      <div className="client-actions">{archived ? <button className="client-action" disabled={isRestoring} onClick={onRestore} type="button"><RotateCcw size={15} />{isRestoring ? 'Ripristino...' : 'Ripristina'}</button> : <><button className="client-action" onClick={onEdit} type="button"><Pencil size={15} />Modifica</button><a aria-label={`Listino di ${client.companyName}`} className="client-action" href={`/admin/listini?r=${client.recordId}`} title="Listino riservato"><Tags size={15} />Listino</a><button className="client-action client-action--primary" onClick={onCredits} type="button"><Coins size={16} />Crediti</button><button aria-label={`Archivia ${client.companyName}`} className="client-action client-action--archive" onClick={onArchive} type="button"><Archive size={15} /></button></>}</div>
       <span className="sr-only">Saldo totale: {formatNumber(totalCredits)} crediti</span>
     </article>
   );

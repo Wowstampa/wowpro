@@ -16,6 +16,7 @@ import {
   Palette,
   FolderOpen,
   Gift,
+  Tags,
   Plus,
   Settings,
   ChevronUp,
@@ -54,7 +55,8 @@ function getClientLinks(notificationCounts: AdminNotificationCounts, locked: boo
   // Grouped by what the client is doing; the Richieste badge counts only what waits for the client.
   {href: '/dashboard/richieste', label: 'Richieste', icon: MessageSquareText, count: notificationCounts.requests || undefined, section: 'LAVORI'},
   {href: '/dashboard/ordini', label: 'Ordini', icon: PackageCheck},
-  {href: '/dashboard/promo', label: 'In anteprima', icon: Gift, section: 'PROMOZIONI', tag: promoTag},
+  {href: '/dashboard/listino', label: 'Il tuo listino', icon: Tags, section: 'VANTAGGI'},
+  {href: '/dashboard/promo', label: 'In anteprima', icon: Gift, tag: promoTag},
   {href: '/dashboard/brand-kit', label: 'Brand kit', icon: Palette, section: 'IL TUO BRAND'},
   {href: '/dashboard/file', label: 'File', icon: FolderOpen},
   {href: locked ? '/dashboard/abbonamento' : '/dashboard/crediti', label: 'Piano e crediti', icon: Crown, section: 'ACCOUNT', match: ['/dashboard/crediti', '/dashboard/abbonamento', '/dashboard/fatture']},
@@ -77,6 +79,7 @@ function getAdminLinks(notificationCounts: AdminNotificationCounts, isAdministra
   {href: '/admin/messaggi', label: 'Messaggi', icon: MessagesSquare, count: notificationCounts.support || undefined},
   {href: '/admin/crediti', label: 'Crediti', icon: BadgeEuro},
   {href: '/admin/feedback', label: 'Feedback & idee', icon: Lightbulb, count: notificationCounts.feedback || undefined, section: 'COMMUNITY'},
+  {href: '/admin/listini', label: 'Listini', icon: Tags, section: 'VANTAGGI'},
   {href: '/admin/promo', label: 'Promo', icon: Gift},
   ];
   if (isAdministrator) links.push({href: '/admin/team-ruoli', label: 'Team & ruoli', icon: UsersRound, section: 'AMMINISTRAZIONE'});

@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import {ArrowLeft, ArrowRight, Coins, Gift, Headphones, LayoutDashboard, Lightbulb, Lock, MessageSquareText, Package, Palette, FolderOpen, Settings} from 'lucide-react';
+import {ArrowLeft, ArrowRight, Coins, Gift, Tags, Headphones, LayoutDashboard, Lightbulb, Lock, MessageSquareText, Package, Palette, FolderOpen, Settings} from 'lucide-react';
 
 const SECTIONS: Record<string, {label: string; text: string; icon: typeof Lock}> = {
   workspace: {label: 'La tua Dashboard', text: 'Il workspace con richieste in corso, ordini, crediti e il tuo account manager dedicato.', icon: LayoutDashboard},
@@ -11,6 +11,7 @@ const SECTIONS: Record<string, {label: string; text: string; icon: typeof Lock}>
   ordini: {label: 'Ordini', text: 'Lo storico dei tuoi ordini, i pagamenti e le spedizioni in un unico posto.', icon: Package},
   crediti: {label: 'Crediti', text: 'I crediti grafici inclusi ogni mese, quelli extra e tutti i movimenti.', icon: Coins},
   supporto: {label: 'Messaggi', text: 'Il canale diretto con il tuo account manager dedicato.', icon: Headphones},
+  listino: {label: 'Il tuo listino', text: 'I prezzi riservati concordati con WowStampa per la tua azienda, già applicati nei preventivi.', icon: Tags},
   promo: {label: 'Promo in anteprima', text: 'Le offerte WowStampa sbloccate in anticipo per i clienti WOWPRO, prima di tutti gli altri.', icon: Gift},
   feedback: {label: 'Feedback & idee', text: 'Proponi idee e vota le novità della piattaforma insieme agli altri clienti.', icon: Lightbulb},
 };
