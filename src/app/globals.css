@@ -2629,3 +2629,7 @@ textarea.bk-input { resize: vertical; line-height: 1.5; }
 .pl-site s { color: #9aa4b2; }
 .pl-badge { margin-left: 6px; padding: 2px 7px; border-radius: 999px; background: #f1f4f7; color: #8a95a5; font-size: 10px; font-style: normal; font-weight: 800; vertical-align: 2px; }
 .pl-badge--on { background: #eaf6ef; color: #0b7a39; }
+/* Quote configurator: leave the choice to the account manager */
+.qc__am { display: inline-flex; align-items: center; gap: 6px; border-style: dashed !important; border-color: #b9e0c8 !important; background: #f8fcf9 !important; color: #0b7a39 !important; font-weight: 700; }
+.qc__am.is-active { border-style: solid !important; border-color: var(--green) !important; background: #eaf6ef !important; }
+.qc__swatches .qc__am { align-self: center; padding: 8px 12px; border: 1.5px dashed #b9e0c8; border-radius: 10px; font: inherit; font-size: 12.5px; cursor: pointer; }
