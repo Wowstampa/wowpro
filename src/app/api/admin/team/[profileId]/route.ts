@@ -3,6 +3,7 @@ import {z} from 'zod';
 
 import {getCurrentProfile} from '@/lib/auth';
 import {createAdminClient} from '@/lib/supabase/admin.server';
+import {writeTeamMemberToAirtable} from '@/lib/access-sync';
 
 const updateOperatorSchema = z.object({
   fullName: z.string().trim().min(2).max(120),
@@ -29,7 +30,11 @@ export async function PATCH(request: Request, {params}: {params: Promise<{profil
       const {error: phoneError} = await createAdminClient().from('profiles').update({phone: parsed.data.phone || null}).eq('id', profileId);
       if (phoneError) console.error('[Team phone]', phoneError); else phone = parsed.data.phone || null;
     }
-    return NextResponse.json({operator: {...data, phone}});
+    // Airtable "Utenti" is the source of truth: keep it aligned or the next sync would undo this change.
+    let warning: string | undefined;
+    try { await writeTeamMemberToAirtable({email: data.email, fullName: data.full_name || parsed.data.fullName, role: parsed.data.role, status: parsed.data.status}); }
+    catch (airtableError) { console.error('[Team Airtable]', airtableError); warning = 'Salvato nel portale, ma non in Airtable: aggiorna la tabella Utenti a mano, altrimenti la prossima sincronizzazione annulla la modifica.'; }
+    return NextResponse.json({operator: {...data, phone}, warning});
   } catch (error) {
     console.error('[Team update]', error);
     return NextResponse.json({error: 'Impossibile aggiornare l’operatore.'}, {status: 502});
