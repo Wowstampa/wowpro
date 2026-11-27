@@ -4,6 +4,7 @@ import {z} from 'zod';
 import {getCurrentProfile} from '@/lib/auth';
 import {createWowproClient, nextWowproClientId} from '@/lib/integrations/airtable';
 import {createAdminClient} from '@/lib/supabase/admin.server';
+import {linkClientAccount} from '@/lib/client-login-link';
 
 const createSchema = z.object({
   ragione_sociale: z.string().trim().min(1).max(200),
@@ -75,7 +76,9 @@ export async function POST(request: Request) {
       const {data: invitation, error: invitationError} = await admin.auth.admin.inviteUserByEmail(email, {redirectTo: `${origin}/auth/callback?next=/auth/set-password`});
       if (invitationError || !invitation.user) {
         if (invitationError?.message.toLowerCase().includes('already')) {
-          warning = 'Cliente creato. Esiste già un account con questa email, quindi non è stato inviato un nuovo invito.';
+          // The person already has an account (maybe as a former team member): it becomes this client's login.
+          const linked = await linkClientAccount(email, company.id, profile.id);
+          warning = linked === 'self' ? 'Cliente creato, ma l’email è quella del tuo account: usa un’altra email per l’accesso del cliente.' : 'Cliente creato. Esisteva già un account con questa email: ora accede come cliente con la sua password attuale.';
         } else {
           throw invitationError || new Error('Invito non creato.');
         }
